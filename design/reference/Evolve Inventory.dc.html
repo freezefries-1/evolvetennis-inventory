@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/sportcraft-design-system-1803c2a9-3a3c-4732-aadf-c605d1f21fa4/styles.css">
+<script src="https://unpkg.com/lucide@0.544.0/dist/umd/lucide.min.js"></script>
+<script src="_ds/sportcraft-design-system-1803c2a9-3a3c-4732-aadf-c605d1f21fa4/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap">
+<style>:root{--font-display:"Manrope",system-ui,sans-serif;--font-body:"Manrope",system-ui,sans-serif;--font-mono:"Manrope",system-ui,sans-serif}body{margin:0;background:#FAF9F6;font-family:"Manrope",system-ui,sans-serif;font-variant-numeric:tabular-nums;color:#101418;-webkit-font-smoothing:antialiased}button:not([data-plain]){font-weight:600!important}a{color:#12573F}a:hover{color:#0B3227}*{box-sizing:border-box}select:focus,button:focus-visible{outline:none;box-shadow:0 0 0 2px #FAF9F6,0 0 0 4px #C2DC42}</style>
+</helmet>
+<div style="display:flex;min-height:100vh;background:#FAF9F6">
+<aside style="width:{{ sideW }};flex:0 0 auto;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;gap:2px;padding:20px 12px;background:#0B3227;overflow-y:auto">
+<div style="display:flex;align-items:center;gap:9px;padding:2px 10px 18px;min-height:44px">
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span style="font-family:'Manrope',sans-serif;font-weight:700;font-size:18px;letter-spacing:-0.022em;color:#FFFFFF">Evolve Tennis</span><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10px;letter-spacing:0.06em;text-transform:uppercase;color:#D6F25B;border:1px solid #3E8E73;border-radius:3px;padding:2px 5px">Stock</span></sc-if>
+<sc-if value="{{ narrow }}"><span style="font-family:'Manrope',sans-serif;font-weight:700;font-size:18px;color:#FFFFFF">ET</span></sc-if>
+</div>
+<sc-for list="{{ nav }}" as="n" hint-placeholder-count="8">
+<sc-if value="{{ n.hasGroup }}"><div style="padding:16px 10px 6px;font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#6FA793">{{ n.group }}</div></sc-if>
+<button onClick="{{ n.go }}" title="{{ n.label }}" style="display:flex;align-items:center;gap:11px;height:38px;padding:0 10px;border-radius:5px;border:none;cursor:pointer;width:100%;text-align:left;font-family:'Manrope',sans-serif;font-size:14.5px;font-weight:600;background:{{ n.bg }};color:{{ n.fg }};transition:background 120ms cubic-bezier(0.2,0.6,0.2,1)">
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Icon" name="{{ n.icon }}" size="{{ 18 }}" hint-size="18px,18px"></x-import>
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}"><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ n.label }}</span><sc-if value="{{ n.hasCount }}"><span style="font-family:'Manrope',sans-serif;font-size:11.5px;color:#0B3227;background:#D6F25B;border-radius:3px;padding:1px 6px">{{ n.count }}</span></sc-if></sc-if>
+</button>
+</sc-for>
+<div style="flex:1"></div>
+<sc-if value="{{ wide }}" hint-placeholder-val="{{ true }}">
+<div style="padding:14px 10px 0;border-top:1px solid #0F4436;display:flex;flex-direction:column;gap:6px">
+<span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#6FA793">Today · {{ todayLabel }}</span>
+<button data-plain="1" onClick="{{ resetData }}" style="background:none;border:none;padding:0;text-align:left;cursor:pointer;font-family:'Manrope',sans-serif;font-size:13px;color:#AFCCC0;text-decoration:underline;text-underline-offset:3px">Reset sample data</button>
+</div>
+</sc-if>
+</aside>
+<main style="flex:1;min-width:0;display:flex;flex-direction:column">
+<header style="position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:16px;min-height:64px;padding:10px 28px;border-bottom:1px solid #E3E7E9;background:#FFFFFF;flex-wrap:wrap">
+<div style="display:flex;flex-direction:column;gap:2px;flex:1;min-width:180px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">{{ eyebrow }}</span><h1 style="font-family:'Manrope',sans-serif;font-size:20px;letter-spacing:-0.012em;font-weight:700;margin:0">{{ title }}</h1></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<sc-if value="{{ isProducts }}"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="ghost" size="md" iconLeft="plus" onClick="{{ openVariant }}" hint-size="130px,38px">Add variant</x-import></sc-if>
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="secondary" size="md" iconLeft="package-plus" onClick="{{ openPurchaseBlank }}" hint-size="160px,38px">Record purchase</x-import>
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="primary" size="md" iconLeft="receipt" onClick="{{ openSale }}" hint-size="130px,38px">Record sale</x-import>
+</div>
+</header>
+<div style="flex:1;padding:28px 28px 64px;display:flex;flex-direction:column;gap:20px;max-width:1440px;width:100%">
+
+<!-- DASHBOARD A: Overview -->
+<sc-if value="{{ dashA }}" hint-placeholder-val="{{ true }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px">
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:22px 24px;display:flex;flex-direction:column;gap:10px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Inventory value</span><span style="font-family:'Manrope',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.016em">{{ k.invCost }}</span><span style="font-size:13.5px;color:#5A646D">At cost · {{ k.invRetail }} at retail</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:22px 24px;display:flex;flex-direction:column;gap:10px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Sales · last 30 days</span><span style="font-family:'Manrope',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.016em">{{ k.rev30 }}</span><span style="font-size:13.5px;color:#5A646D"><span style="font-family:'Manrope',sans-serif;color:{{ k.deltaColor }}">{{ k.delta }}</span> vs previous 30 days</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:22px 24px;display:flex;flex-direction:column;gap:10px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Gross profit · 30 days</span><span style="font-family:'Manrope',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.016em">{{ k.profit30 }}</span><span style="font-size:13.5px;color:#5A646D"><span style="font-family:'Manrope',sans-serif">{{ k.margin30 }}</span> margin · {{ k.units30 }} units sold</span></div>
+<button data-plain="1" onClick="{{ goLow }}" style="text-align:left;cursor:pointer;font:inherit;color:inherit;background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:22px 24px;display:flex;flex-direction:column;gap:10px" style-hover="box-shadow:0 2px 6px rgba(16,20,24,0.08);border-color:#C7CDD1"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Low stock</span><span style="font-family:'Manrope',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.016em;color:#9A6B0C">{{ k.lowCount }} <span style="font-family:'Manrope',sans-serif;font-size:13px;color:#79838B">variants</span></span><span style="font-size:13.5px;color:#5A646D">{{ k.outCount }} out of stock · review →</span></button>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:16px">
+<div style="flex:2 1 520px;min-width:0;background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06)">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Sales by month</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Revenue · SGD</span></div>
+<div style="display:flex;align-items:flex-end;gap:14px;height:240px;padding:24px 24px 16px">
+<sc-for list="{{ months }}" as="m" hint-placeholder-count="7"><div style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px"><span style="font-family:'Manrope',sans-serif;font-size:11.5px;color:#434C54">{{ m.short }}</span><div style="flex:1;min-height:0;width:100%;display:flex;align-items:flex-end;justify-content:center"><div style="width:100%;max-width:56px;height:{{ m.pct }}%;background:{{ m.color }};border-radius:4px 4px 0 0;transition:height 240ms cubic-bezier(0.2,0.6,0.2,1)"></div></div><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">{{ m.label }}</span></div></sc-for>
+</div>
+</div>
+<div style="flex:1 1 320px;min-width:0;background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06)">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Needs reordering</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">On hand / min</span></div>
+<sc-for list="{{ lowTop }}" as="v" hint-placeholder-count="5"><div style="display:flex;align-items:center;gap:12px;padding:12px 20px;border-top:1px solid #F0F2F3"><div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:600">{{ v.name }}</div><div style="font-size:13px;color:#79838B;margin-top:2px">{{ v.spec }}</div></div><span style="font-family:'Manrope',sans-serif;font-size:13px;color:{{ v.stockColor }}">{{ v.stock }} / {{ v.threshold }}</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="ghost" size="sm" onClick="{{ v.reorder }}" hint-size="72px,30px">Reorder</x-import></div></sc-for>
+<sc-if value="{{ noLow }}"><div style="padding:24px 20px;font-size:14px;color:#5A646D">Every variant is above its reorder level.</div></sc-if>
+</div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:16px">
+<div style="flex:3 1 520px;min-width:0;background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Recent stock movement</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Last 7 records</span></div>
+<sc-for list="{{ recent }}" as="r" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:86px 74px minmax(0,1fr) 90px 104px;gap:14px;align-items:center;padding:12px 20px;border-top:1px solid #F0F2F3"><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#5A646D">{{ r.id }}</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Badge" tone="{{ r.tone }}" hint-size="70px,22px">{{ r.kind }}</x-import><div style="min-width:0"><div style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.party }}</div><div style="font-size:12.5px;color:#79838B;margin-top:2px">{{ r.date }}</div></div><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:{{ r.unitColor }}">{{ r.units }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ r.total }}</span></div></sc-for>
+</div>
+<div style="flex:2 1 340px;min-width:0;background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Best sellers</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">90 days</span></div>
+<sc-for list="{{ topProducts }}" as="t" hint-placeholder-count="5"><div style="padding:12px 20px;border-top:1px solid #F0F2F3;display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;gap:12px"><div style="min-width:0"><div style="font-size:14.5px;font-weight:600">{{ t.name }}</div><div style="font-size:12.5px;color:#79838B;margin-top:2px">{{ t.spec }} · {{ t.units }} units</div></div><span style="font-family:'Manrope',sans-serif;font-size:13px">{{ t.rev }}</span></div><div style="height:4px;background:#F0F2F3;border-radius:999px;overflow:hidden"><div style="height:100%;width:{{ t.pct }}%;background:#3E8E73;border-radius:999px"></div></div></div></sc-for>
+</div>
+</div>
+</sc-if>
+
+<!-- DASHBOARD B: Stock-first -->
+<sc-if value="{{ dashB }}">
+<div style="display:flex;flex-wrap:wrap;gap:16px">
+<div style="flex:2 1 520px;min-width:0;background:#EFF6F2;border:1px solid #DCEAE3;border-radius:8px;padding:28px;display:flex;flex-direction:column;gap:22px">
+<div style="display:flex;flex-wrap:wrap;gap:28px;align-items:flex-end;justify-content:space-between"><div style="display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#12573F">Inventory value at cost</span><span style="font-family:'Manrope',sans-serif;font-size:40px;font-weight:700;letter-spacing:-0.022em;color:#07231C;line-height:1">{{ k.invCost }}</span></div>
+<div style="display:flex;gap:32px;flex-wrap:wrap"><div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">At retail</span><span style="font-family:'Manrope',sans-serif;font-size:20px;font-weight:700">{{ k.invRetail }}</span></div><div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Units on hand</span><span style="font-family:'Manrope',sans-serif;font-size:20px;font-weight:700">{{ k.units }}</span></div><div style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Variants</span><span style="font-family:'Manrope',sans-serif;font-size:20px;font-weight:700">{{ k.variants }}</span></div></div></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px">
+<sc-for list="{{ catBars }}" as="c" hint-placeholder-count="3"><div style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between"><span style="font-size:14px;font-weight:500">{{ c.label }}</span><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#434C54">{{ c.value }}</span></div><div style="height:6px;background:#DCEAE3;border-radius:999px;overflow:hidden"><div style="height:100%;width:{{ c.pct }}%;background:#12573F;border-radius:999px"></div></div><span style="font-family:'Manrope',sans-serif;font-size:11.5px;color:#5A646D">{{ c.share }} of value</span></div></sc-for>
+</div>
+</div>
+<div style="flex:1 1 280px;min-width:0;display:grid;grid-template-rows:1fr 1fr;gap:16px">
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Sales · last 30 days</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700">{{ k.rev30 }}</span><span style="font-size:13.5px;color:#5A646D"><span style="font-family:'Manrope',sans-serif;color:{{ k.deltaColor }}">{{ k.delta }}</span> vs previous 30 days</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Units out · 30 days</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700">{{ k.units30 }}</span><span style="font-size:13.5px;color:#5A646D">{{ k.unitsIn30 }} units received</span></div>
+</div>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);overflow:hidden">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Needs reordering</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#9A6B0C">{{ k.lowCount }} low · {{ k.outCount }} out</span></div>
+<div style="overflow-x:auto"><div style="min-width:720px">
+<div style="display:grid;grid-template-columns:130px minmax(0,1.6fr) 110px 110px 110px 100px;gap:16px;padding:10px 20px;background:#FAF9F6;border-bottom:1px solid #E3E7E9;font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B"><span>SKU</span><span>Variant</span><span style="text-align:right">On hand</span><span style="text-align:right">Reorder at</span><span>Status</span><span></span></div>
+<sc-for list="{{ lowAll }}" as="v" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:130px minmax(0,1.6fr) 110px 110px 110px 100px;gap:16px;align-items:center;padding:12px 20px;border-top:1px solid #F0F2F3"><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#5A646D">{{ v.id }}</span><div><div style="font-size:14.5px;font-weight:600">{{ v.name }}</div><div style="font-size:13px;color:#79838B;margin-top:2px">{{ v.spec }}</div></div><span style="font-family:'Manrope',sans-serif;font-size:13.5px;text-align:right;color:{{ v.stockColor }}">{{ v.stock }}</span><span style="font-family:'Manrope',sans-serif;font-size:13.5px;text-align:right;color:#5A646D">{{ v.threshold }}</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Badge" tone="{{ v.tone }}" dot="{{ true }}" hint-size="80px,22px">{{ v.status }}</x-import><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="secondary" size="sm" onClick="{{ v.reorder }}" hint-size="80px,30px">Reorder</x-import></div></sc-for>
+</div></div>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Stock by product</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Units · value at cost</span></div>
+<sc-for list="{{ stockByProduct }}" as="p" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,2fr) 80px 110px;gap:16px;align-items:center;padding:12px 20px;border-top:1px solid #F0F2F3"><div><div style="font-size:14.5px;font-weight:600">{{ p.name }}</div><div style="font-size:12.5px;color:#79838B;margin-top:2px">{{ p.kind }} · {{ p.count }} variants</div></div><div style="height:6px;background:#F0F2F3;border-radius:999px;overflow:hidden"><div style="height:100%;width:{{ p.pct }}%;background:#3E8E73;border-radius:999px"></div></div><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ p.units }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ p.value }}</span></div></sc-for>
+</div>
+</sc-if>
+
+<!-- DASHBOARD C: Sales-first -->
+<sc-if value="{{ dashC }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px">
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:22px 24px;display:flex;flex-direction:column;gap:10px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Revenue · 30 days</span><span style="font-family:'Manrope',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.016em">{{ k.rev30 }}</span><span style="font-size:13.5px;color:#5A646D"><span style="font-family:'Manrope',sans-serif;color:{{ k.deltaColor }}">{{ k.delta }}</span> vs previous 30 days</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:22px 24px;display:flex;flex-direction:column;gap:10px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Gross profit · 30 days</span><span style="font-family:'Manrope',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.016em">{{ k.profit30 }}</span><span style="font-size:13.5px;color:#5A646D"><span style="font-family:'Manrope',sans-serif">{{ k.margin30 }}</span> margin</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:22px 24px;display:flex;flex-direction:column;gap:10px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Orders · 30 days</span><span style="font-family:'Manrope',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.016em">{{ k.orders30 }}</span><span style="font-size:13.5px;color:#5A646D">{{ k.units30 }} units · avg {{ k.avgOrder }}</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:22px 24px;display:flex;flex-direction:column;gap:10px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Awaiting payment</span><span style="font-family:'Manrope',sans-serif;font-size:30px;font-weight:700;letter-spacing:-0.016em;color:#B3542F">{{ k.unpaidTotal }}</span><span style="font-size:13.5px;color:#5A646D">{{ k.unpaidCount }} unpaid invoices</span></div>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06)">
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;border-bottom:1px solid #E3E7E9;flex-wrap:wrap"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Revenue and gross profit by month</h3><div style="display:flex;gap:16px;font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D"><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#DCEAE3"></span>Revenue</span><span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:2px;background:#12573F"></span>Gross profit</span></div></div>
+<div style="display:flex;align-items:flex-end;gap:20px;height:260px;padding:24px 24px 16px">
+<sc-for list="{{ months }}" as="m" hint-placeholder-count="7"><div style="flex:1;min-width:0;height:100%;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:8px"><span style="font-family:'Manrope',sans-serif;font-size:11.5px;color:#434C54">{{ m.short }}</span><div style="flex:1;min-height:0;width:100%;display:flex;align-items:flex-end;justify-content:center"><div style="width:100%;max-width:72px;height:{{ m.pct }}%;background:#DCEAE3;border-radius:4px 4px 0 0;display:flex;align-items:flex-end"><div style="width:100%;height:{{ m.profitPct }}%;background:#12573F;border-radius:4px 4px 0 0"></div></div></div><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">{{ m.label }}</span></div></sc-for>
+</div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px">
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Top customers</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">90 days</span></div>
+<sc-for list="{{ topCustomers }}" as="c" hint-placeholder-count="5"><button data-plain="1" onClick="{{ c.open }}" style="width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit;background:none;border:none;border-top:1px solid #F0F2F3;display:flex;justify-content:space-between;gap:12px;padding:12px 20px" style-hover="background:#FAF9F6"><div style="min-width:0"><div style="font-size:14.5px;font-weight:600">{{ c.name }}</div><div style="font-size:12.5px;color:#79838B;margin-top:2px">{{ c.type }} · {{ c.country }} · {{ c.orders }} orders</div></div><span style="font-family:'Manrope',sans-serif;font-size:13px">{{ c.rev }}</span></button></sc-for>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Best sellers</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">90 days</span></div>
+<sc-for list="{{ topProducts }}" as="t" hint-placeholder-count="5"><div style="padding:12px 20px;border-top:1px solid #F0F2F3;display:flex;justify-content:space-between;gap:12px"><div style="min-width:0"><div style="font-size:14.5px;font-weight:600">{{ t.name }}</div><div style="font-size:12.5px;color:#79838B;margin-top:2px">{{ t.spec }} · {{ t.units }} units</div></div><span style="font-family:'Manrope',sans-serif;font-size:13px">{{ t.rev }}</span></div></sc-for>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06)">
+<div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Unpaid invoices</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Oldest first</span></div>
+<sc-for list="{{ unpaidList }}" as="u" hint-placeholder-count="5"><div style="padding:12px 20px;border-top:1px solid #F0F2F3;display:flex;align-items:center;gap:12px"><div style="flex:1;min-width:0"><div style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ u.customer }}</div><div style="font-family:'Manrope',sans-serif;font-size:12px;color:#79838B;margin-top:2px">{{ u.id }} · {{ u.date }} · {{ u.total }}</div></div><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="ghost" size="sm" onClick="{{ u.markPaid }}" hint-size="86px,30px">Mark paid</x-import></div></sc-for>
+<sc-if value="{{ noUnpaid }}"><div style="padding:24px 20px;font-size:14px;color:#5A646D">All invoices are paid.</div></sc-if>
+</div>
+</div>
+</sc-if>
+
+<!-- PRODUCTS -->
+<sc-if value="{{ isProducts }}">
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+<div style="display:inline-flex;gap:2px;padding:3px;background:#F3F1EC;border-radius:6px;border:1px solid #E3E7E9"><sc-for list="{{ catTabs }}" as="t" hint-placeholder-count="4"><button onClick="{{ t.onClick }}" style="height:30px;padding:0 12px;border:none;border-radius:4px;cursor:pointer;font-family:'Manrope',sans-serif;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}<span style="font-family:'Manrope',sans-serif;font-size:11.5px;color:#79838B">{{ t.count }}</span></button></sc-for></div>
+<div style="width:300px;max-width:100%"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" iconLeft="search" placeholder="Search product, SKU, gauge or colour" value="{{ q }}" onChange="{{ setQ }}" hint-size="100%,38px"></x-import></div>
+</div>
+<sc-for list="{{ productList }}" as="p" hint-placeholder-count="3">
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);overflow:hidden">
+<div style="display:flex;align-items:center;gap:14px;padding:16px 20px;flex-wrap:wrap"><div style="flex:1;min-width:200px;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:17px;font-weight:600;letter-spacing:-0.008em">{{ p.name }}</h3><span style="font-size:13.5px;color:#5A646D">{{ p.kind }}</span></div><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Badge" tone="neutral" hint-size="70px,22px">{{ p.category }}</x-import><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#434C54">{{ p.count }} variants · {{ p.units }} units</span></div>
+<div style="overflow-x:auto"><div style="min-width:860px">
+<div style="display:grid;grid-template-columns:132px 80px minmax(0,1fr) 100px 90px 90px 90px 70px 80px 96px;gap:14px;padding:9px 20px;background:#FAF9F6;border-top:1px solid #E3E7E9;border-bottom:1px solid #E3E7E9;font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B"><span>SKU</span><span>Gauge</span><span>Colour</span><span>Pack</span><span style="text-align:right">Cost</span><span style="text-align:right">Distrib.</span><span style="text-align:right">Retail</span><span style="text-align:right">Margin</span><span style="text-align:right">Stock</span><span>Status</span></div>
+<sc-for list="{{ p.variants }}" as="v" hint-placeholder-count="3"><div style="display:grid;grid-template-columns:132px 80px minmax(0,1fr) 100px 90px 90px 90px 70px 80px 96px;gap:14px;align-items:center;padding:11px 20px;border-top:1px solid #F0F2F3" style-hover="background:#FAF9F6"><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#5A646D">{{ v.id }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px">{{ v.gaugeLabel }}</span><span style="display:flex;align-items:center;gap:8px;font-size:14px"><span style="width:10px;height:10px;border-radius:50%;border:1px solid #C7CDD1;background:{{ v.swatch }};flex:0 0 auto"></span>{{ v.colour }}</span><span style="font-size:14px;color:#2A3138">{{ v.pack }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#5A646D">{{ v.costL }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ v.distL }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ v.retailL }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#12573F">{{ v.marginL }}</span><span style="font-family:'Manrope',sans-serif;font-size:13.5px;text-align:right;font-weight:500;color:{{ v.stockColor }}">{{ v.stock }}</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Badge" tone="{{ v.tone }}" dot="{{ true }}" hint-size="80px,22px">{{ v.status }}</x-import></div></sc-for>
+</div></div>
+</div>
+</sc-for>
+<sc-if value="{{ noProducts }}"><div style="padding:40px;text-align:center;font-size:15px;color:#5A646D;background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px">No variants match those filters.</div></sc-if>
+<p style="margin:0;font-size:13px;color:#79838B">Margin is retail price against cost. Distributor margin shows on the Reports page.</p>
+</sc-if>
+
+<!-- STOCK -->
+<sc-if value="{{ isStock }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px">
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Units on hand</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700">{{ k.units }}</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Value at cost</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700">{{ k.invCost }}</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Value at retail</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700">{{ k.invRetail }}</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Below reorder level</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700;color:#9A6B0C">{{ k.lowCount }}</span></div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+<div style="display:inline-flex;gap:2px;padding:3px;background:#F3F1EC;border-radius:6px;border:1px solid #E3E7E9"><sc-for list="{{ stockTabs }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.onClick }}" style="height:30px;padding:0 12px;border:none;border-radius:4px;cursor:pointer;font-family:'Manrope',sans-serif;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}<span style="font-family:'Manrope',sans-serif;font-size:11.5px;color:#79838B">{{ t.count }}</span></button></sc-for></div>
+<div style="width:300px;max-width:100%"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" iconLeft="search" placeholder="Search product, SKU, gauge or colour" value="{{ q }}" onChange="{{ setQ }}" hint-size="100%,38px"></x-import></div>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);overflow:hidden">
+<div style="overflow-x:auto"><div style="min-width:860px">
+<div style="display:grid;grid-template-columns:132px minmax(0,1.6fr) 80px 80px 80px 90px 110px 104px 92px;gap:14px;padding:10px 20px;background:#FAF9F6;border-bottom:1px solid #E3E7E9;font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B"><span>SKU</span><span>Variant</span><span style="text-align:right">In</span><span style="text-align:right">Out</span><span style="text-align:right">On hand</span><span style="text-align:right">Reorder at</span><span style="text-align:right">Value</span><span>Status</span><span></span></div>
+<sc-for list="{{ stockRows }}" as="v" hint-placeholder-count="8"><div style="display:grid;grid-template-columns:132px minmax(0,1.6fr) 80px 80px 80px 90px 110px 104px 92px;gap:14px;align-items:center;padding:11px 20px;border-top:1px solid #F0F2F3" style-hover="background:#FAF9F6"><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#5A646D">{{ v.id }}</span><div style="min-width:0"><div style="font-size:14.5px;font-weight:600">{{ v.name }}</div><div style="font-size:13px;color:#79838B;margin-top:2px">{{ v.spec }}</div></div><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#12573F">+{{ v.inQty }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#5A646D">−{{ v.outQty }}</span><span style="font-family:'Manrope',sans-serif;font-size:14px;font-weight:500;text-align:right;color:{{ v.stockColor }}">{{ v.stock }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#5A646D">{{ v.threshold }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ v.valueL }}</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Badge" tone="{{ v.tone }}" dot="{{ true }}" hint-size="80px,22px">{{ v.status }}</x-import><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="ghost" size="sm" onClick="{{ v.reorder }}" hint-size="80px,30px">Reorder</x-import></div></sc-for>
+</div></div>
+<sc-if value="{{ noStockRows }}"><div style="padding:40px;text-align:center;font-size:15px;color:#5A646D">No variants match those filters.</div></sc-if>
+</div>
+<p style="margin:0;font-size:13px;color:#79838B">On hand = opening stock + purchased − sold. It updates the moment a purchase or sale is recorded.</p>
+</sc-if>
+
+<!-- PURCHASES -->
+<sc-if value="{{ isPurchases }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px">
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Purchase orders · YTD</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700">{{ pk.count }}</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Spent · YTD</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700">{{ pk.total }}</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Units received · YTD</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700">{{ pk.units }}</span></div>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);overflow:hidden">
+<div style="overflow-x:auto"><div style="min-width:720px">
+<div style="display:grid;grid-template-columns:24px 100px 110px minmax(0,1.4fr) 90px 90px 120px;gap:14px;padding:10px 20px;background:#FAF9F6;border-bottom:1px solid #E3E7E9;font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B"><span></span><span>PO</span><span>Date</span><span>Supplier</span><span style="text-align:right">Lines</span><span style="text-align:right">Units</span><span style="text-align:right">Total cost</span></div>
+<sc-for list="{{ purchaseRows }}" as="r" hint-placeholder-count="6">
+<button data-plain="1" onClick="{{ r.toggle }}" style="width:100%;font:inherit;color:inherit;text-align:left;cursor:pointer;background:{{ r.bg }};border:none;border-top:1px solid #F0F2F3;display:grid;grid-template-columns:24px 100px 110px minmax(0,1.4fr) 90px 90px 120px;gap:14px;align-items:center;padding:12px 20px" style-hover="background:#FAF9F6"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Icon" name="{{ r.chev }}" size="{{ 16 }}" color="#79838B" hint-size="16px,16px"></x-import><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#434C54">{{ r.id }}</span><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#5A646D">{{ r.date }}</span><span style="font-size:14.5px;font-weight:600">{{ r.party }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ r.lineCount }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#12573F">+{{ r.units }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ r.total }}</span></button>
+<sc-if value="{{ r.open }}"><div style="padding:4px 20px 16px 58px;background:#FAF9F6"><sc-for list="{{ r.lines }}" as="l" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:132px minmax(0,1fr) 80px 100px 110px;gap:14px;padding:8px 0;border-bottom:1px solid #E3E7E9;align-items:center"><span style="font-family:'Manrope',sans-serif;font-size:12px;color:#5A646D">{{ l.sku }}</span><span style="font-size:14px">{{ l.label }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">× {{ l.qty }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#5A646D">{{ l.unit }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ l.total }}</span></div></sc-for></div></sc-if>
+</sc-for>
+</div></div>
+</div>
+</sc-if>
+
+<!-- SALES -->
+<sc-if value="{{ isSales }}">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:16px">
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Revenue · 30 days</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700">{{ k.rev30 }}</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Orders · 30 days</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700">{{ k.orders30 }}</span></div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 24px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Awaiting payment</span><span style="font-family:'Manrope',sans-serif;font-size:26px;font-weight:700;color:#B3542F">{{ k.unpaidTotal }}</span></div>
+</div>
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+<div style="display:inline-flex;gap:2px;padding:3px;background:#F3F1EC;border-radius:6px;border:1px solid #E3E7E9"><sc-for list="{{ saleTabs }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.onClick }}" style="height:30px;padding:0 12px;border:none;border-radius:4px;cursor:pointer;font-family:'Manrope',sans-serif;font-size:13.5px;font-weight:600;display:flex;align-items:center;gap:6px;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}<span style="font-family:'Manrope',sans-serif;font-size:11.5px;color:#79838B">{{ t.count }}</span></button></sc-for></div>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);overflow:hidden">
+<div style="overflow-x:auto"><div style="min-width:860px">
+<div style="display:grid;grid-template-columns:24px 96px 90px minmax(0,1.4fr) 100px 70px 110px 92px 96px;gap:14px;padding:10px 20px;background:#FAF9F6;border-bottom:1px solid #E3E7E9;font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B"><span></span><span>Invoice</span><span>Date</span><span>Customer</span><span>Price list</span><span style="text-align:right">Units</span><span style="text-align:right">Total</span><span>Payment</span><span></span></div>
+<sc-for list="{{ saleRows }}" as="r" hint-placeholder-count="8">
+<div style="display:grid;grid-template-columns:24px 96px 90px minmax(0,1.4fr) 100px 70px 110px 92px 96px;gap:14px;align-items:center;padding:11px 20px;border-top:1px solid #F0F2F3;background:{{ r.bg }}">
+<button onClick="{{ r.toggle }}" title="Show lines" style="width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:none;border:none;border-radius:4px;cursor:pointer;padding:0;color:#79838B" style-hover="background:#F3F1EC"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Icon" name="{{ r.chev }}" size="{{ 16 }}" hint-size="16px,16px"></x-import></button>
+<span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#434C54">{{ r.id }}</span><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#5A646D">{{ r.date }}</span><div style="min-width:0"><div style="font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ r.party }}</div><div style="font-size:12.5px;color:#79838B;margin-top:2px">{{ r.partyMeta }}</div></div><span style="font-size:13.5px;color:#434C54">{{ r.tier }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">−{{ r.units }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ r.total }}</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Badge" tone="{{ r.payTone }}" dot="{{ true }}" hint-size="70px,22px">{{ r.payText }}</x-import>
+<div><sc-if value="{{ r.unpaid }}"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="ghost" size="sm" onClick="{{ r.markPaid }}" hint-size="86px,30px">Mark paid</x-import></sc-if></div>
+</div>
+<sc-if value="{{ r.open }}"><div style="padding:4px 20px 16px 58px;background:#FAF9F6"><sc-for list="{{ r.lines }}" as="l" hint-placeholder-count="2"><div style="display:grid;grid-template-columns:132px minmax(0,1fr) 80px 100px 110px;gap:14px;padding:8px 0;border-bottom:1px solid #E3E7E9;align-items:center"><span style="font-family:'Manrope',sans-serif;font-size:12px;color:#5A646D">{{ l.sku }}</span><span style="font-size:14px">{{ l.label }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">× {{ l.qty }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#5A646D">{{ l.unit }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ l.total }}</span></div></sc-for></div></sc-if>
+</sc-for>
+</div></div>
+<sc-if value="{{ noSaleRows }}"><div style="padding:40px;text-align:center;font-size:15px;color:#5A646D">No invoices match that filter.</div></sc-if>
+</div>
+</sc-if>
+
+<!-- CUSTOMERS / SUPPLIERS (shared two-pane) -->
+<sc-if value="{{ isParties }}">
+<div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+<div style="flex:1 1 300px;max-width:420px;min-width:0;background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);overflow:hidden">
+<div style="padding:10px 20px;background:#FAF9F6;border-bottom:1px solid #E3E7E9;display:flex;justify-content:space-between;font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B"><span>{{ partyHead }}</span><span>{{ partyValueHead }}</span></div>
+<sc-for list="{{ parties }}" as="c" hint-placeholder-count="6"><button data-plain="1" onClick="{{ c.select }}" style="width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit;border:none;border-top:1px solid #F0F2F3;border-left:3px solid {{ c.edge }};display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 20px 13px 17px;background:{{ c.bg }}" style-hover="background:#FAF9F6"><div style="min-width:0"><div style="font-size:14.5px;font-weight:600">{{ c.name }}</div><div style="font-size:12.5px;color:#79838B;margin-top:2px">{{ c.meta }}</div></div><span style="font-family:'Manrope',sans-serif;font-size:13px;white-space:nowrap">{{ c.total }}</span></button></sc-for>
+</div>
+<div style="flex:2 1 460px;min-width:0;display:flex;flex-direction:column;gap:16px">
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:24px;display:flex;flex-direction:column;gap:20px">
+<div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap"><div style="display:flex;flex-direction:column;gap:4px"><h2 style="margin:0;font-family:'Manrope',sans-serif;font-size:24px;font-weight:700;letter-spacing:-0.012em">{{ sel.name }}</h2><span style="font-size:14px;color:#5A646D">{{ sel.meta }}</span></div><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Badge" tone="brand" hint-size="90px,22px">{{ sel.badge }}</x-import></div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:1px;background:#E3E7E9;border:1px solid #E3E7E9;border-radius:6px;overflow:hidden">
+<sc-for list="{{ sel.stats }}" as="st" hint-placeholder-count="4"><div style="background:#FFFFFF;padding:14px 16px;display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">{{ st.label }}</span><span style="font-family:'Manrope',sans-serif;font-size:19px;font-weight:700;color:{{ st.color }}">{{ st.value }}</span></div></sc-for>
+</div>
+<sc-if value="{{ sel.hasFav }}"><div style="font-size:14px;color:#434C54">Buys most: <strong style="font-weight:600">{{ sel.fav }}</strong></div></sc-if>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);overflow:hidden">
+<div style="padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">{{ historyTitle }}</h3></div>
+<sc-for list="{{ sel.history }}" as="h" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:96px 70px minmax(0,1fr) 110px 76px;gap:14px;align-items:start;padding:12px 20px;border-top:1px solid #F0F2F3"><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#434C54">{{ h.id }}</span><span style="font-family:'Manrope',sans-serif;font-size:12.5px;color:#5A646D">{{ h.date }}</span><span style="font-size:13.5px;color:#2A3138;line-height:1.5">{{ h.summary }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ h.total }}</span><sc-if value="{{ h.hasStatus }}"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Badge" tone="{{ h.tone }}" hint-size="60px,22px">{{ h.status }}</x-import></sc-if></div></sc-for>
+<sc-if value="{{ sel.noHistory }}"><div style="padding:24px 20px;font-size:14px;color:#5A646D">No orders recorded yet.</div></sc-if>
+</div>
+</div>
+</div>
+</sc-if>
+
+<!-- REPORTS -->
+<sc-if value="{{ isReports }}">
+<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between">
+<div style="display:inline-flex;gap:2px;padding:3px;background:#F3F1EC;border-radius:6px;border:1px solid #E3E7E9"><sc-for list="{{ rangeTabs }}" as="t" hint-placeholder-count="3"><button onClick="{{ t.onClick }}" style="height:30px;padding:0 12px;border:none;border-radius:4px;cursor:pointer;font-family:'Manrope',sans-serif;font-size:13.5px;font-weight:600;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button></sc-for></div>
+<span style="font-family:'Manrope',sans-serif;font-size:12px;color:#5A646D">{{ rep.period }}</span>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:16px">
+<sc-for list="{{ rep.stats }}" as="st" hint-placeholder-count="5"><div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);padding:20px 22px;display:flex;flex-direction:column;gap:8px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">{{ st.label }}</span><span style="font-family:'Manrope',sans-serif;font-size:24px;font-weight:700">{{ st.value }}</span></div></sc-for>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);overflow:hidden">
+<div style="padding:16px 20px;border-bottom:1px solid #E3E7E9"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Sales by product</h3></div>
+<div style="overflow-x:auto"><div style="min-width:720px">
+<div style="display:grid;grid-template-columns:minmax(0,1.6fr) 80px 120px 120px 120px 80px;gap:14px;padding:10px 20px;background:#FAF9F6;border-bottom:1px solid #E3E7E9;font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B"><span>Product</span><span style="text-align:right">Units</span><span style="text-align:right">Revenue</span><span style="text-align:right">Cost</span><span style="text-align:right">Profit</span><span style="text-align:right">Margin</span></div>
+<sc-for list="{{ rep.byProduct }}" as="r" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:minmax(0,1.6fr) 80px 120px 120px 120px 80px;gap:14px;align-items:center;padding:11px 20px;border-top:1px solid #F0F2F3"><div><div style="font-size:14.5px;font-weight:600">{{ r.name }}</div><div style="font-size:12.5px;color:#79838B;margin-top:2px">{{ r.kind }}</div></div><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ r.units }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ r.rev }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#5A646D">{{ r.cost }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ r.profit }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#12573F">{{ r.margin }}</span></div></sc-for>
+<div style="display:grid;grid-template-columns:minmax(0,1.6fr) 80px 120px 120px 120px 80px;gap:14px;align-items:center;padding:12px 20px;border-top:1.5px solid #2A3138;font-weight:600"><span style="font-size:14.5px">Total</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ rep.tot.units }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ rep.tot.rev }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ rep.tot.cost }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ rep.tot.profit }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#12573F">{{ rep.tot.margin }}</span></div>
+</div></div>
+</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:16px">
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);overflow:hidden">
+<div style="padding:16px 20px;border-bottom:1px solid #E3E7E9;display:flex;justify-content:space-between"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Sales by customer</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">Share of revenue</span></div>
+<sc-for list="{{ rep.byCustomer }}" as="r" hint-placeholder-count="5"><div style="padding:12px 20px;border-top:1px solid #F0F2F3;display:flex;flex-direction:column;gap:8px"><div style="display:flex;justify-content:space-between;gap:12px"><div style="min-width:0"><div style="font-size:14.5px;font-weight:600">{{ r.name }}</div><div style="font-size:12.5px;color:#79838B;margin-top:2px">{{ r.type }} · {{ r.orders }} orders</div></div><div style="text-align:right"><div style="font-family:'Manrope',sans-serif;font-size:13px">{{ r.rev }}</div><div style="font-family:'Manrope',sans-serif;font-size:12px;color:#79838B;margin-top:2px">{{ r.share }}</div></div></div><div style="height:4px;background:#F0F2F3;border-radius:999px;overflow:hidden"><div style="height:100%;width:{{ r.pct }}%;background:#3E8E73;border-radius:999px"></div></div></div></sc-for>
+</div>
+<div style="background:#FFFFFF;border:1px solid #E3E7E9;border-radius:8px;box-shadow:0 1px 2px rgba(16,20,24,0.06);overflow:hidden">
+<div style="padding:16px 20px;border-bottom:1px solid #E3E7E9;display:flex;justify-content:space-between"><h3 style="margin:0;font-family:'Manrope',sans-serif;font-size:16px;font-weight:600">Stock movement</h3><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:10.5px;letter-spacing:0.06em;text-transform:uppercase;color:#79838B">In · out · now</span></div>
+<sc-for list="{{ rep.movement }}" as="r" hint-placeholder-count="6"><div style="display:grid;grid-template-columns:minmax(0,1fr) 56px 56px 56px;gap:12px;align-items:center;padding:11px 20px;border-top:1px solid #F0F2F3"><div style="min-width:0"><div style="font-size:14px;font-weight:500">{{ r.name }}</div><div style="font-size:12.5px;color:#79838B;margin-top:2px">{{ r.spec }}</div></div><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#12573F">+{{ r.inQ }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;color:#5A646D">−{{ r.outQ }}</span><span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right;font-weight:500;color:{{ r.stockColor }}">{{ r.stock }}</span></div></sc-for>
+</div>
+</div>
+</sc-if>
+</div>
+</main>
+</div>
+
+<!-- DIALOG: purchase -->
+<sc-if value="{{ dlgPurchase }}">
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Dialog" open="{{ true }}" title="Record purchase" description="Stock goes up as soon as you save." width="{{ 760 }}" onClose="{{ closeDialog }}" hint-size="0px,0px">
+<div style="display:flex;flex-direction:column;gap:18px">
+<div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:14px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Supplier</span><select value="{{ draft.supplierId }}" onChange="{{ setSupplier }}" style="height:38px;padding:0 10px;border:1px solid #C7CDD1;border-radius:5px;background:#FFFFFF;font-family:'Manrope',sans-serif;font-size:14.5px;color:#101418;width:100%"><sc-for list="{{ supplierOpts }}" as="o" hint-placeholder-count="2"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Date received</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="date" value="{{ draft.date }}" onChange="{{ setDate }}" hint-size="100%,38px"></x-import></label>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 84px 104px 100px 32px;gap:10px;font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D"><span>Variant</span><span>Qty</span><span>Unit cost</span><span style="text-align:right">Line</span><span></span></div>
+<sc-for list="{{ draftLines }}" as="l" hint-placeholder-count="1"><div style="display:grid;grid-template-columns:minmax(0,1fr) 84px 104px 100px 32px;gap:10px;align-items:center">
+<select value="{{ l.variantId }}" onChange="{{ l.onVariant }}" style="height:38px;padding:0 10px;border:1px solid #C7CDD1;border-radius:5px;background:#FFFFFF;font-family:'Manrope',sans-serif;font-size:14px;color:#101418;width:100%;min-width:0"><option value="">Choose a variant…</option><sc-for list="{{ variantOpts }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select>
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="number" min="0" value="{{ l.qty }}" onChange="{{ l.onQty }}" hint-size="100%,38px"></x-import>
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="number" min="0" step="0.01" value="{{ l.price }}" onChange="{{ l.onPrice }}" hint-size="100%,38px"></x-import>
+<span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ l.lineTotal }}</span>
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.IconButton" icon="x" label="Remove line" size="sm" onClick="{{ l.remove }}" hint-size="30px,30px"></x-import>
+</div></sc-for>
+<div><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="ghost" size="sm" iconLeft="plus" onClick="{{ addLine }}" hint-size="90px,30px">Add line</x-import></div>
+</div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:16px;border-top:1px solid #E3E7E9;flex-wrap:wrap">
+<span style="font-size:14px;color:#434C54"><span style="font-family:'Manrope',sans-serif">+{{ draftUnits }}</span> units · total <strong style="font-family:'Manrope',sans-serif;font-weight:600;color:#101418">{{ draftTotal }}</strong></span>
+<div style="display:flex;gap:8px"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="ghost" onClick="{{ closeDialog }}" hint-size="80px,38px">Cancel</x-import><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="primary" iconLeft="check" disabled="{{ draftInvalid }}" onClick="{{ submitPurchase }}" hint-size="150px,38px">Save purchase</x-import></div>
+</div>
+</div>
+</x-import>
+</sc-if>
+
+<!-- DIALOG: sale -->
+<sc-if value="{{ dlgSale }}">
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Dialog" open="{{ true }}" title="Record sale" description="Stock goes down as soon as you save." width="{{ 760 }}" onClose="{{ closeDialog }}" hint-size="0px,0px">
+<div style="display:flex;flex-direction:column;gap:18px">
+<div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:14px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Customer</span><select value="{{ draft.customerId }}" onChange="{{ setCustomer }}" style="height:38px;padding:0 10px;border:1px solid #C7CDD1;border-radius:5px;background:#FFFFFF;font-family:'Manrope',sans-serif;font-size:14.5px;color:#101418;width:100%"><sc-for list="{{ customerOpts }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select><span style="font-size:12.5px;color:#5A646D">{{ tierNote }}</span></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Date</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="date" value="{{ draft.date }}" onChange="{{ setDate }}" hint-size="100%,38px"></x-import></label>
+</div>
+<div style="display:flex;flex-direction:column;gap:8px">
+<div style="display:grid;grid-template-columns:minmax(0,1fr) 84px 104px 100px 32px;gap:10px;font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D"><span>Variant</span><span>Qty</span><span>Unit price</span><span style="text-align:right">Line</span><span></span></div>
+<sc-for list="{{ draftLines }}" as="l" hint-placeholder-count="1"><div style="display:flex;flex-direction:column;gap:4px"><div style="display:grid;grid-template-columns:minmax(0,1fr) 84px 104px 100px 32px;gap:10px;align-items:center">
+<select value="{{ l.variantId }}" onChange="{{ l.onVariant }}" style="height:38px;padding:0 10px;border:1px solid #C7CDD1;border-radius:5px;background:#FFFFFF;font-family:'Manrope',sans-serif;font-size:14px;color:#101418;width:100%;min-width:0"><option value="">Choose a variant…</option><sc-for list="{{ variantOpts }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for></select>
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="number" min="0" value="{{ l.qty }}" invalid="{{ l.hasError }}" onChange="{{ l.onQty }}" hint-size="100%,38px"></x-import>
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="number" min="0" step="0.01" value="{{ l.price }}" onChange="{{ l.onPrice }}" hint-size="100%,38px"></x-import>
+<span style="font-family:'Manrope',sans-serif;font-size:13px;text-align:right">{{ l.lineTotal }}</span>
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.IconButton" icon="x" label="Remove line" size="sm" onClick="{{ l.remove }}" hint-size="30px,30px"></x-import>
+</div><span style="font-family:'Manrope',sans-serif;font-size:11.5px;color:{{ l.noteColor }}">{{ l.note }}</span></div></sc-for>
+<div><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="ghost" size="sm" iconLeft="plus" onClick="{{ addLine }}" hint-size="90px,30px">Add line</x-import></div>
+</div>
+<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Payment</span><div style="display:inline-flex;gap:2px;padding:3px;background:#F3F1EC;border-radius:6px;border:1px solid #E3E7E9"><sc-for list="{{ payTabs }}" as="t" hint-placeholder-count="2"><button onClick="{{ t.onClick }}" style="height:30px;padding:0 14px;border:none;border-radius:4px;cursor:pointer;font-family:'Manrope',sans-serif;font-size:13.5px;font-weight:600;background:{{ t.bg }};color:{{ t.fg }}">{{ t.label }}</button></sc-for></div></div>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:16px;border-top:1px solid #E3E7E9;flex-wrap:wrap">
+<span style="font-size:14px;color:#434C54"><span style="font-family:'Manrope',sans-serif">−{{ draftUnits }}</span> units · total <strong style="font-family:'Manrope',sans-serif;font-weight:600;color:#101418">{{ draftTotal }}</strong></span>
+<div style="display:flex;gap:8px"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="ghost" onClick="{{ closeDialog }}" hint-size="80px,38px">Cancel</x-import><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="primary" iconLeft="check" disabled="{{ draftInvalid }}" onClick="{{ submitSale }}" hint-size="120px,38px">Save sale</x-import></div>
+</div>
+</div>
+</x-import>
+</sc-if>
+
+<!-- DIALOG: variant -->
+<sc-if value="{{ dlgVariant }}">
+<x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Dialog" open="{{ true }}" title="Add variant" description="A variant is one sellable combination of gauge, colour and pack." width="{{ 640 }}" onClose="{{ closeDialog }}" hint-size="0px,0px">
+<div style="display:flex;flex-direction:column;gap:16px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Product</span><select value="{{ draft.productId }}" onChange="{{ vf.productId }}" style="height:38px;padding:0 10px;border:1px solid #C7CDD1;border-radius:5px;background:#FFFFFF;font-family:'Manrope',sans-serif;font-size:14.5px;color:#101418;width:100%"><sc-for list="{{ productOpts }}" as="o" hint-placeholder-count="4"><option value="{{ o.id }}">{{ o.label }}</option></sc-for><option value="__new">New product…</option></select></label>
+<sc-if value="{{ isNewProduct }}"><div style="display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:14px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Product name</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" placeholder="e.g. Focus Hex Plus 38" value="{{ draft.newName }}" onChange="{{ vf.newName }}" hint-size="100%,38px"></x-import></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Category</span><select value="{{ draft.category }}" onChange="{{ vf.category }}" style="height:38px;padding:0 10px;border:1px solid #C7CDD1;border-radius:5px;background:#FFFFFF;font-family:'Manrope',sans-serif;font-size:14.5px;color:#101418;width:100%"><option value="String">String</option><option value="Grip">Grip</option><option value="Accessory">Accessory</option></select></label>
+</div></sc-if>
+<div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px">
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Gauge</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" placeholder="1.25" suffix="mm" value="{{ draft.gauge }}" onChange="{{ vf.gauge }}" hint-size="100%,38px"></x-import></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Colour</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" placeholder="Black" value="{{ draft.colour }}" onChange="{{ vf.colour }}" hint-size="100%,38px"></x-import></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Pack</span><select value="{{ draft.pack }}" onChange="{{ vf.pack }}" style="height:38px;padding:0 10px;border:1px solid #C7CDD1;border-radius:5px;background:#FFFFFF;font-family:'Manrope',sans-serif;font-size:14.5px;color:#101418;width:100%"><option value="12m set">12m set</option><option value="200m reel">200m reel</option><option value="3-pack">3-pack</option><option value="1 pc">1 pc</option></select></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Unit cost</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="number" suffix="SGD" value="{{ draft.cost }}" onChange="{{ vf.cost }}" hint-size="100%,38px"></x-import></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Distributor price</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="number" suffix="SGD" value="{{ draft.dist }}" onChange="{{ vf.dist }}" hint-size="100%,38px"></x-import></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Retail price</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="number" suffix="SGD" value="{{ draft.retail }}" onChange="{{ vf.retail }}" hint-size="100%,38px"></x-import></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Reorder at</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="number" suffix="units" value="{{ draft.threshold }}" onChange="{{ vf.threshold }}" hint-size="100%,38px"></x-import></label>
+<label style="display:flex;flex-direction:column;gap:6px"><span style="font-family:'Manrope',sans-serif;font-weight:600;font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#5A646D">Opening stock</span><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Input" type="number" suffix="units" value="{{ draft.opening }}" onChange="{{ vf.opening }}" hint-size="100%,38px"></x-import></label>
+</div>
+<div style="display:flex;justify-content:flex-end;gap:8px;padding-top:16px;border-top:1px solid #E3E7E9"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="ghost" onClick="{{ closeDialog }}" hint-size="80px,38px">Cancel</x-import><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Button" variant="primary" iconLeft="check" disabled="{{ draftInvalid }}" onClick="{{ submitVariant }}" hint-size="130px,38px">Save variant</x-import></div>
+</div>
+</x-import>
+</sc-if>
+
+<sc-if value="{{ hasToast }}"><div style="position:fixed;right:24px;bottom:24px;z-index:60;width:380px;max-width:calc(100vw - 48px)"><x-import component-from-global-scope="SportCraftDesignSystem_1803c2.Toast" title="{{ toast.title }}" message="{{ toast.message }}" tone="{{ toast.tone }}" onDismiss="{{ dismissToast }}" hint-size="100%,72px"></x-import></div></sc-if>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;dashboardLayout&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;Overview&quot;,&quot;Stock-first&quot;,&quot;Sales-first&quot;],&quot;default&quot;:&quot;Overview&quot;,&quot;tsType&quot;:&quot;'Overview'|'Stock-first'|'Sales-first'&quot;,&quot;section&quot;:&quot;Dashboard&quot;}}">
+const TODAY = '2026-10-07', LS = 'evolve-inventory-v4';
+function rng(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+function addDays(d,n){const x=new Date(d+'T00:00:00Z');x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
+function money(n){return 'S$'+(+n||0).toLocaleString('en-SG',{minimumFractionDigits:2,maximumFractionDigits:2})}
+function money0(n){return 'S$'+Math.round(+n||0).toLocaleString('en-SG')}
+function num(n){return Math.round(+n||0).toLocaleString('en-SG')}
+function pct(n){return isFinite(n)?Math.round(n*100)+'%':'—'}
+function fdate(d){return new Date(d+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',timeZone:'UTC'})}
+function fdateY(d){return new Date(d+'T00:00:00Z').toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'2-digit',timeZone:'UTC'})}
+const SWATCH={Black:'#1B2126',White:'#FFFFFF',Silver:'#C7CDD1',Natural:'#E9E0C9','Neon Yellow':'#D6F25B','Neon Green':'#7BD96B'};
+function sku(code,g,c,pk){return [code,g&&g.replace('.',''),c.split(' ').map(w=>w[0]).join('').toUpperCase(),pk==='200m reel'?'R':pk==='12m set'?'S':'P'].filter(Boolean).join('-')}
+
+function buildSeed(){
+  const R=rng(11);
+  const products=[
+    {id:'p1',name:'Focus Hex Soft',code:'FHS',category:'String',kind:'Co-polyester'},
+    {id:'p2',name:'Focus Hex',code:'FH',category:'String',kind:'Co-polyester'},
+    {id:'p3',name:'Co-Focus',code:'CF',category:'String',kind:'Co-polyester'},
+    {id:'p4',name:'Hepta-Twist',code:'HT',category:'String',kind:'Co-polyester'},
+    {id:'p5',name:'Swift',code:'SW',category:'String',kind:'Multifilament'},
+    {id:'p6',name:'Pro Overgrip',code:'OG',category:'Grip',kind:'Overgrip'},
+    {id:'p7',name:'Tour Replacement Grip',code:'RG',category:'Grip',kind:'Replacement grip'},
+    {id:'p8',name:'Vibration Dampener',code:'DA',category:'Accessory',kind:'Dampener'}];
+  const PM=Object.fromEntries(products.map(p=>[p.id,p]));
+  const S=['12m set',5.8,9.5,15,40,90], RL=['200m reel',88,135,195,4,8], SS=['12m set',7.5,12,19,30,60], SR=['200m reel',115,165,240,3,6], OG=['3-pack',2.4,4.2,6.9,60,240], RG=['1 pc',3.1,5.5,9.9,30,120], DA=['1 pc',0.8,1.8,3.5,40,200];
+  const raw=[['p1','1.15','Black',...S],['p1','1.15','Black',...RL],['p1','1.15','Neon Yellow',...S],['p1','1.20','Black',...S],['p1','1.20','Black',...RL],['p1','1.25','Black',...RL],
+    ['p2','1.18','Black',...S],['p2','1.23','Black',...S],['p2','1.23','Black',...RL],['p2','1.27','Silver',...RL],
+    ['p3','1.18','Neon Green',...S],['p3','1.23','Neon Green',...RL],['p4','1.20','Black',...S],['p4','1.25','Black',...RL],
+    ['p5','1.25','Natural',...SS],['p5','1.30','Natural',...SR],['p6','','White',...OG],['p6','','Black',...OG],['p7','','Black',...RG],['p8','','Black',...DA],['p8','','Neon Yellow',...DA]];
+  const variants=raw.map(([pid,g,c,pack,cost,dist,retail,threshold,opening])=>({id:sku(PM[pid].code,g,c,pack),productId:pid,gauge:g,colour:c,pack,cost,dist,retail,threshold,opening}));
+  const customers=[
+    {id:'c1',name:'Racquet Lab KL',type:'Distributor',country:'Malaysia'},
+    {id:'c2',name:'Bangkok Pro Racquet',type:'Distributor',country:'Thailand'},
+    {id:'c3',name:'Jakarta Tennis Supply',type:'Distributor',country:'Indonesia'},
+    {id:'c5',name:'Manila Stringing Co.',type:'Distributor',country:'Philippines'},
+    {id:'c4',name:'Kallang Tennis Hub',type:'Club',country:'Singapore'},
+    {id:'c6',name:'Tanglin Tennis Academy',type:'Club',country:'Singapore'},
+    {id:'c7',name:'Walk-in & online',type:'Retail',country:'Singapore'}];
+  const suppliers=[{id:'s1',name:'MSV GmbH',country:'Germany',lead:'6–8 weeks',supplies:'Strings'},{id:'s2',name:'Formosa Grip Works',country:'Taiwan',lead:'3–4 weeks',supplies:'Grips and accessories'}];
+  const poDates={s1:['2026-04-20','2026-06-08','2026-07-27','2026-09-14'],s2:['2026-05-11','2026-08-03','2026-09-28']};
+  const stock={}; variants.forEach(v=>stock[v.id]=v.opening);
+  const W=[['c1',.13],['c2',.11],['c3',.09],['c5',.07],['c4',.12],['c6',.1],['c7',.38]];
+  const purchases=[], sales=[]; let po=1001, inv=2001;
+  for(let day='2026-04-01'; day<=TODAY; day=addDays(day,1)){
+    for(const sid of ['s1','s2']) if(poDates[sid].includes(day)){
+      const lines=variants.filter(v=>(sid==='s1')===(PM[v.productId].category==='String')).filter(()=>R()>0.25).map(v=>{
+        const qty=v.pack==='200m reel'?4+2*Math.floor(R()*3):v.pack==='12m set'?60+20*Math.floor(R()*4):v.pack==='3-pack'?120+60*Math.floor(R()*3):60+40*Math.floor(R()*3);
+        stock[v.id]+=qty; return {variantId:v.id,qty,cost:v.cost};});
+      purchases.push({id:'PO-'+(po++),date:day,supplierId:sid,lines});
+    }
+    const n=(R()<0.5?1:0)+(R()<0.15?1:0);
+    for(let k=0;k<n;k++){
+      let x=R(),cid='c7'; for(const [id,w] of W){if(x<w){cid=id;break}x-=w}
+      const cu=customers.find(c=>c.id===cid), isD=cu.type==='Distributor', isC=cu.type==='Club';
+      const nl=1+Math.floor(R()*(isD?4:2)), used=new Set(), lines=[];
+      for(let i=0;i<nl;i++){
+        const v=variants[Math.floor(R()*variants.length)]; if(used.has(v.id))continue; used.add(v.id);
+        let qty;
+        if(v.pack==='12m set') qty=isD?20+10*Math.floor(R()*4):isC?6+6*Math.floor(R()*3):1+Math.floor(R()*3);
+        else if(v.pack==='200m reel') qty=isD?1+Math.floor(R()*2):isC?1:(R()<0.3?1:0);
+        else qty=isD?24+24*Math.floor(R()*2):isC?12:1+Math.floor(R()*3);
+        if(qty>0&&stock[v.id]>=qty){stock[v.id]-=qty;lines.push({variantId:v.id,qty,price:isD?v.dist:v.retail})}
+      }
+      if(lines.length){const age=(new Date(TODAY)-new Date(day))/864e5;sales.push({id:'INV-'+(inv++),date:day,customerId:cid,tier:isD?'dist':'retail',lines,paid:age>35?true:R()<(isD?0.35:0.85)})}
+    }
+  }
+  // tune a few variants into low / out states via opening stock or reorder level (no extra sales)
+  for(const [id,t] of [['FHS-115-B-S',18],['FHS-120-B-R',0],['OG-W-P',35],['SW-125-N-S',12],['CF-123-NG-R',2],['FH-127-S-R',0]]){
+    const v=variants.find(x=>x.id===id); if(!v)continue; let diff=stock[id]-t; if(diff<=0)continue; stock[id]=t;
+    const fromOpen=Math.min(v.opening,diff); v.opening-=fromOpen; diff-=fromOpen;
+    for(let i=purchases.length-1;i>=0&&diff>0;i--){const l=purchases[i].lines.find(x=>x.variantId===id);if(!l)continue;const take=Math.min(l.qty,diff);l.qty-=take;diff-=take;if(!l.qty)purchases[i].lines=purchases[i].lines.filter(x=>x!==l)}
+  }
+  return {products,variants,customers,suppliers,purchases,sales,seq:{po,inv}};
+}
+function loadDb(){try{const s=localStorage.getItem(LS);if(s)return JSON.parse(s)}catch(e){}return buildSeed()}
+function derive(db){
+  const P=Object.fromEntries(db.products.map(p=>[p.id,p]));
+  const mv={}; db.variants.forEach(v=>mv[v.id]={in:0,out:0});
+  db.purchases.forEach(p=>p.lines.forEach(l=>{if(mv[l.variantId])mv[l.variantId].in+=+l.qty}));
+  db.sales.forEach(s=>s.lines.forEach(l=>{if(mv[l.variantId])mv[l.variantId].out+=+l.qty}));
+  const V=db.variants.map(v=>{const p=P[v.productId]||{name:'?'};const stock=+v.opening+mv[v.id].in-mv[v.id].out;
+    const status=stock<=0?'Out':stock<=+v.threshold?'Low':'In stock';
+    const spec=[v.gauge&&v.gauge+'mm',v.colour,v.pack].filter(Boolean).join(' · ');
+    return {...v,product:p,name:p.name,category:p.category,kind:p.kind,stock,inQty:mv[v.id].in,outQty:mv[v.id].out,status,spec,
+      tone:status==='Out'?'danger':status==='Low'?'warning':'success',stockColor:status==='Out'?'#B0342A':status==='Low'?'#9A6B0C':'#101418',
+      short:p.name+' '+[v.gauge&&v.gauge+'mm',v.pack].filter(Boolean).join(' ')};});
+  return {P,V,VM:Object.fromEntries(V.map(v=>[v.id,v]))};
+}
+
+class Component extends DCLogic {
+  state = { db: loadDb(), page:'dashboard', narrow: typeof window!=='undefined' && window.innerWidth<1100, q:'', cat:'All', stockFilter:'All', saleFilter:'All', expanded:null, custId:'c1', supId:'s1', range:'90', dialog:null, draft:null, toast:null };
+  componentDidMount(){ this.onR=()=>{const n=window.innerWidth<1100; if(n!==this.state.narrow)this.setState({narrow:n})}; window.addEventListener('resize',this.onR); }
+  componentWillUnmount(){ window.removeEventListener('resize',this.onR); clearTimeout(this.tt); }
+  componentDidUpdate(pp,ps){ if(ps.db!==this.state.db){ try{localStorage.setItem(LS,JSON.stringify(this.state.db))}catch(e){} } }
+  go(page,extra){ this.setState({page,q:'',expanded:null,...(extra||{})}); try{window.scrollTo(0,0)}catch(e){} }
+  toastMsg(title,message,tone){ clearTimeout(this.tt); this.setState({toast:{title,message,tone:tone||'success'}}); this.tt=setTimeout(()=>this.setState({toast:null}),4500); }
+  val(e){ return e&&e.target?e.target.value:e; }
+  setDraft(k){ return e=>{const v=this.val(e); this.setState(s=>({draft:{...s.draft,[k]:v}}))}; }
+  updLine(i,patch){ this.setState(s=>({draft:{...s.draft,lines:s.draft.lines.map((l,j)=>j===i?{...l,...patch}:l)}})); }
+  tierOf(cid){ const c=this.state.db.customers.find(x=>x.id===cid); return c&&c.type==='Distributor'?'dist':'retail'; }
+  openPurchase(v){ const {VM}=derive(this.state.db); let supplierId='s1', lines=[{variantId:'',qty:'',price:''}];
+    if(v){ const x=VM[v]; supplierId=x.category==='String'?'s1':'s2'; const q=Math.max(+x.threshold*3-Math.max(x.stock,0), x.pack==='200m reel'?4:20); lines=[{variantId:v,qty:String(Math.ceil(q/ (x.pack==='200m reel'?2:10))*(x.pack==='200m reel'?2:10)),price:String(x.cost)}]; }
+    this.setState({dialog:'purchase',draft:{supplierId,date:TODAY,lines}}); }
+  openSale(){ this.setState({dialog:'sale',draft:{customerId:'c7',date:TODAY,paid:true,lines:[{variantId:'',qty:'',price:''}]}}); }
+  openVariant(){ this.setState({dialog:'variant',draft:{productId:'p1',newName:'',category:'String',gauge:'',colour:'',pack:'12m set',cost:'',dist:'',retail:'',threshold:'',opening:'0'}}); }
+  submitPurchase(){ const s=this.state, d=s.draft; const lines=d.lines.filter(l=>l.variantId&&+l.qty>0).map(l=>({variantId:l.variantId,qty:+l.qty,cost:+l.price||0}));
+    if(!lines.length)return; const id='PO-'+s.db.seq.po, u=lines.reduce((a,l)=>a+l.qty,0);
+    this.setState(st=>({dialog:null,draft:null,db:{...st.db,purchases:[{id,date:d.date||TODAY,supplierId:d.supplierId,lines},...st.db.purchases],seq:{...st.db.seq,po:st.db.seq.po+1}}}));
+    this.toastMsg(id+' saved','Stock up '+num(u)+' units across '+lines.length+(lines.length>1?' variants.':' variant.')); }
+  submitSale(){ const s=this.state, d=s.draft, {VM}=derive(s.db); const lines=d.lines.filter(l=>l.variantId&&+l.qty>0).map(l=>({variantId:l.variantId,qty:+l.qty,price:+l.price||0}));
+    if(!lines.length)return; const id='INV-'+s.db.seq.inv, u=lines.reduce((a,l)=>a+l.qty,0);
+    const lows=lines.filter(l=>{const v=VM[l.variantId];return v.stock-l.qty<=+v.threshold&&v.stock>+v.threshold}).length;
+    this.setState(st=>({dialog:null,draft:null,db:{...st.db,sales:[{id,date:d.date||TODAY,customerId:d.customerId,tier:this.tierOf(d.customerId),lines,paid:!!d.paid},...st.db.sales],seq:{...st.db.seq,inv:st.db.seq.inv+1}}}));
+    this.toastMsg(id+' saved','Stock down '+num(u)+' units.'+(lows?' '+lows+(lows>1?' variants are':' variant is')+' now below reorder level.':''), lows?'warning':'success'); }
+  submitVariant(){ const s=this.state, d=s.draft; let db=s.db, pid=d.productId;
+    if(pid==='__new'){ pid='p'+(Date.now()%100000); const code=d.newName.replace(/[^A-Za-z ]/g,'').split(' ').filter(Boolean).map(w=>w[0]).join('').toUpperCase().slice(0,3)||'NEW';
+      db={...db,products:[...db.products,{id:pid,name:d.newName.trim(),code,category:d.category,kind:d.category==='String'?'String':d.category}]}; }
+    const p=db.products.find(x=>x.id===pid); let id=sku(p.code,d.gauge.trim(),d.colour.trim()||'X',d.pack); if(db.variants.some(v=>v.id===id))id+='-'+(db.variants.length+1);
+    const v={id,productId:pid,gauge:d.gauge.trim(),colour:d.colour.trim(),pack:d.pack,cost:+d.cost||0,dist:+d.dist||0,retail:+d.retail||0,threshold:+d.threshold||0,opening:+d.opening||0};
+    this.setState({dialog:null,draft:null,db:{...db,variants:[...db.variants,v]},cat:'All',q:''});
+    this.toastMsg(id+' added',p.name+' · '+[v.gauge&&v.gauge+'mm',v.colour,v.pack].filter(Boolean).join(' · ')+' with '+num(v.opening)+' units opening stock.'); }
+  markPaid(id){ this.setState(s=>({db:{...s.db,sales:s.db.sales.map(x=>x.id===id?{...x,paid:true}:x)}})); this.toastMsg(id+' marked paid',''); }
+  tabs(items,cur,set){ return items.map(([key,label,count])=>({label,count:count==null?'':count,onClick:()=>set(key),bg:key===cur?'#FFFFFF':'transparent',fg:key===cur?'#101418':'#5A646D'})); }
+
+  renderVals(){
+    const s=this.state, db=s.db, layout=this.props.dashboardLayout??'Overview';
+    const {P,V,VM}=derive(db);
+    const C=Object.fromEntries(db.customers.map(c=>[c.id,c])), SU=Object.fromEntries(db.suppliers.map(x=>[x.id,x]));
+    const rev=x=>x.lines.reduce((a,l)=>a+l.qty*l.price,0), cogs=x=>x.lines.reduce((a,l)=>a+l.qty*(VM[l.variantId]?.cost||0),0), units=x=>x.lines.reduce((a,l)=>a+ +l.qty,0), poTot=x=>x.lines.reduce((a,l)=>a+l.qty*l.cost,0);
+    const sum=(a,f)=>a.reduce((t,x)=>t+f(x),0);
+    const sales=[...db.sales].sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+    const purchases=[...db.purchases].sort((a,b)=>b.date.localeCompare(a.date)||b.id.localeCompare(a.id));
+    const d30=addDays(TODAY,-29), d60=addDays(TODAY,-59), d90=addDays(TODAY,-89);
+    const s30=sales.filter(x=>x.date>=d30), sp30=sales.filter(x=>x.date>=d60&&x.date<d30), s90=sales.filter(x=>x.date>=d90);
+    const rev30=sum(s30,rev), prev30=sum(sp30,rev), cost30=sum(s30,cogs), delta=prev30?(rev30-prev30)/prev30:0;
+    const unpaid=sales.filter(x=>!x.paid).sort((a,b)=>a.date.localeCompare(b.date));
+    const pos=V.map(v=>({...v,st:Math.max(v.stock,0)}));
+    const invCost=sum(pos,v=>v.st*v.cost), invRetail=sum(pos,v=>v.st*v.retail);
+    const low=V.filter(v=>v.status!=='In stock').sort((a,b)=>(a.stock/a.threshold)-(b.stock/b.threshold));
+    const lineView=l=>{const v=VM[l.variantId]||{name:l.variantId,spec:''};const p=l.price??l.cost;return {sku:l.variantId,label:v.name+' · '+v.spec,qty:num(l.qty),unit:money(p),total:money(p*l.qty)}};
+    const summary=x=>x.lines.map(l=>(VM[l.variantId]?.short||l.variantId)+' ×'+l.qty).join(', ');
+    const reorder=id=>()=>this.openPurchase(id);
+    const lowRow=v=>({...v,stock:num(v.stock),threshold:num(v.threshold),reorder:reorder(v.id)});
+    const k={invCost:money0(invCost),invRetail:money0(invRetail),units:num(sum(pos,v=>v.st)),variants:V.length,rev30:money0(rev30),
+      delta:(delta>=0?'+':'−')+Math.abs(Math.round(delta*100))+'%',deltaColor:delta>=0?'#157F52':'#B0342A',profit30:money0(rev30-cost30),margin30:pct(rev30?(rev30-cost30)/rev30:NaN),
+      units30:num(sum(s30,units)),unitsIn30:num(sum(purchases.filter(x=>x.date>=d30),units)),orders30:s30.length,avgOrder:money0(s30.length?rev30/s30.length:0),
+      lowCount:V.filter(v=>v.status==='Low').length+V.filter(v=>v.status==='Out').length,outCount:V.filter(v=>v.status==='Out').length,unpaidTotal:money0(sum(unpaid,rev)),unpaidCount:unpaid.length};
+    const mk=['2026-04','2026-05','2026-06','2026-07','2026-08','2026-09','2026-10'];
+    const mdata=mk.map(m=>{const xs=sales.filter(x=>x.date.startsWith(m));return {m,rev:sum(xs,rev),profit:sum(xs,rev)-sum(xs,cogs)}});
+    const mmax=Math.max(1,...mdata.map(x=>x.rev));
+    const months=mdata.map(x=>({label:new Date(x.m+'-01T00:00:00Z').toLocaleDateString('en-GB',{month:'short',timeZone:'UTC'})+(x.m===TODAY.slice(0,7)?' *':''),short:'S$'+(x.rev/1000).toFixed(1)+'k',pct:Math.max(2,x.rev/mmax*100),profitPct:x.rev?x.profit/x.rev*100:0,color:x.m===TODAY.slice(0,7)?'#AFCCC0':'#12573F'}));
+    const agg=(xs,keyFn)=>{const m={};xs.forEach(x=>x.lines.forEach(l=>{const key=keyFn(x,l);const a=m[key]||(m[key]={key,units:0,rev:0,cost:0,orders:new Set()});a.units+=+l.qty;a.rev+=l.qty*l.price;a.cost+=l.qty*(VM[l.variantId]?.cost||0);a.orders.add(x.id)}));return Object.values(m).sort((a,b)=>b.rev-a.rev)};
+    const tp=agg(s90,(x,l)=>l.variantId).slice(0,5), tpMax=tp[0]?.rev||1;
+    const topProducts=tp.map(a=>({name:VM[a.key]?.name,spec:VM[a.key]?.spec,units:num(a.units),rev:money0(a.rev),pct:a.rev/tpMax*100}));
+    const topCustomers=agg(s90,x=>x.customerId).slice(0,5).map(a=>({name:C[a.key]?.name,type:C[a.key]?.type,country:C[a.key]?.country,orders:a.orders.size,rev:money0(a.rev),open:()=>this.go('customers',{custId:a.key})}));
+    const recent=[...sales.slice(0,8).map(x=>({x,kind:'Sale',party:C[x.customerId]?.name,u:-units(x),t:rev(x)})),...purchases.slice(0,8).map(x=>({x,kind:'Purchase',party:SU[x.supplierId]?.name,u:units(x),t:poTot(x)}))]
+      .sort((a,b)=>b.x.date.localeCompare(a.x.date)).slice(0,7).map(r=>({id:r.x.id,kind:r.kind,tone:r.kind==='Sale'?'neutral':'brand',party:r.party,date:fdateY(r.x.date),units:(r.u>0?'+':'−')+num(Math.abs(r.u)),unitColor:r.u>0?'#12573F':'#434C54',total:money(r.t)}));
+    const cats=['String','Grip','Accessory'];
+    const catBars=cats.map(c=>{const v=sum(pos.filter(x=>x.category===c),x=>x.st*x.cost);return {label:c==='String'?'Strings':c==='Grip'?'Grips':'Accessories',value:money0(v),pct:invCost?v/invCost*100:0,share:pct(invCost?v/invCost:0)}});
+    const sbp=db.products.map(p=>{const vs=pos.filter(v=>v.productId===p.id);return {name:p.name,kind:p.kind,count:vs.length,u:sum(vs,v=>v.st),val:sum(vs,v=>v.st*v.cost)}}).sort((a,b)=>b.val-a.val);
+    const sbpMax=sbp[0]?.val||1;
+    const stockByProduct=sbp.map(p=>({...p,units:num(p.u),value:money0(p.val),pct:p.val/sbpMax*100}));
+
+    const q=s.q.trim().toLowerCase(), match=v=>!q||[v.id,v.name,v.colour,v.gauge,v.pack,v.kind].join(' ').toLowerCase().includes(q);
+    const catCount=c=>V.filter(v=>c==='All'||v.category===c).length;
+    const catTabs=this.tabs([['All','All',catCount('All')],['String','Strings',catCount('String')],['Grip','Grips',catCount('Grip')],['Accessory','Accessories',catCount('Accessory')]],s.cat,c=>this.setState({cat:c}));
+    const productList=db.products.filter(p=>s.cat==='All'||p.category===s.cat).map(p=>{const vs=V.filter(v=>v.productId===p.id);const shown=vs.filter(match);
+      return {name:p.name,kind:p.kind,category:p.category,count:vs.length,units:num(sum(vs,v=>Math.max(v.stock,0))),show:shown.length>0,
+        variants:shown.map(v=>({...v,gaugeLabel:v.gauge?v.gauge+' mm':'—',swatch:SWATCH[v.colour]||'#E3E7E9',costL:money(v.cost),distL:money(v.dist),retailL:money(v.retail),marginL:pct(v.retail?(v.retail-v.cost)/v.retail:NaN),stock:num(v.stock)}))}}).filter(p=>p.show);
+    const sf=s.stockFilter;
+    const stockTabs=this.tabs([['All','All',V.length],['Low','Low',V.filter(v=>v.status==='Low').length],['Out','Out of stock',V.filter(v=>v.status==='Out').length]],sf,f=>this.setState({stockFilter:f}));
+    const stockRows=V.filter(v=>(sf==='All'||v.status===sf)&&match(v)).map(v=>({...v,stock:num(v.stock),threshold:num(v.threshold),inQty:num(v.inQty),outQty:num(v.outQty),valueL:money(Math.max(v.stock,0)*v.cost),reorder:reorder(v.id)}));
+
+    const tog=id=>()=>this.setState(st=>({expanded:st.expanded===id?null:id}));
+    const ytd=purchases.filter(x=>x.date>='2026-01-01');
+    const pk={count:ytd.length,total:money0(sum(ytd,poTot)),units:num(sum(ytd,units))};
+    const purchaseRows=purchases.map(x=>({id:x.id,date:fdateY(x.date),party:SU[x.supplierId]?.name,lineCount:x.lines.length,units:num(units(x)),total:money(poTot(x)),open:s.expanded===x.id,toggle:tog(x.id),chev:s.expanded===x.id?'chevron-down':'chevron-right',bg:s.expanded===x.id?'#FAF9F6':'#FFFFFF',lines:x.lines.map(lineView)}));
+    const saleTabs=this.tabs([['All','All',sales.length],['Unpaid','Unpaid',unpaid.length],['Paid','Paid',sales.length-unpaid.length]],s.saleFilter,f=>this.setState({saleFilter:f}));
+    const saleRows=sales.filter(x=>s.saleFilter==='All'||(s.saleFilter==='Unpaid')===!x.paid).map(x=>({id:x.id,date:fdateY(x.date),party:C[x.customerId]?.name,partyMeta:C[x.customerId]?.country,tier:x.tier==='dist'?'Distributor':'Retail',units:num(units(x)),total:money(rev(x)),
+      unpaid:!x.paid,payText:x.paid?'Paid':'Unpaid',payTone:x.paid?'success':'warning',markPaid:()=>this.markPaid(x.id),open:s.expanded===x.id,toggle:tog(x.id),chev:s.expanded===x.id?'chevron-down':'chevron-right',bg:s.expanded===x.id?'#FAF9F6':'#FFFFFF',lines:x.lines.map(lineView)}));
+
+    const isCust=s.page==='customers', isSup=s.page==='suppliers';
+    let parties=[], sel={stats:[],history:[]};
+    if(isCust){
+      parties=db.customers.map(c=>{const xs=sales.filter(x=>x.customerId===c.id);const a=c.id===s.custId;return {id:c.id,name:c.name,meta:c.type+' · '+c.country,total:money0(sum(xs,rev)),select:()=>this.setState({custId:c.id}),bg:a?'#EFF6F2':'#FFFFFF',edge:a?'#12573F':'transparent'}});
+      const c=C[s.custId]||db.customers[0], xs=sales.filter(x=>x.customerId===c.id), up=xs.filter(x=>!x.paid), fav=agg(xs,(x,l)=>VM[l.variantId]?.productId||'?')[0];
+      sel={name:c.name,meta:c.country+' · '+(c.type==='Distributor'?'Distributor price list':'Retail price list'),badge:c.type,
+        stats:[{label:'Total spent',value:money0(sum(xs,rev)),color:'#101418'},{label:'Orders',value:xs.length,color:'#101418'},{label:'Last order',value:xs[0]?fdateY(xs[0].date):'—',color:'#101418'},{label:'Unpaid',value:money0(sum(up,rev)),color:up.length?'#B3542F':'#101418'}],
+        hasFav:!!fav,fav:fav?(P[fav.key]?.name+' · '+num(fav.units)+' units'):'',noHistory:!xs.length,
+        history:xs.slice(0,25).map(x=>({id:x.id,date:fdate(x.date),summary:summary(x),total:money(rev(x)),hasStatus:true,status:x.paid?'Paid':'Unpaid',tone:x.paid?'success':'warning'}))};
+    }
+    if(isSup){
+      parties=db.suppliers.map(c=>{const xs=purchases.filter(x=>x.supplierId===c.id);const a=c.id===s.supId;return {id:c.id,name:c.name,meta:c.supplies+' · '+c.country,total:money0(sum(xs,poTot)),select:()=>this.setState({supId:c.id}),bg:a?'#EFF6F2':'#FFFFFF',edge:a?'#12573F':'transparent'}});
+      const c=SU[s.supId]||db.suppliers[0], xs=purchases.filter(x=>x.supplierId===c.id);
+      sel={name:c.name,meta:c.country+' · '+c.supplies,badge:'Supplier',hasFav:false,fav:'',noHistory:!xs.length,
+        stats:[{label:'Total purchased',value:money0(sum(xs,poTot)),color:'#101418'},{label:'Orders',value:xs.length,color:'#101418'},{label:'Units received',value:num(sum(xs,units)),color:'#101418'},{label:'Lead time',value:c.lead,color:'#101418'}],
+        history:xs.map(x=>({id:x.id,date:fdate(x.date),summary:summary(x),total:money(poTot(x)),hasStatus:false}))};
+    }
+
+    const rs=s.range==='30'?d30:s.range==='90'?d90:'2026-01-01';
+    const rx=sales.filter(x=>x.date>=rs), rRev=sum(rx,rev), rCost=sum(rx,cogs);
+    const byP=agg(rx,(x,l)=>VM[l.variantId]?.productId||'?'), byC=agg(rx,x=>x.customerId);
+    const rep={period:fdateY(rs)+' – '+fdateY(TODAY),
+      stats:[{label:'Revenue',value:money0(rRev)},{label:'Cost of goods',value:money0(rCost)},{label:'Gross profit',value:money0(rRev-rCost)},{label:'Margin',value:pct(rRev?(rRev-rCost)/rRev:NaN)},{label:'Units sold',value:num(sum(rx,units))}],
+      byProduct:byP.map(a=>({name:P[a.key]?.name,kind:P[a.key]?.kind,units:num(a.units),rev:money(a.rev),cost:money(a.cost),profit:money(a.rev-a.cost),margin:pct((a.rev-a.cost)/a.rev)})),
+      tot:{units:num(sum(rx,units)),rev:money(rRev),cost:money(rCost),profit:money(rRev-rCost),margin:pct(rRev?(rRev-rCost)/rRev:NaN)},
+      byCustomer:byC.map(a=>({name:C[a.key]?.name,type:C[a.key]?.type,orders:a.orders.size,rev:money0(a.rev),share:pct(rRev?a.rev/rRev:0),pct:rRev?a.rev/(byC[0].rev)*100:0})),
+      movement:V.map(v=>{const i=sum(purchases.filter(x=>x.date>=rs),x=>sum(x.lines.filter(l=>l.variantId===v.id),l=>+l.qty)),o=sum(rx,x=>sum(x.lines.filter(l=>l.variantId===v.id),l=>+l.qty));return {name:v.name,spec:v.spec,i,o,inQ:num(i),outQ:num(o),stock:num(v.stock),stockColor:v.stockColor}}).filter(r=>r.i||r.o).sort((a,b)=>b.o-a.o)};
+    const rangeTabs=this.tabs([['30','Last 30 days'],['90','Last 90 days'],['ytd','Year to date']],s.range,r=>this.setState({range:r}));
+
+    const NAV=[['dashboard','Dashboard','layout-dashboard','Overview'],['products','Products & variants','package','Inventory'],['stock','Stock levels','boxes',null],['purchases','Purchases','truck','Transactions'],['sales','Sales','receipt',null],['customers','Customers & distributors','users','Contacts'],['suppliers','Suppliers','factory',null],['reports','Reports','chart-column','Insights']];
+    const nav=NAV.map(([id,label,icon,group])=>{const a=s.page===id;const count=id==='stock'?k.lowCount:id==='sales'?unpaid.length:0;return {id,label,icon,group,hasGroup:!!group&&!s.narrow,count,hasCount:count>0,go:()=>this.go(id),bg:a?'#12573F':'transparent',fg:a?'#FFFFFF':'#AFCCC0'}});
+    const meta=NAV.find(n=>n[0]===s.page)||NAV[0];
+
+    // dialog view-model
+    const d=s.draft, dlg=s.dialog; let draftLines=[], draftUnits=0, draftTotal=0, draftInvalid=true;
+    if(d&&(dlg==='purchase'||dlg==='sale')){
+      const isSale=dlg==='sale', tier=isSale?this.tierOf(d.customerId):null;
+      draftLines=d.lines.map((l,i)=>{const v=VM[l.variantId], qn=+l.qty||0, over=isSale&&v&&qn>v.stock;
+        draftUnits+=qn; draftTotal+=qn*(+l.price||0);
+        return {...l,lineTotal:money(qn*(+l.price||0)),hasError:!!over,
+          note:!v?' ':over?'Only '+num(v.stock)+' on hand':'On hand '+num(v.stock)+(qn?' → '+num(v.stock+(isSale?-qn:qn)):''),noteColor:over?'#B0342A':'#79838B',
+          onVariant:e=>{const id=this.val(e),x=VM[id];this.updLine(i,{variantId:id,price:x?String(isSale?(tier==='dist'?x.dist:x.retail):x.cost):''})},
+          onQty:e=>this.updLine(i,{qty:this.val(e)}),onPrice:e=>this.updLine(i,{price:this.val(e)}),
+          remove:()=>this.setState(st=>({draft:{...st.draft,lines:st.draft.lines.length>1?st.draft.lines.filter((_,j)=>j!==i):[{variantId:'',qty:'',price:''}]}}))};});
+      draftInvalid=!draftLines.some(l=>l.variantId&&+l.qty>0)||draftLines.some(l=>l.hasError);
+    }
+    if(d&&dlg==='variant') draftInvalid=!(d.productId!=='__new'||d.newName.trim())||!d.colour.trim()||!(+d.retail>0);
+    const vf={}; ['productId','newName','category','gauge','colour','pack','cost','dist','retail','threshold','opening'].forEach(f=>vf[f]=this.setDraft(f));
+    const ctier=d&&dlg==='sale'?this.tierOf(d.customerId):null;
+
+    return {
+      sideW:s.narrow?'72px':'248px', wide:!s.narrow, narrow:s.narrow, todayLabel:fdateY(TODAY), nav,
+      eyebrow:s.page==='dashboard'?'Overview':(meta[3]||NAV.slice(0,NAV.indexOf(meta)).reverse().find(n=>n[3])[3]), title:s.page==='dashboard'?'Dashboard':meta[1],
+      resetData:()=>{if(window.confirm('Replace all records with the sample data?')){this.setState({db:buildSeed()});this.toastMsg('Sample data restored','','info')}},
+      openPurchaseBlank:()=>this.openPurchase(), openSale:()=>this.openSale(), openVariant:()=>this.openVariant(), goLow:()=>this.go('stock',{stockFilter:'Low'}),
+      isDash:s.page==='dashboard', dashA:s.page==='dashboard'&&layout==='Overview', dashB:s.page==='dashboard'&&layout==='Stock-first', dashC:s.page==='dashboard'&&layout==='Sales-first',
+      isProducts:s.page==='products', isStock:s.page==='stock', isPurchases:s.page==='purchases', isSales:s.page==='sales', isParties:isCust||isSup, isReports:s.page==='reports',
+      k, months, lowTop:low.slice(0,5).map(lowRow), lowAll:low.map(lowRow), noLow:!low.length, recent, topProducts, topCustomers, catBars, stockByProduct,
+      unpaidList:unpaid.slice(0,6).map(x=>({id:x.id,customer:C[x.customerId]?.name,date:fdate(x.date),total:money0(rev(x)),markPaid:()=>this.markPaid(x.id)})), noUnpaid:!unpaid.length,
+      q:s.q, setQ:e=>this.setState({q:this.val(e)}), catTabs, productList, noProducts:!productList.length, stockTabs, stockRows, noStockRows:!stockRows.length,
+      pk, purchaseRows, saleTabs, saleRows, noSaleRows:!saleRows.length,
+      parties, sel, partyHead:isCust?'Customer':'Supplier', partyValueHead:isCust?'Lifetime sales':'Lifetime spend', historyTitle:isCust?'Purchase history':'Purchase orders',
+      rep, rangeTabs,
+      dlgPurchase:dlg==='purchase', dlgSale:dlg==='sale', dlgVariant:dlg==='variant', draft:d||{}, draftLines, draftUnits:num(draftUnits), draftTotal:money(draftTotal), draftInvalid,
+      closeDialog:()=>this.setState({dialog:null,draft:null}), addLine:()=>this.setState(st=>({draft:{...st.draft,lines:[...st.draft.lines,{variantId:'',qty:'',price:''}]}})),
+      setSupplier:this.setDraft('supplierId'), setDate:this.setDraft('date'),
+      setCustomer:e=>{const cid=this.val(e),t=this.tierOf(cid);this.setState(st=>({draft:{...st.draft,customerId:cid,lines:st.draft.lines.map(l=>{const x=VM[l.variantId];return x?{...l,price:String(t==='dist'?x.dist:x.retail)}:l})}}))},
+      tierNote:ctier==='dist'?'Distributor prices applied':'Retail prices applied',
+      payTabs:d&&dlg==='sale'?this.tabs([[false,'Unpaid'],[true,'Paid']],!!d.paid,p=>this.setState(st=>({draft:{...st.draft,paid:p}}))):[],
+      submitPurchase:()=>this.submitPurchase(), submitSale:()=>this.submitSale(), submitVariant:()=>this.submitVariant(),
+      supplierOpts:db.suppliers.map(x=>({id:x.id,label:x.name+' · '+x.country})), customerOpts:db.customers.map(x=>({id:x.id,label:x.name+' · '+x.type})),
+      variantOpts:V.map(v=>({id:v.id,label:v.name+' · '+v.spec+'  ('+num(v.stock)+' on hand)'})), productOpts:db.products.map(p=>({id:p.id,label:p.name+' · '+p.category})),
+      isNewProduct:d&&d.productId==='__new', vf,
+      hasToast:!!s.toast, toast:s.toast||{}, dismissToast:()=>this.setState({toast:null}),
+    };
+  }
+}
+</script>
+</body>
+</html>
