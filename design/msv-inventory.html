@@ -367,6 +367,27 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
 @media (max-width:640px){.form-grid.cols-4,.form-grid.cols-3{grid-template-columns:minmax(0,1fr)}.form-grid .w2{grid-column:auto}.cat-row{grid-template-columns:minmax(0,1fr) auto}}
 
 .stat-strip .badge{display:inline-flex;margin-top:4px}
+.combo{position:relative;min-width:0}
+.combo-list{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:70;background:var(--surface);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow-2);padding:4px;max-height:320px;overflow-y:auto}
+.combo-opt{display:flex;justify-content:space-between;align-items:center;gap:12px;width:100%;text-align:left;background:none;border:none;border-radius:7px;padding:8px 10px;cursor:pointer;font-size:13.5px;color:var(--fg)}
+.combo-opt b{font-weight:600}
+.combo-opt small{display:block;color:var(--fg-3);font-size:12px}
+.combo-opt:hover,.combo-opt[aria-selected="true"]{background:var(--hover)}
+.combo-empty{padding:10px 12px;color:var(--fg-3);font-size:13px}
+.line-meta{font-size:12px;color:var(--fg-3);min-height:0}
+.line-meta:empty,.line-warn:empty{display:none}
+.line-warn{font-size:12px;color:var(--warn-fg);font-weight:600}
+.p-line{display:grid;grid-template-columns:minmax(0,1fr) 96px 150px 130px 36px;gap:10px;align-items:start}
+.p-line .line-total{padding-top:10px;text-align:right;font-weight:600}
+.p-line.line-head{align-items:end}
+.ref-link{font-weight:600;text-decoration:none}
+.ref-link:hover{text-decoration:underline;text-underline-offset:3px}
+.timeline{display:flex;flex-direction:column}
+.tl-item{display:grid;grid-template-columns:14px minmax(0,1fr) auto;gap:12px;padding:10px 0;border-top:1px solid var(--line-soft);font-size:13.5px;align-items:start}
+.tl-item:first-child{border-top:none;padding-top:0}
+.tl-dot{width:10px;height:10px;border-radius:50%;margin-top:5px}
+.btn[disabled].danger{opacity:.45}
+@media (max-width:640px){.p-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.p-line .combo-cell{grid-column:1/-1}.p-line.line-head{display:none}.p-line .line-total{text-align:left}}
 .backdrop{display:none}
 
 @media (max-width:1180px){
@@ -413,7 +434,7 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
       <div><b>MSV Southeast Asia</b><span>Inventory Management</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
-    <div class="side-foot"><strong>Phase 2</strong>Products and inventory are live</div>
+    <div class="side-foot"><strong>Phase 3</strong>Products, inventory and purchasing are live</div>
   </aside>
   <div class="backdrop" id="backdrop"></div>
   <div class="main">
@@ -425,7 +446,7 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
         <span class="kbd">/</span>
       </form>
       <div class="top-right">
-        <span class="proto-tag">Phase 2 · saved in this browser</span>
+        <span class="proto-tag">Phase 3 · saved in this browser</span>
         <div style="position:relative">
           <button class="icon-btn" id="notifBtn" aria-label="Notifications" aria-haspopup="true"><i data-lucide="bell" class="i"></i><span class="dot" id="notifDot"></span></button>
           <div class="pop" id="notifPop" hidden></div>
@@ -460,6 +481,7 @@ const n0 = n=>Number(n||0).toLocaleString('en-SG');
 const ic = (name,cls='i')=>`<i data-lucide="${name}" class="${cls}"></i>`;
 const uid = p=>p+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 function todayISO(){const d=new Date();d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)}
+const fmtStamp = ts=>{const d=new Date(ts);return `${d.getDate()} ${MON[d.getMonth()]} ${d.getFullYear()}, ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
 const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const fmtDate = iso=>{if(!iso)return '—';const [y,m,d]=iso.split('-').map(Number);return `${d} ${MON[m-1]} ${y}`};
 function timeAgo(ts){const s=(Date.now()-ts)/1000;if(s<60)return 'Just now';if(s<3600)return Math.floor(s/60)+' min ago';if(s<86400)return Math.floor(s/3600)+'h ago';const d=Math.floor(s/86400);return d===1?'Yesterday':d<30?d+' days ago':fmtDate(new Date(ts).toISOString().slice(0,10))}
@@ -485,18 +507,30 @@ const Store={
 const MOVEMENT_TYPES={
   opening:{label:'Opening Stock',tone:'mute'},
   adjustment:{label:'Manual Adjustment',tone:'warn'},
-  purchase:{label:'Purchase',tone:'ok'},     // Phase 3
-  sale:{label:'Sale',tone:'info'},           // Phase 4
+  purchase:{label:'Purchase',tone:'ok'},
+  purchase_reversal:{label:'Purchase Reversal',tone:'bad'},
+  sale:{label:'Sale',tone:'info'},           // Sales phase
   return:{label:'Return',tone:'ok'},         // later
 };
 const ADJ_REASONS=['Opening Balance','Stock Count Correction','Damaged Item','Lost Item','Sample / Giveaway','Returned Stock','Other'];
 const GAUGES=['1.18','1.20','1.23','1.25','1.27','1.30'];
 const COLOURS={Black:'#1E2421',White:'#FFFFFF',Red:'#C8473D',Blue:'#3567B5',Yellow:'#E8D23C',Green:'#3D9B5F',Natural:'#E9E0C9',Silver:'#C7CDD1'};
 const PACKAGING=['Reel','Set','Other'];
+const BASE_CURRENCY='SGD';
+const DEFAULT_CURRENCIES=['SGD','USD','EUR','GBP','MYR','THB','CNY','JPY'];
+const PURCHASE_STATUSES=['Draft','Ordered','Received','Cancelled','Reversed'];
+const COST_FIELDS=[['shipping','Shipping / Freight'],['duties','Import Duties'],['customs','Customs Fees'],['handling','Handling Fees'],['other','Other Costs']];
+const emptyCosts = ()=>({shipping:0,duties:0,customs:0,handling:0,other:0,otherDesc:''});
+
+function seedSuppliers(t0){return [
+  {id:'s-msv',name:'MSV GmbH',contact:'Katrin Weber',country:'Germany',email:'export@msv.example',phone:'+49 2304 000 120',address:'Industriestrasse 12, Schwerte, Germany',currency:'EUR',notes:'Main string supplier. Sea freight 6–8 weeks, air freight about 10 days.',status:'Active',createdAt:t0},
+  {id:'s-msvasia',name:'MSV Asia Logistics',contact:'Daniel Tan',country:'Singapore',email:'ops@msv-asia.example',phone:'+65 6000 2290',address:'2 Changi South Lane, Singapore',currency:'SGD',notes:'Local top-up orders from regional stock.',status:'Active',createdAt:t0+1},
+  {id:'s-formosa',name:'Formosa Grip Works',contact:'Lin Mei-Hua',country:'Taiwan',email:'sales@formosagrip.example',phone:'+886 4 0000 1172',address:'Gongye 1st Road, Taichung, Taiwan',currency:'USD',notes:'Overgrips and small accessories.',status:'Active',createdAt:t0+2},
+]}
 
 function seedDb(){
-  const t0=Date.UTC(2026,8,1);
-  const db={version:2,categories:[],products:[],variants:[],movements:[],seq:0};
+  const t0=Date.UTC(2026,8,1), day=86400000;
+  const db={version:3,categories:[],products:[],variants:[],movements:[],seq:0,suppliers:seedSuppliers(t0),purchases:[],activity:[],counters:{},currencies:DEFAULT_CURRENCIES.slice()};
   const cat=(id,name,usesGauge)=>db.categories.push({id,name,usesGauge});
   cat('cat-strings','Tennis Strings',true);cat('cat-grips','Grips',false);cat('cat-acc','Accessories',false);cat('cat-equip','Equipment',false);cat('cat-other','Other',false);
   const P=[
@@ -511,6 +545,7 @@ function seedDb(){
   ];
   P.forEach(([code,name,categoryId,description],i)=>db.products.push({id:'p-'+code.toLowerCase(),name,brand:'MSV',code,categoryId,description,status:'Active',createdAt:t0+i}));
   const PM=Object.fromEntries(P.map(p=>[p[0],p]));
+  // [product code, gauge, colour, packaging, quantity on hand today, reorder level, damaged adjustment]
   const RAW=[
     ['FH','1.18','Black','Reel',58,10],['FH','1.23','Black','Reel',24,10,-2],['FH','1.25','Black','Reel',30,10],['FH','1.27','Black','Reel',6,8],
     ['FH','1.23','White','Set',100,40],['FH','1.23','Black','Set',136,40],['FH','1.18','Red','Set',22,30],
@@ -521,24 +556,49 @@ function seedDb(){
     ['BU','1.25','Black','Reel',46,8],['BU','1.25','White','Set',14,25],['BU','1.30','Black','Reel',38,8],
     ['ST','1.30','White','Reel',40,6],['ST','1.30','White','Set',48,25],['ST','1.25','White','Reel',30,6],
   ];
-  let k=0;
+  const plan=[]; let k=0;
   RAW.forEach(([code,g,c,pack,qty,reorder,adj])=>{
     const p=PM[code],[cost,price]=pack==='Reel'?p[4]:p[5];
     const v={id:'v'+(++k),productId:'p-'+code.toLowerCase(),sku:['MSV',code,g.replace('.',''),colourCode(c),pack[0]].join('-'),gauge:g,colour:c,packaging:pack,cost,price,reorder,qty:0,status:'Active',createdAt:t0+k};
-    db.variants.push(v);
-    const opening=qty-(adj||0);
-    if(opening>0) postMovement(db,v.id,{type:'opening',change:opening,date:'2026-09-01',reason:'Opening Balance',notes:'Stock on hand at system setup',unitCost:cost,createdAt:t0+k*10});
-    if(adj) postMovement(db,v.id,{type:'adjustment',change:adj,date:'2026-10-0'+(5+k%4),reason:'Damaged Item',notes:'Found during weekly stock check',createdAt:t0+86400000*35+k});
+    db.variants.push(v); plan.push({v,qty,adj:adj||0});
   });
   [['White',72,40],['Black',54,40]].forEach(([c,qty,reorder])=>{
     const v={id:'v'+(++k),productId:'p-og',sku:'MSV-OG-'+colourCode(c)+'-3P',gauge:'',colour:c,packaging:'3-pack',cost:2.4,price:6.9,reorder,qty:0,status:'Active',createdAt:t0+k};
-    db.variants.push(v);
-    postMovement(db,v.id,{type:'opening',change:qty,date:'2026-09-01',reason:'Opening Balance',notes:'Stock on hand at system setup',unitCost:v.cost,createdAt:t0+k*10});
+    db.variants.push(v); plan.push({v,qty,adj:0});
   });
+  const bySku=sku=>db.variants.find(v=>v.sku===sku).id;
+  const SEEDP=[
+    {supplierId:'s-msv',date:'2026-09-15',expectedDate:'2026-09-22',receivedDate:'2026-09-22',invoiceNo:'MSV-RE-48812',currency:'EUR',status:'Received',notes:'Sea freight, arrived in one carton.',
+      lines:[['MSV-FH-123-BLK-R',12,68],['MSV-SW-125-BLK-R',10,65],['MSV-FH-123-BLK-S',60,6]],costs:{shipping:180,duties:96,customs:35}},
+    {supplierId:'s-formosa',date:'2026-09-28',expectedDate:'2026-10-02',receivedDate:'2026-10-02',invoiceNo:'FGW-2026-1187',currency:'USD',status:'Received',notes:'',
+      lines:[['MSV-OG-WHT-3P',48,1.75]],costs:{shipping:42}},
+    {supplierId:'s-msv',date:'2026-10-05',expectedDate:'2026-11-12',invoiceNo:'',currency:'EUR',status:'Ordered',notes:'Restock of out-of-stock lines. Sea freight.',
+      lines:[['MSV-FHU-130-BLU-R',8,78],['MSV-HT-123-BLK-S',60,6.4],['MSV-FH-127-BLK-R',10,68]],costs:{shipping:220}},
+    {supplierId:'s-msvasia',date:'2026-10-07',expectedDate:'',invoiceNo:'',currency:'SGD',status:'Draft',notes:'Top-up for Kallang Tennis Hub order.',
+      lines:[['MSV-CF-118-RED-S',40,7.6]],costs:{}},
+  ];
+  const received={};
+  SEEDP.filter(s=>s.status==='Received').forEach(s=>s.lines.forEach(([sku,q])=>received[sku]=(received[sku]||0)+q));
+  // Post in date order so every movement's previous/new quantity chains correctly.
+  plan.forEach(({v,qty,adj},i)=>{const opening=qty-adj-(received[v.sku]||0);
+    if(opening>0) postMovement(db,v.id,{type:'opening',change:opening,date:'2026-09-01',reason:'Opening Balance',notes:'Stock on hand at system setup',createdAt:t0+i*10});});
+  SEEDP.forEach((s,i)=>{
+    const at=Date.parse(s.date+'T09:00:00Z');
+    const p=createPurchaseRecord(db,{...s,lines:s.lines.map(([sku,qty,unitCost])=>({variantId:bySku(sku),qty,unitCost}))},{at,year:2026});
+    if(s.status==='Received') receivePurchase(db,p,{date:s.receivedDate,at:Date.parse(s.receivedDate+'T10:00:00Z')});
+  });
+  plan.forEach(({v,adj},i)=>{ if(adj) postMovement(db,v.id,{type:'adjustment',change:adj,date:'2026-10-0'+(5+i%3),reason:'Damaged Item',notes:'Found during weekly stock check',createdAt:t0+day*35+i}); });
   return db;
 }
-function emptyDb(){const s=seedDb();return {version:2,categories:s.categories,products:[],variants:[],movements:[],seq:0}}
-function migrate(db){ if(!db||db.version!==2) return seedDb(); return db; }
+function emptyDb(){const s=seedDb();return {version:3,categories:s.categories,products:[],variants:[],movements:[],seq:0,suppliers:[],purchases:[],activity:[],counters:DB&&DB.counters?{...DB.counters}:{},currencies:DB&&DB.currencies?DB.currencies.slice():DEFAULT_CURRENCIES.slice()}}
+function migrate(db){
+  if(!db) return seedDb();
+  if(db.version===2){ // Phase 2 data: keep every product, variant and movement; add the purchasing tables.
+    Object.assign(db,{version:3,suppliers:seedSuppliers(Date.now()),purchases:[],activity:[],counters:{},currencies:DEFAULT_CURRENCIES.slice()});
+    return db;
+  }
+  return db.version===3?db:seedDb();
+}
 
 let DB=migrate(Store.load());
 let storageWarned=false;
@@ -547,7 +607,7 @@ function persist(){ const ok=Store.save(DB); if(!ok&&!storageWarned){storageWarn
 /* ---------- Inventory engine ---------- */
 /* The one place stock quantities change. Purchases, sales and returns
    (later phases) call this with their own type and reference. */
-function postMovement(db,variantId,{type,change,date,reason='',notes='',reference='',unitCost=null,createdAt=Date.now()}){
+function postMovement(db,variantId,{type,change,date,reason='',notes='',reference='',unitCost=null,currency=BASE_CURRENCY,createdAt=Date.now(),...links}){
   const v=db.variants.find(x=>x.id===variantId);
   if(!v) throw new Error('Variant not found');
   if(!MOVEMENT_TYPES[type]) throw new Error('Unknown movement type');
@@ -555,14 +615,77 @@ function postMovement(db,variantId,{type,change,date,reason='',notes='',referenc
   if(!change) throw new Error('Quantity change cannot be zero');
   const prev=v.qty, next=prev+change;
   if(next<0) throw new Error(`Only ${prev} in stock, so you can't remove ${-change}.`);
-  const m={id:uid('m'),seq:++db.seq,date:date||todayISO(),variantId,sku:v.sku,type,change,prevQty:prev,newQty:next,unitCost:unitCost??v.cost,reason,notes,reference:reference||(type==='opening'?'Opening':'ADJ-'+String(db.seq).padStart(4,'0')),createdAt};
+  // links: purchaseId, lineId, supplierId (purchases); later saleId, customerId, etc.
+  const m={id:uid('m'),seq:++db.seq,date:date||todayISO(),variantId,sku:v.sku,type,change,prevQty:prev,newQty:next,unitCost:unitCost??v.cost,currency,reason,notes,reference:reference||(type==='opening'?'Opening':'ADJ-'+String(db.seq).padStart(4,'0')),createdAt,...links};
   db.movements.push(m); v.qty=next; return m;
+}
+
+/* ---------- Purchasing engine ----------
+   Supplier → Purchase → Purchase lines → Variants → Stock movements → Inventory.
+   A purchase changes stock only when it is received, and only once:
+   receivePurchase() posts one 'purchase' movement per line; reversePurchase()
+   posts matching 'purchase_reversal' movements and keeps the originals. */
+function lineTotal(l){return round2(l.qty*l.unitCost)}
+function purchaseTotals(p){
+  const sub=round2(p.lines.reduce((a,l)=>a+lineTotal(l),0)), add=round2(COST_FIELDS.reduce((a,[k])=>a+(+(p.costs||{})[k]||0),0));
+  return {items:p.lines.length,units:p.lines.reduce((a,l)=>a+l.qty,0),sub,add,total:round2(sub+add)};
+}
+function nextPurchaseNo(db,year){const k='PUR-'+year;db.counters[k]=(db.counters[k]||0)+1;return `${k}-${String(db.counters[k]).padStart(4,'0')}`}
+function logActivity(db,a){db.activity.push({id:uid('a'),at:Date.now(),...a});if(db.activity.length>300)db.activity.splice(0,db.activity.length-300)}
+function addHistory(p,text,kind,at=Date.now()){p.history.push({at,text,kind})}
+function createPurchaseRecord(db,d,{at=Date.now(),year=new Date().getFullYear()}={}){
+  const s=db.suppliers.find(x=>x.id===d.supplierId);
+  const p={id:uid('pu'),no:nextPurchaseNo(db,year),supplierId:d.supplierId,date:d.date,expectedDate:d.expectedDate||'',invoiceNo:d.invoiceNo||'',currency:d.currency,
+    status:d.status==='Ordered'?'Ordered':'Draft',notes:d.notes||'',costs:{...emptyCosts(),...(d.costs||{})},
+    lines:d.lines.map(l=>({id:uid('pl'),variantId:l.variantId,qty:l.qty,unitCost:l.unitCost})),createdAt:at,history:[]};
+  db.purchases.push(p);
+  addHistory(p,d.status==='Received'?'Created':`Created as ${p.status}`,'created',at);
+  if(d.status!=='Received') logActivity(db,{at,tone:p.status==='Ordered'?'info':'mute',icon:'file-plus',title:`Purchase ${p.no} created`,sub:`${s?s.name:'Supplier'} · ${p.status}`,link:'purchase-'+p.id});
+  return p;
+}
+function receivePurchase(db,p,{date,updateCost=false,at=Date.now()}){
+  if(!['Draft','Ordered'].includes(p.status)) throw new Error(`${p.no} is ${p.status.toLowerCase()}, so it can't be received again.`);
+  if(db.movements.some(m=>m.purchaseId===p.id&&m.type==='purchase')) throw new Error(`${p.no} has already added stock.`);
+  if(!p.lines.length) throw new Error('Add at least one item before receiving.');
+  for(const l of p.lines){
+    if(!db.variants.some(v=>v.id===l.variantId)) throw new Error('An item on this purchase no longer exists.');
+    if(!(Number.isInteger(l.qty)&&l.qty>0)) throw new Error('Every item needs a quantity greater than 0.');
+    if(!(l.unitCost>=0)) throw new Error('Unit costs cannot be negative.');
+  }
+  const s=db.suppliers.find(x=>x.id===p.supplierId); let units=0;
+  p.lines.forEach((l,i)=>{
+    postMovement(db,l.variantId,{type:'purchase',change:l.qty,date,reason:`Received from ${s?s.name:'supplier'}`,notes:p.invoiceNo?`Invoice ${p.invoiceNo}`:'',reference:p.no,unitCost:l.unitCost,currency:p.currency,purchaseId:p.id,lineId:l.id,supplierId:p.supplierId,createdAt:at+i});
+    const v=db.variants.find(x=>x.id===l.variantId);
+    if(!v.lastPurchaseDate||date>=v.lastPurchaseDate) Object.assign(v,{lastPurchaseCost:l.unitCost,lastPurchaseCurrency:p.currency,lastPurchaseDate:date,lastPurchaseId:p.id});
+    if(updateCost&&p.currency===BASE_CURRENCY) v.cost=l.unitCost;
+    units+=l.qty;
+  });
+  Object.assign(p,{status:'Received',receivedDate:date,receivedAt:at});
+  addHistory(p,`Received · ${n0(units)} units added to inventory${updateCost&&p.currency===BASE_CURRENCY?' · cost prices updated':''}`,'received',at);
+  logActivity(db,{at,tone:'ok',icon:'package-check',title:`Received ${p.no} from ${s?s.name:'supplier'}`,sub:`+${n0(units)} units added to inventory`,link:'purchase-'+p.id});
+  return units;
+}
+function reversalShortfalls(db,p){
+  const need={}; p.lines.forEach(l=>need[l.variantId]=(need[l.variantId]||0)+l.qty);
+  return Object.entries(need).map(([id,q])=>{const v=db.variants.find(x=>x.id===id);return {v,q,after:v?v.qty-q:-q}}).filter(x=>x.after<0);
+}
+function reversePurchase(db,p,{date,reason,notes='',at=Date.now()}){
+  if(p.status!=='Received') throw new Error('Only received purchases can be reversed.');
+  const short=reversalShortfalls(db,p);
+  if(short.length) throw new Error(`Not enough stock to reverse: ${short.map(x=>`${x.v?x.v.sku:'deleted item'} has ${x.v?x.v.qty:0}, needs ${x.q}`).join('; ')}.`);
+  let units=0;
+  p.lines.forEach((l,i)=>{postMovement(db,l.variantId,{type:'purchase_reversal',change:-l.qty,date,reason:`Reversal: ${reason}`,notes,reference:p.no,unitCost:l.unitCost,currency:p.currency,purchaseId:p.id,lineId:l.id,supplierId:p.supplierId,createdAt:at+i});units+=l.qty});
+  Object.assign(p,{status:'Reversed',reversedDate:date,reversedAt:at,reverseReason:reason});
+  addHistory(p,`Reversed · ${n0(units)} units removed from inventory · ${reason}${notes?' · '+notes:''}`,'reversed',at);
+  logActivity(db,{at,tone:'bad',icon:'undo-2',title:`Purchase ${p.no} reversed`,sub:`−${n0(units)} units · ${reason}`,link:'purchase-'+p.id});
+  return units;
 }
 const stockStatus = v=>v.qty<=0?'Out of Stock':v.qty<=v.reorder?'Low Stock':'In Stock';
 const productOf = v=>DB.products.find(p=>p.id===v.productId);
 const categoryOf = p=>DB.categories.find(c=>c.id===p.categoryId)||{name:'Uncategorised',usesGauge:false};
 const variantsOf = pid=>DB.variants.filter(v=>v.productId===pid);
 const movementsOf = vid=>DB.movements.filter(m=>m.variantId===vid).sort((a,b)=>a.seq-b.seq);
+const usedInPurchases = vid=>DB.purchases.some(p=>p.lines.some(l=>l.variantId===vid));
 const isLive = v=>v.status==='Active'&&productOf(v)?.status==='Active';
 function variantLabel(v){const parts=[v.gauge?gaugeLabel(v.gauge):'',v.colour,v.packaging].filter(Boolean);return parts.length?parts.join(' / '):'Standard'}
 const gaugeLabel = g=>/^\d+(\.\d+)?$/.test(g)?g+'mm':g;
@@ -612,17 +735,6 @@ const CUSTOMERS = [
   {id:'c11',name:'Sarah Tan',             type:'Individual',      country:'Singapore',   city:'Singapore',    contact:'Sarah Tan',     email:'sarah.tan@gmail.com',   phone:'+65 8234 1190',   terms:'Prepaid', orders:4,  total:420,   last:'20 Oct 2026'},
 ];
 const CM = Object.fromEntries(CUSTOMERS.map(c=>[c.id,c]));
-const PURCHASES = [
-  {no:'PO-2026-018', date:'27 Oct 2026', supplier:'MSV GmbH', country:'Germany', items:6, units:184, total:9860,  cur:'EUR', status:'In Transit'},
-  {no:'PO-2026-017', date:'14 Oct 2026', supplier:'MSV GmbH', country:'Germany', items:4, units:96,  total:6240,  cur:'EUR', status:'Received'},
-  {no:'PO-2026-016', date:'29 Sep 2026', supplier:'MSV GmbH', country:'Germany', items:8, units:310, total:14820, cur:'EUR', status:'Received'},
-  {no:'PO-2026-015', date:'12 Sep 2026', supplier:'MSV Asia Logistics', country:'Singapore', items:3, units:72, total:2140, cur:'SGD', status:'Received'},
-  {no:'PO-2026-014', date:'25 Aug 2026', supplier:'MSV GmbH', country:'Germany', items:7, units:240, total:12980, cur:'EUR', status:'Received'},
-  {no:'PO-2026-013', date:'02 Aug 2026', supplier:'MSV GmbH', country:'Germany', items:5, units:128, total:7460,  cur:'EUR', status:'Received'},
-  {no:'PO-2026-012', date:'18 Jul 2026', supplier:'MSV GmbH', country:'Germany', items:6, units:360, total:15240, cur:'EUR', status:'Received'},
-  {no:'PO-2026-019', date:'—',           supplier:'MSV GmbH', country:'Germany', items:5, units:150, total:8350,  cur:'EUR', status:'Draft'},
-  {no:'PO-2026-011', date:'30 Jun 2026', supplier:'MSV GmbH', country:'Germany', items:2, units:40,  total:2480,  cur:'EUR', status:'Cancelled'},
-];
 const SALES = [
   {no:'INV-1094', date:'27 Oct 2026', cid:'c4', products:'Focus Hex 1.23 Black Set, Swift 1.25 White Set', units:36, amount:496, status:'Paid'},
   {no:'INV-1093', date:'26 Oct 2026', cid:'c9', products:'Focus Hex 1.23 Black Reel', units:2, amount:240, status:'Paid'},
@@ -644,7 +756,7 @@ const TONE = {'In Stock':'ok','Paid':'ok','Completed':'ok','Received':'ok','Acti
   'Low Stock':'warn','Pending':'warn','Partially Paid':'warn',
   'Out of Stock':'bad','Cancelled':'bad','Overdue':'bad',
   'Processing':'info','In Transit':'info','Ordered':'info',
-  'Draft':'mute','Inactive':'mute'};
+  'Draft':'mute','Inactive':'mute','Reversed':'bad'};
 const badge = (s,tone)=>`<span class="badge b-${tone||TONE[s]||'mute'}">${esc(s)}</span>`;
 const sw = c=>`<span class="sw" style="background:${COLOURS[c]||'transparent'};${COLOURS[c]?'':'border-style:dashed'}"></span>`;
 function niceMax(v){if(!v)return 10;const p=Math.pow(10,Math.floor(Math.log10(v)));for(const m of [1,1.5,2,2.5,3,4,5,6,8,10]){if(m*p>=v)return m*p}return 10*p}
@@ -691,15 +803,36 @@ const crumbs = (...parts)=>`<div class="crumb">${parts.map((p,i)=>i<parts.length
 
 /* ---------- View state ---------- */
 const blankInvFilters = ()=>({q:'',cat:'',prod:'',gauge:'',colour:'',pack:'',status:'',showInactive:false});
-const S = {inv:{...blankInvFilters(),sort:'product',dir:1,view:'levels'}, prod:{q:'',cat:'',status:'Active'}, vtab:'Overview', customer:'c1', range:'Last 3 Months', rtab:'Sales', salesFilter:'All', purchFilter:'All', custType:'All', custQ:''};
+const S = {pur:{...blankPurFilters(),sort:'no',dir:-1}, sup:{q:'',status:'Active'}, inv:{...blankInvFilters(),sort:'product',dir:1,view:'levels'}, prod:{q:'',cat:'',status:'Active'}, vtab:'Overview', customer:'c1', range:'Last 3 Months', rtab:'Sales', salesFilter:'All', purchFilter:'All', custType:'All', custQ:''};
 
 /* ---------- Pages ---------- */
 const PAGES = {};
+/* ----- Purchasing helpers ----- */
+const cur = (n,c,d=2)=>`${c} ${(+n||0).toLocaleString('en-SG',{minimumFractionDigits:d,maximumFractionDigits:d})}`;
+const supplierOf = p=>DB.suppliers.find(s=>s.id===p.supplierId)||{id:'',name:'Unknown supplier',country:'',currency:''};
+const variantById = id=>DB.variants.find(v=>v.id===id);
+const thisMonth = iso=>!!iso&&iso.slice(0,7)===todayISO().slice(0,7);
+function byCurrency(list,fn){const m={};list.forEach(p=>{m[p.currency]=round2((m[p.currency]||0)+fn(p))});return m}
+const fmtCurrencies = (m,d=2)=>Object.keys(m).length?Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([c,n])=>cur(n,c,d)).join(' · '):'—';
+function purchaseSearchText(p){const s=supplierOf(p);return [p.no,s.name,s.country,p.invoiceNo,p.notes,p.currency,p.status,...p.lines.flatMap(l=>{const v=variantById(l.variantId);return v?[v.sku,productOf(v).name,variantLabel(v)]:[]})].join(' ').toLowerCase()}
+const purchaseLink = p=>`<a class="ref-link" href="#purchase-${p.id}">${esc(p.no)}</a>`;
+function purchaseLineLabel(l){const v=variantById(l.variantId);return v?{name:productOf(v).name,variant:variantLabel(v),sku:v.sku,v}:{name:'Deleted item',variant:'',sku:'—',v:null}}
+
+/* ----- Dashboard ----- */
+function activityFeed(n){
+  const acts=DB.activity.map(a=>({...a}));
+  const mv=DB.movements.filter(m=>m.type==='opening'||m.type==='adjustment').map(m=>{const v=variantById(m.variantId),p=v&&productOf(v),up=m.change>0;
+    return {at:m.createdAt,tone:up?'ok':'warn',icon:m.type==='opening'?'package-plus':'sliders-horizontal',title:`${MOVEMENT_TYPES[m.type].label} · ${up?'+':'−'}${n0(Math.abs(m.change))}`,sub:`${p?p.name:''} ${v?variantLabel(v):m.sku} · ${m.reason}`,link:v?'variant-'+v.id:''}});
+  return acts.concat(mv).sort((a,b)=>b.at-a.at).slice(0,n);
+}
+const activityList = items=>`<div class="list">${items.map(a=>`<div class="list-item ${a.link?'click':''}" ${a.link?`data-go="${a.link}"`:''} style="${a.link?'cursor:pointer':''}"><span class="act-icon" style="background:var(--${a.tone}-bg);color:var(--${a.tone}-fg)">${ic(a.icon,'i i-sm')}</span><div style="min-width:0"><div class="t">${esc(a.title)}</div><div class="d">${esc(a.sub)}</div></div><span class="when">${timeAgo(a.at)}</span></div>`).join('')}</div>`;
 PAGES.dashboard = ()=>{
-  const live=DB.variants.filter(isLive), t=totals(DB.variants), att=attention();
+  const t=totals(DB.variants), att=attention();
   const lowRows=att.slice().sort((a,b)=>a.qty/(a.reorder||1)-b.qty/(b.reorder||1)).slice(0,6);
-  const recent=DB.movements.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,6);
+  const recentP=DB.purchases.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,5);
+  const recvM=DB.purchases.filter(p=>p.status==='Received'&&thisMonth(p.receivedDate));
   const today=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const feed=activityFeed(6);
   return head('Dashboard',`${today} · overview of stock and sales across Southeast Asia`,btn('Record Purchase','purchase','package-plus')+btn('Record Sale','sale','receipt','primary'))+
   `<div class="grid kpis">
     ${kpi('Inventory Value',money(Math.round(t.value)),`At cost · ${sgd(Math.round(t.retail))} at selling price`,'wallet')}
@@ -721,9 +854,159 @@ PAGES.dashboard = ()=>{
     <div class="card"><div class="card-head"><h3>Top Selling Products</h3>${sample()}</div>
       <div class="card-body"><div class="list">${MOCK.topProducts.map((p,i)=>`<div class="list-item" style="align-items:center"><span class="rank">${i+1}</span><div style="min-width:0"><div class="t">${p[0]}</div><div class="d">${p[1]} · ${p[2]} units</div></div><span class="when strong" style="color:var(--fg);font-size:13px">${sgd(p[3])}</span></div>`).join('')}</div></div></div>
   </div>
-  <div class="card"><div class="card-head"><h3>Recent Stock Activity</h3><button class="btn sm ghost" data-go="inventory" data-view="history">View all ${ic('arrow-right','i i-sm')}</button></div>
-    <div class="card-body">${recent.length?`<div class="list">${recent.map(m=>{const v=DB.variants.find(x=>x.id===m.variantId),p=v&&productOf(v);const up=m.change>0;return `<div class="list-item"><span class="act-icon" style="background:var(--${up?'ok':'warn'}-bg);color:var(--${up?'ok':'warn'}-fg)">${ic(m.type==='opening'?'package-plus':'sliders-horizontal','i i-sm')}</span><div style="min-width:0"><div class="t">${MOVEMENT_TYPES[m.type].label} · <span class="${up?'chg-in':'chg-out'}">${up?'+':'−'}${Math.abs(m.change)}</span></div><div class="d">${esc(p?p.name:'')} ${esc(v?variantLabel(v):m.sku)} · ${esc(m.reason)}</div></div><span class="when">${timeAgo(m.createdAt)}</span></div>`}).join('')}</div>`:`<div class="empty" style="padding:24px"><b>No stock activity yet</b>Add a product with opening stock to get started.</div>`}</div></div>`;
+  <div class="grid g-2-1">
+    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Recent Purchases</h3><span class="sub">This month: ${recvM.length} received · ${n0(recvM.reduce((a,p)=>a+purchaseTotals(p).units,0))} units in</span></div><button class="btn sm ghost" data-go="purchases">View all ${ic('arrow-right','i i-sm')}</button></div>
+      ${recentP.length?`<div class="table-wrap"><table><thead><tr><th>Purchase</th><th>Supplier</th><th>Status</th><th class="num">Units</th><th class="num">Total Cost</th></tr></thead><tbody>
+      ${recentP.map(p=>{const t=purchaseTotals(p);return `<tr class="click" data-go="purchase-${p.id}"><td class="mono strong" style="color:var(--fg)">${esc(p.no)}<span class="cell-sub">${fmtDate(p.date)}</span></td><td>${esc(supplierOf(p).name)}</td><td>${badge(p.status)}</td><td class="num">${n0(t.units)}</td><td class="num strong">${cur(t.total,p.currency)}</td></tr>`}).join('')}
+      </tbody></table></div>`:`<div class="empty"><b>No purchases yet</b><button class="link-btn" data-action="purchase">Record your first purchase</button></div>`}</div>
+    <div class="card"><div class="card-head"><h3>Recent Activity</h3><button class="btn sm ghost" data-go="inventory" data-view="history">Stock history ${ic('arrow-right','i i-sm')}</button></div>
+      <div class="card-body">${feed.length?activityList(feed):`<div class="empty" style="padding:24px"><b>No activity yet</b>Add products or record a purchase to get started.</div>`}</div></div>
+  </div>`;
 };
+
+/* ----- Purchases ----- */
+function blankPurFilters(){return {q:'',status:'',supplier:'',currency:'',product:'',country:'',from:'',to:''}}
+function purRows(){
+  const f=S.pur;
+  const rows=DB.purchases.filter(p=>{const s=supplierOf(p);
+    return (!f.q||matches(purchaseSearchText(p),f.q))&&(!f.status||p.status===f.status)&&(!f.supplier||p.supplierId===f.supplier)&&(!f.currency||p.currency===f.currency)
+      &&(!f.product||p.lines.some(l=>{const v=variantById(l.variantId);return v&&v.productId===f.product}))&&(!f.country||s.country===f.country)&&(!f.from||p.date>=f.from)&&(!f.to||p.date<=f.to)});
+  const key={no:p=>p.no,date:p=>p.date,supplier:p=>supplierOf(p).name,invoice:p=>p.invoiceNo,status:p=>PURCHASE_STATUSES.indexOf(p.status),items:p=>p.lines.length,units:p=>purchaseTotals(p).units,currency:p=>p.currency,sub:p=>purchaseTotals(p).sub,add:p=>purchaseTotals(p).add,total:p=>purchaseTotals(p).total}[f.sort];
+  rows.sort((a,b)=>{const x=key(a),y=key(b);return (typeof x==='number'?x-y:String(x).localeCompare(String(y),undefined,{numeric:true}))*f.dir||b.no.localeCompare(a.no,undefined,{numeric:true})});
+  return rows;
+}
+const purFiltersActive = ()=>Object.entries(S.pur).some(([k,v])=>!['sort','dir'].includes(k)&&v);
+PAGES.purchases = ()=>{
+  const f=S.pur, all=DB.purchases;
+  const recvM=all.filter(p=>p.status==='Received'&&thisMonth(p.receivedDate)), ordered=all.filter(p=>p.status==='Ordered'), drafts=all.filter(p=>p.status==='Draft');
+  const spendM=byCurrency(recvM,p=>purchaseTotals(p).total), spendTop=Object.entries(spendM).sort((a,b)=>b[1]-a[1]);
+  const nextEta=ordered.map(p=>p.expectedDate).filter(Boolean).sort()[0];
+  const countries=uniqSorted(DB.suppliers.map(s=>s.country));
+  const products=DB.products.filter(p=>all.some(pu=>pu.lines.some(l=>variantById(l.variantId)?.productId===p.id))).sort((a,b)=>a.name.localeCompare(b.name));
+  return head('Purchases',`${all.length} purchase records from ${new Set(all.map(p=>p.supplierId)).size} suppliers. Stock is added only when a purchase is marked Received.`,btn('Suppliers','gosuppliers','factory')+btn('Record Purchase','purchase','package-plus','primary'))+
+  `<div class="grid kpis">
+    ${kpi('Units Received This Month',n0(recvM.reduce((a,p)=>a+purchaseTotals(p).units,0)),`${recvM.length} purchase${recvM.length===1?'':'s'} received`,'package-check')}
+    ${kpi('Spent This Month',spendTop.length?`<small>${spendTop[0][0]}</small>${(+spendTop[0][1]).toLocaleString('en-SG',{maximumFractionDigits:0})}`:'—',spendTop.length>1?spendTop.slice(1).map(([c,n])=>cur(n,c,0)).join(' · '):'Received purchases incl. additional costs','wallet')}
+    ${kpi('On Order',ordered.length,ordered.length?`${n0(ordered.reduce((a,p)=>a+purchaseTotals(p).units,0))} units${nextEta?` · next expected ${fmtDate(nextEta)}`:''}`:'Nothing on order','ship')}
+    ${kpi('Drafts',drafts.length,drafts.length?'Not yet ordered or received':'No drafts','file-pen-line')}
+  </div>
+  <div class="card" style="overflow:hidden">
+    <div class="toolbar">
+      <div class="field-search">${ic('search')}<input class="input" id="purQ" placeholder="Search number, supplier, invoice, product, SKU, notes" value="${esc(f.q)}" aria-label="Search purchases"></div>
+      <select class="select" data-pfilter="status" aria-label="Status">${opt(PURCHASE_STATUSES,f.status,'All statuses')}</select>
+      <select class="select" data-pfilter="supplier" aria-label="Supplier">${opt(DB.suppliers.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(s=>[s.id,s.name]),f.supplier,'All suppliers')}</select>
+      <select class="select" data-pfilter="currency" aria-label="Currency">${opt(uniqSorted(all.map(p=>p.currency)),f.currency,'All currencies')}</select>
+      <select class="select" data-pfilter="product" aria-label="Product">${opt(products.map(p=>[p.id,p.name]),f.product,'All products')}</select>
+      <select class="select" data-pfilter="country" aria-label="Supplier country">${opt(countries,f.country,'All countries')}</select>
+      <label class="check" style="font-weight:500">From <input type="date" class="input" data-pfilter="from" value="${f.from}" style="width:auto;height:38px" aria-label="From date"></label>
+      <label class="check" style="font-weight:500">To <input type="date" class="input" data-pfilter="to" value="${f.to}" style="width:auto;height:38px" aria-label="To date"></label>
+      <button class="btn sm ghost" data-action="resetPur" ${purFiltersActive()?'':'disabled'}>${ic('rotate-ccw','i i-sm')}Reset Filters</button>
+    </div>
+    <div id="purTable"></div>
+  </div>`;
+};
+function renderPurTable(){
+  const box=$('#purTable'); if(!box) return;
+  const f=S.pur, rows=purRows();
+  const th=(label,key,num)=>`<th class="sortable ${num?'num':''} ${f.sort===key?'sorted':''}" data-psort="${key}" aria-sort="${f.sort===key?(f.dir>0?'ascending':'descending'):'none'}">${label}${sortIcon()}</th>`;
+  box.innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr>${th('Purchase Number','no')}${th('Date','date')}${th('Supplier','supplier')}${th('Invoice Number','invoice')}${th('Status','status')}${th('Items','items',1)}${th('Units','units',1)}${th('Currency','currency')}${th('Subtotal','sub',1)}${th('Additional Costs','add',1)}${th('Total Cost','total',1)}<th class="num">Actions</th></tr></thead><tbody>
+    ${rows.map(p=>{const t=purchaseTotals(p),s=supplierOf(p);return `<tr class="click" data-go="purchase-${p.id}"><td class="mono strong" style="color:var(--fg)">${esc(p.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(p.date)}</td><td style="white-space:nowrap"><span class="strong">${esc(s.name)}</span><span class="cell-sub">${esc(s.country)}</span></td><td class="mono">${esc(p.invoiceNo)||'<span class="muted">—</span>'}</td><td>${badge(p.status)}</td><td class="num">${t.items}</td><td class="num strong">${n0(t.units)}</td><td>${esc(p.currency)}</td><td class="num">${cur(t.sub,p.currency).replace(p.currency+' ','')}</td><td class="num muted">${cur(t.add,p.currency).replace(p.currency+' ','')}</td><td class="num strong">${cur(t.total,p.currency).replace(p.currency+' ','')}</td><td class="num" style="white-space:nowrap">${['Draft','Ordered'].includes(p.status)?`<button class="btn sm" data-action="receivePurchase" data-id="${p.id}">Receive</button>`:`<button class="btn sm ghost" data-go="purchase-${p.id}">View</button>`}</td></tr>`}).join('')}
+    </tbody></table></div><div class="table-foot"><span>Showing ${rows.length} of ${DB.purchases.length} purchases</span><span>Amounts are in each purchase's own currency</span></div>`
+    :`<div class="empty"><b>${DB.purchases.length?'No purchases match those filters':'No purchases yet'}</b>${DB.purchases.length?`Try another search or <button class="link-btn" data-action="resetPur">reset the filters</button>.`:`<button class="link-btn" data-action="purchase">Record your first purchase</button>`}</div>`;
+  refreshIcons();
+}
+
+PAGES.purchase = id=>{
+  const p=DB.purchases.find(x=>x.id===id); if(!p) return notFound('purchase');
+  const s=supplierOf(p), t=purchaseTotals(p), c=p.currency, mv=DB.movements.filter(m=>m.purchaseId===p.id);
+  const A=(l,a,i,k='')=>btn(l,a,i,k,`data-id="${p.id}"`);
+  const later=A('Add Note','notePurchase','message-square-plus')+A('Copy as New','copyPurchase','copy');
+  const actions={Draft:A('Edit','editPurchase','pencil')+A('Delete','deletePurchase','trash-2','ghost danger-btn')+A('Mark as Ordered','orderPurchase','send')+A('Mark as Received','receivePurchase','package-check','primary'),
+    Ordered:A('Edit','editPurchase','pencil')+A('Cancel Purchase','cancelPurchase','circle-x','ghost danger-btn')+A('Mark as Received','receivePurchase','package-check','primary'),
+    Received:A('Reverse Purchase','reversePurchase','undo-2','ghost danger-btn')+later,Cancelled:later,Reversed:later}[p.status];
+  const notice={Draft:['info','file-pen-line','Draft. This purchase has not changed stock. Stock is added once, when you mark it as Received.'],
+    Ordered:['info','ship',`Ordered${p.expectedDate?`, expected ${fmtDate(p.expectedDate)}`:''}. Stock is added once, when you mark it as Received.`],
+    Received:['ok','package-check',`Received ${fmtDate(p.receivedDate)}. ${n0(t.units)} units were added to inventory. Items and quantities are now locked; to undo, use Reverse Purchase.`],
+    Cancelled:['mute','circle-x',`Cancelled${p.cancelledDate?' '+fmtDate(p.cancelledDate):''}${p.cancelReason?` · ${p.cancelReason}`:''}. No stock was affected.`],
+    Reversed:['bad','undo-2',`Reversed ${fmtDate(p.reversedDate)} · ${p.reverseReason||''}. The stock it added was removed; both the receipt and the reversal stay in the stock history.`]}[p.status];
+  const mvFor=l=>mv.filter(m=>m.lineId===l.id);
+  return head(`${esc(p.no)} <span style="vertical-align:5px">${badge(p.status)}</span>`,`${esc(s.name)} · ${fmtDate(p.date)}${p.invoiceNo?` · Invoice ${esc(p.invoiceNo)}`:''} · ${esc(c)}`,actions,crumbs(['Purchases','purchases'],[p.no]))+
+  `<div class="notice" style="background:var(--${notice[0]}-bg);color:var(--${notice[0]}-fg)">${ic(notice[1],'i i-sm')}${esc(notice[2])}</div>
+  <div class="grid kpis">
+    ${kpi('Total Units',n0(t.units),`${t.items} item${t.items===1?'':'s'}`,'boxes')}
+    ${kpi('Subtotal',`<small>${esc(c)}</small>${t.sub.toLocaleString('en-SG',{minimumFractionDigits:2,maximumFractionDigits:2})}`,'Items only','receipt')}
+    ${kpi('Additional Costs',`<small>${esc(c)}</small>${t.add.toLocaleString('en-SG',{minimumFractionDigits:2,maximumFractionDigits:2})}`,'Freight, duties and fees','truck')}
+    ${kpi('Total Cost',`<small>${esc(c)}</small>${t.total.toLocaleString('en-SG',{minimumFractionDigits:2,maximumFractionDigits:2})}`,'Subtotal + additional costs','wallet')}
+  </div>
+  <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>Items</h3><span class="sub">${t.items} line${t.items===1?'':'s'} · ${n0(t.units)} units</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Product</th><th>Variant</th><th>SKU</th><th class="num">Quantity</th><th class="num">Unit Cost</th><th class="num">Line Total</th>${mv.length?'<th>Stock</th>':''}</tr></thead><tbody>
+      ${p.lines.map(l=>{const L=purchaseLineLabel(l),ms=mvFor(l);return `<tr ${L.v?`class="click" data-variant="${L.v.id}"`:''}><td class="strong" style="white-space:nowrap">${esc(L.name)}</td><td style="white-space:nowrap">${L.v&&L.v.colour?sw(L.v.colour)+' ':''}${esc(L.variant)}</td><td class="mono">${esc(L.sku)}</td><td class="num strong">${n0(l.qty)}</td><td class="num">${cur(l.unitCost,c)}</td><td class="num strong">${cur(lineTotal(l),c)}</td>${mv.length?`<td style="white-space:nowrap">${ms.map(m=>`<span class="${m.change>0?'chg-in':'chg-out'} strong">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</span> <span class="muted">${m.prevQty} → ${m.newQty}</span>`).join('<br>')}</td>`:''}</tr>`}).join('')}
+      </tbody></table></div></div>
+  <div class="grid g-3">
+    <div class="card"><div class="card-head"><h3>Details</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:130px minmax(0,1fr)">
+      <dt>Supplier</dt><dd>${s.id?`<a href="#supplier-${s.id}">${esc(s.name)}</a>`:esc(s.name)}</dd><dt>Country</dt><dd>${esc(s.country)||'—'}</dd>
+      <dt>Purchase date</dt><dd>${fmtDate(p.date)}</dd><dt>Expected arrival</dt><dd>${fmtDate(p.expectedDate)}</dd><dt>Received</dt><dd>${fmtDate(p.receivedDate)}</dd>
+      <dt>Invoice number</dt><dd>${esc(p.invoiceNo)||'—'}</dd><dt>Currency</dt><dd>${esc(c)}</dd><dt>Status</dt><dd>${badge(p.status)}</dd></dl></div></div>
+    <div class="card"><div class="card-head"><h3>Costs and notes</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:16px">
+      <div class="summary"><div><span>Subtotal · ${n0(t.units)} units</span><span>${cur(t.sub,c)}</span></div>
+      ${COST_FIELDS.map(([k,l])=>`<div><span>${k==='other'&&p.costs.otherDesc?`Other: ${esc(p.costs.otherDesc)}`:l}</span><span class="${+p.costs[k]?'':'muted'}">${cur(p.costs[k]||0,c)}</span></div>`).join('')}
+      <div class="total"><span>Total Purchase Cost</span><span>${cur(t.total,c)}</span></div></div>
+      <div><div class="field-label" style="margin-bottom:4px">Notes</div><p class="desc">${p.notes?esc(p.notes):'<span class="muted">No notes</span>'}</p></div>
+      <div class="note">${ic('info','i i-sm')}Additional costs are stored with the purchase. Spreading them across item costs (landed cost) comes in a later phase.</div></div></div>
+    <div class="card"><div class="card-head"><h3>Activity</h3></div><div class="card-body"><div class="timeline">${p.history.slice().reverse().map(h=>`<div class="tl-item"><span class="tl-dot" style="background:var(--${{received:'ok-fg',reversed:'bad-fg',cancelled:'bad-fg',ordered:'info-fg',note:'warn-fg'}[h.kind]||'fg-3'})"></span><span>${esc(h.text)}</span><span class="muted" style="white-space:nowrap;font-size:12.5px">${fmtStamp(h.at)}</span></div>`).join('')}</div></div></div>
+  </div>`;
+};
+
+/* ----- Suppliers ----- */
+function supplierStats(s){
+  const ps=DB.purchases.filter(p=>p.supplierId===s.id), rec=ps.filter(p=>p.status==='Received');
+  const active=ps.filter(p=>!['Cancelled','Reversed'].includes(p.status));
+  return {ps,rec,count:rec.length,records:ps.length,amount:byCurrency(rec,p=>purchaseTotals(p).total),last:active.map(p=>p.date).sort().pop()||''};
+}
+PAGES.suppliers = ()=>{
+  const f=S.sup;
+  const rows=DB.suppliers.filter(s=>(f.status==='All'||s.status===f.status)&&(!f.q||matches([s.name,s.country,s.contact,s.email,s.phone,s.currency,s.notes].join(' ').toLowerCase(),f.q))).sort((a,b)=>a.name.localeCompare(b.name));
+  return head('Suppliers',`${DB.suppliers.length} suppliers · ${DB.suppliers.filter(s=>s.status==='Active').length} active`,btn('Add Supplier','addSupplier','plus','primary'),crumbs(['Purchases','purchases'],['Suppliers']))+
+  `<div class="card" style="overflow:hidden">
+    <div class="toolbar"><div class="field-search">${ic('search')}<input class="input" id="supQ" placeholder="Search name, country, contact, email" value="${esc(f.q)}" aria-label="Search suppliers"></div>${filterSeg(['Active','Inactive','All'],f.status,'sstatus')}</div>
+    ${rows.length?`<div class="table-wrap"><table><thead><tr><th>Supplier Name</th><th>Country</th><th>Contact Person</th><th>Email</th><th>Phone</th><th>Currency</th><th class="num">Total Purchases</th><th>Last Purchase</th><th>Status</th></tr></thead><tbody>
+    ${rows.map(s=>{const st=supplierStats(s);return `<tr class="click ${s.status==='Active'?'':'inactive-row'}" data-go="supplier-${s.id}"><td class="strong" style="white-space:nowrap">${esc(s.name)}</td><td>${esc(s.country)||'—'}</td><td>${esc(s.contact)||'—'}</td><td>${esc(s.email)||'—'}</td><td style="white-space:nowrap">${esc(s.phone)||'—'}</td><td>${esc(s.currency)}</td><td class="num" style="white-space:nowrap"><span class="strong">${fmtCurrencies(st.amount,0)}</span><span class="cell-sub">${st.count} received</span></td><td class="muted" style="white-space:nowrap">${fmtDate(st.last)}</td><td>${badge(s.status)}</td></tr>`}).join('')}
+    </tbody></table></div>`:`<div class="empty"><b>${DB.suppliers.length?'No suppliers match':'No suppliers yet'}</b>${DB.suppliers.length?'Try another search or status.':'<button class="link-btn" data-action="addSupplier">Add your first supplier</button>'}</div>`}
+  </div>`;
+};
+PAGES.supplier = id=>{
+  const s=DB.suppliers.find(x=>x.id===id); if(!s) return notFound('supplier');
+  const st=supplierStats(s), ps=st.ps.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.no.localeCompare(a.no));
+  const actions=btn('Edit Supplier','editSupplier','pencil','',`data-id="${s.id}"`)+
+    (s.status==='Active'?btn('Deactivate','toggleSupplier','circle-pause','ghost',`data-id="${s.id}"`):btn('Reactivate','toggleSupplier','circle-play','',`data-id="${s.id}"`))+
+    (!ps.length?btn('Delete','deleteSupplier','trash-2','ghost danger-btn',`data-id="${s.id}"`):'')+
+    (s.status==='Active'?btn('Record Purchase','purchaseFor','package-plus','primary',`data-id="${s.id}"`):'');
+  return head(esc(s.name),`${esc(s.country)||'No country'} · default currency ${esc(s.currency)}`,actions,crumbs(['Purchases','purchases'],['Suppliers','suppliers'],[s.name]))+
+  (s.status!=='Active'?`<div class="notice">${ic('circle-pause','i i-sm')}This supplier is inactive. Past purchases stay visible, but it won't be offered for new purchases.</div>`:'')+
+  `<div class="grid kpis">
+    ${kpi('Total Purchases',st.count,'Received purchases','package-check')}
+    ${kpi('Total Amount Purchased',Object.keys(st.amount).length===1?`<small>${Object.keys(st.amount)[0]}</small>${Object.values(st.amount)[0].toLocaleString('en-SG',{maximumFractionDigits:0})}`:Object.keys(st.amount).length?fmtCurrencies(st.amount,0):'—','Received, incl. additional costs','wallet')}
+    ${kpi('Last Purchase Date',st.last?fmtDate(st.last):'—','Excludes cancelled and reversed','calendar')}
+    ${kpi('Purchase Records',st.records,`${st.ps.filter(p=>p.status==='Ordered').length} on order · ${st.ps.filter(p=>p.status==='Draft').length} draft`,'file-text')}
+  </div>
+  <div class="split">
+    <div class="card"><div class="card-head"><h3>Supplier Information</h3>${badge(s.status)}</div><div class="card-body"><dl class="spec" style="grid-template-columns:110px minmax(0,1fr)">
+      <dt>Contact</dt><dd>${esc(s.contact)||'—'}</dd><dt>Email</dt><dd style="word-break:break-all">${esc(s.email)||'—'}</dd><dt>Phone</dt><dd>${esc(s.phone)||'—'}</dd>
+      <dt>Address</dt><dd style="font-weight:500">${esc(s.address)||'—'}</dd><dt>Country</dt><dd>${esc(s.country)||'—'}</dd><dt>Currency</dt><dd>${esc(s.currency)}</dd><dt>Notes</dt><dd style="font-weight:500;color:var(--fg-2)">${esc(s.notes)||'—'}</dd></dl></div></div>
+    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>Purchase History</h3><span class="sub">${ps.length} record${ps.length===1?'':'s'}</span></div>
+      ${ps.length?`<div class="table-wrap"><table><thead><tr><th>Purchase Number</th><th>Date</th><th>Status</th><th class="num">Items</th><th class="num">Units</th><th>Currency</th><th class="num">Total</th></tr></thead><tbody>
+      ${ps.map(p=>{const t=purchaseTotals(p);return `<tr class="click" data-go="purchase-${p.id}"><td class="mono strong" style="color:var(--fg)">${esc(p.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(p.date)}</td><td>${badge(p.status)}</td><td class="num">${t.items}</td><td class="num">${n0(t.units)}</td><td>${esc(p.currency)}</td><td class="num strong">${cur(t.total,p.currency).replace(p.currency+' ','')}</td></tr>`}).join('')}
+      </tbody></table></div>`:`<div class="empty"><b>No purchases from this supplier yet</b>${s.status==='Active'?`<button class="link-btn" data-action="purchaseFor" data-id="${s.id}">Record a purchase</button>`:''}</div>`}</div>
+  </div>`;
+};
+
+function variantPurchasesTab(v){
+  const rows=DB.purchases.flatMap(p=>p.lines.filter(l=>l.variantId===v.id).map(l=>({p,l}))).sort((a,b)=>b.p.date.localeCompare(a.p.date)||b.p.no.localeCompare(a.p.no));
+  if(!rows.length) return `<div class="empty"><b>No purchases for this SKU yet</b><button class="link-btn" data-action="purchase">Record a purchase</button></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>Purchase Number</th><th>Date</th><th>Supplier</th><th class="num">Quantity</th><th class="num">Unit Cost</th><th>Status</th></tr></thead><tbody>
+  ${rows.map(({p,l})=>`<tr class="click" data-go="purchase-${p.id}"><td class="mono strong" style="color:var(--fg)">${esc(p.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(p.status==='Received'?p.receivedDate:p.date)}</td><td>${esc(supplierOf(p).name)}</td><td class="num strong">${n0(l.qty)}</td><td class="num">${cur(l.unitCost,p.currency)}</td><td>${badge(p.status)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
 
 /* ----- Inventory ----- */
 const uniqSorted = arr=>[...new Set(arr.filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),undefined,{numeric:true}));
@@ -777,14 +1060,14 @@ function renderInvTable(){
   refreshIcons();
 }
 function movementTable(list,{showVariant}){
-  if(!list.length) return `<div class="empty"><b>No stock movements yet</b>Opening stock and adjustments will appear here.</div>`;
+  if(!list.length) return `<div class="empty"><b>No stock movements yet</b>Opening stock, adjustments and received purchases appear here.</div>`;
   return `<div class="table-wrap"><table><thead><tr><th>Date</th>${showVariant?'<th>Product</th>':''}<th>Movement Type</th><th class="num">Quantity</th><th class="num">Previous Stock</th><th class="num">New Stock</th><th>Reason</th><th>Reference</th></tr></thead><tbody>
-  ${list.map(m=>{const v=DB.variants.find(x=>x.id===m.variantId),p=v&&productOf(v),t=MOVEMENT_TYPES[m.type];return `<tr ${showVariant&&v?`class="click" data-variant="${v.id}"`:''}><td class="muted" style="white-space:nowrap">${fmtDate(m.date)}</td>${showVariant?`<td><span class="strong">${esc(p?p.name:'Deleted product')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')} · ${esc(m.sku)}</span></td>`:''}<td>${badge(t.label,t.tone)}</td><td class="num strong ${m.change>0?'chg-in':'chg-out'}">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</td><td class="num muted">${n0(m.prevQty)}</td><td class="num strong">${n0(m.newQty)}</td><td>${esc(m.reason)}${m.notes?`<span class="cell-sub">${esc(m.notes)}</span>`:''}</td><td class="mono">${esc(m.reference)}</td></tr>`}).join('')}
+  ${list.map(m=>{const v=DB.variants.find(x=>x.id===m.variantId),p=v&&productOf(v),t=MOVEMENT_TYPES[m.type];return `<tr ${showVariant&&v?`class="click" data-variant="${v.id}"`:''}><td class="muted" style="white-space:nowrap">${fmtDate(m.date)}</td>${showVariant?`<td><span class="strong">${esc(p?p.name:'Deleted product')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')} · ${esc(m.sku)}</span></td>`:''}<td>${badge(t.label,t.tone)}</td><td class="num strong ${m.change>0?'chg-in':'chg-out'}">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</td><td class="num muted">${n0(m.prevQty)}</td><td class="num strong">${n0(m.newQty)}</td><td>${esc(m.reason)}${m.notes?`<span class="cell-sub">${esc(m.notes)}</span>`:''}</td><td class="mono">${m.purchaseId&&DB.purchases.some(x=>x.id===m.purchaseId)?`<a class="ref-link" href="#purchase-${m.purchaseId}">${esc(m.reference)}</a>`:esc(m.reference)}</td></tr>`}).join('')}
   </tbody></table></div>`;
 }
 function movementHistoryCard(){
   const list=DB.movements.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.seq-a.seq);
-  return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Movement history</h3><span class="sub">Every opening balance and adjustment, newest first. Purchases and sales join this ledger in later phases.</span></div></div>${movementTable(list,{showVariant:true})}</div>`;
+  return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Movement history</h3><span class="sub">Every opening balance, adjustment, purchase receipt and reversal, newest first. Sales join this ledger in a later phase.</span></div></div>${movementTable(list,{showVariant:true})}</div>`;
 }
 
 /* ----- Products ----- */
@@ -816,7 +1099,7 @@ PAGES.products = ()=>{
 PAGES.product = id=>{
   const p=DB.products.find(x=>x.id===id); if(!p) return notFound('product');
   const vs=variantsOf(p.id).sort((a,b)=>(a.status===b.status?0:a.status==='Active'?-1:1)||variantLabel(a).localeCompare(variantLabel(b),undefined,{numeric:true})), t=totals(vs), c=categoryOf(p);
-  const hasHistory=vs.some(v=>movementsOf(v.id).length);
+  const hasHistory=vs.some(v=>movementsOf(v.id).length||usedInPurchases(v.id));
   const actions=btn('Edit Product','editProduct','pencil','',`data-id="${p.id}"`)+
     (p.status==='Active'?btn('Deactivate','toggleProduct','circle-pause','ghost',`data-id="${p.id}"`):btn('Reactivate','toggleProduct','circle-play','',`data-id="${p.id}"`))+
     (!hasHistory?btn('Delete','deleteProduct','trash-2','ghost danger-btn',`data-id="${p.id}"`):'')+
@@ -843,9 +1126,9 @@ PAGES.variant = id=>{
   const p=productOf(v), c=categoryOf(p), st=stockStatus(v), mv=movementsOf(v.id);
   const actions=btn('Edit Variant','editVariant','pencil','',`data-id="${v.id}"`)+
     (v.status==='Active'?btn('Deactivate Variant','toggleVariant','circle-pause','ghost',`data-id="${v.id}"`):btn('Reactivate Variant','toggleVariant','circle-play','',`data-id="${v.id}"`))+
-    (!mv.length?btn('Delete','deleteVariant','trash-2','ghost danger-btn',`data-id="${v.id}"`):'')+
+    (!mv.length&&!usedInPurchases(v.id)?btn('Delete','deleteVariant','trash-2','ghost danger-btn',`data-id="${v.id}"`):'')+
     btn('Adjust Stock','adjust','sliders-horizontal','primary',`data-id="${v.id}"`);
-  const tabs=['Overview','Stock Movement','Purchases','Sales'];
+  const tabs=['Overview','Stock Movement','Purchases','Sales'], nPur=DB.purchases.filter(p=>p.lines.some(l=>l.variantId===v.id)).length;
   return head(`${esc(p.name)} ${esc(variantLabel(v).replace(/ \/ /g,' – '))}`,`<span class="mono">${esc(v.sku)}</span> · ${esc(c.name)}`,actions,crumbs(['Products','products'],[p.name,'product-'+p.id],[variantLabel(v)]))+
   (v.status!=='Active'||p.status!=='Active'?`<div class="notice">${ic('circle-pause','i i-sm')}${v.status!=='Active'?'This variant is inactive.':'The parent product is inactive.'} Its stock history is kept, and it won't be offered in new transactions.</div>`:'')+
   `<div class="stat-strip">
@@ -857,7 +1140,7 @@ PAGES.variant = id=>{
     <div><span>Stock Status</span><b>${badge(st)}</b></div>
   </div>
   <div class="card" style="overflow:hidden">
-    <div class="tabs" role="tablist" style="padding:0 12px">${tabs.map(t=>`<button role="tab" aria-selected="${S.vtab===t}" data-vtab="${t}">${t}${t==='Stock Movement'?` <span class="muted" style="font-weight:500">${mv.length}</span>`:''}</button>`).join('')}</div>
+    <div class="tabs" role="tablist" style="padding:0 12px">${tabs.map(t=>`<button role="tab" aria-selected="${S.vtab===t}" data-vtab="${t}">${t}${t==='Stock Movement'?` <span class="muted" style="font-weight:500">${mv.length}</span>`:t==='Purchases'?` <span class="muted" style="font-weight:500">${nPur}</span>`:''}</button>`).join('')}</div>
     ${S.vtab==='Overview'?`<div class="card-body grid g-1-1" style="gap:28px">
       <div><h3 style="font-size:15px;margin-bottom:12px">Details</h3><dl class="spec">
         <dt>Product</dt><dd><a href="#product-${p.id}">${esc(p.name)}</a></dd><dt>SKU</dt><dd>${esc(v.sku)}</dd><dt>Brand</dt><dd>${esc(p.brand)}</dd><dt>Category</dt><dd>${esc(c.name)}</dd>
@@ -866,9 +1149,11 @@ PAGES.variant = id=>{
         <dt>Variant status</dt><dd>${badge(v.status)}</dd></dl></div>
       <div><h3 style="font-size:15px;margin-bottom:12px">Stock and value</h3><dl class="spec">
         <dt>Current stock</dt><dd>${n0(v.qty)} units</dd><dt>Reorder level</dt><dd>${v.reorder} units</dd><dt>Cost price</dt><dd>${sgd(v.cost,2)}</dd><dt>Selling price</dt><dd>${sgd(v.price,2)}</dd>
+        <dt>Last purchase cost</dt><dd>${v.lastPurchaseCost!=null?`${cur(v.lastPurchaseCost,v.lastPurchaseCurrency)} <span class="muted" style="font-weight:500">on ${fmtDate(v.lastPurchaseDate)}</span>`:'—'}</dd>
         <dt>Margin</dt><dd>${v.price?Math.round((v.price-v.cost)/v.price*100)+'%':'—'}</dd><dt>Inventory value</dt><dd>${sgd(v.qty*v.cost,2)} <span class="muted" style="font-weight:500">(${n0(v.qty)} × ${sgd(v.cost,2)})</span></dd>
         <dt>Last movement</dt><dd>${mv.length?fmtDate(mv[mv.length-1].date)+' · '+MOVEMENT_TYPES[mv[mv.length-1].type].label:'—'}</dd></dl></div></div>`
     :S.vtab==='Stock Movement'?movementTable(mv,{showVariant:false})
+    :S.vtab==='Purchases'?variantPurchasesTab(v)
     :`<div class="empty"><b>${S.vtab} arrive in a later phase</b>Once ${S.vtab.toLowerCase()} are recorded they will update this SKU's stock and show here.</div>`}
   </div>`;
 };
@@ -876,23 +1161,6 @@ const notFound = what=>`<div class="card empty"><b>That ${what} doesn't exist</b
 
 /* ----- Mock pages (Phase 1, unchanged until later phases) ----- */
 const filterSeg = (list,cur,attr)=>`<div class="seg" role="group">${list.map(x=>`<button aria-pressed="${x===cur}" data-${attr}="${x}">${x}</button>`).join('')}</div>`;
-PAGES.purchases = ()=>{
-  const rows=PURCHASES.filter(p=>S.purchFilter==='All'||p.status===S.purchFilter);
-  return head('Purchases','Stock coming into the business from MSV and other suppliers',sample()+btn('Record Purchase','purchase','package-plus','primary'))+
-  `<div class="grid kpis">
-    ${kpi('Purchased · This Year',money(70880),'7 purchase orders received','truck')}
-    ${kpi('Units Received · This Year',n0(1326),'Average 189 units per order','package-check')}
-    ${kpi('In Transit',money(9860),'PO-2026-018 · ETA 12 Nov','ship')}
-    ${kpi('Average Landed Cost',`<small>+</small>8.4%`,'Shipping and import on top of supplier price','calculator')}
-  </div>
-  <div class="card" style="overflow:hidden">
-    <div class="toolbar">${filterSeg(['All','Received','In Transit','Draft','Cancelled'],S.purchFilter,'pf')}<div class="field-search" style="margin-left:auto">${ic('search')}<input class="input" placeholder="Search purchase or supplier" aria-label="Search purchases"></div></div>
-    <div class="table-wrap"><table><thead><tr><th class="sortable sorted">Purchase Number${sortIcon()}</th><th class="sortable">Date${sortIcon()}</th><th>Supplier</th><th class="num">Items</th><th class="num">Units</th><th class="num sortable">Total Cost${sortIcon()}</th><th>Status</th></tr></thead><tbody>
-    ${rows.map(p=>`<tr><td class="mono strong" style="color:var(--fg)">${p.no}</td><td class="muted">${p.date}</td><td><span class="strong">${p.supplier}</span><span class="cell-sub">${p.country} · invoiced in ${p.cur}</span></td><td class="num">${p.items}</td><td class="num">${p.units}</td><td class="num strong">${sgd(p.total)}</td><td>${badge(p.status)}</td></tr>`).join('')}
-    </tbody></table></div>
-    <div class="table-foot"><span>${rows.length} purchase orders</span><div class="pager"><button class="btn sm" disabled>Previous</button><button class="btn sm">Next</button></div></div>
-  </div>`;
-};
 PAGES.sales = ()=>{
   const rows=SALES.filter(s=>S.salesFilter==='All'||s.status===S.salesFilter);
   return head('Sales','Stock going out to distributors, shops, academies and coaches',sample()+btn('Record Sale','sale','receipt','primary'))+
@@ -989,12 +1257,12 @@ PAGES.settings = ()=>{
     <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
       ${sec('categories','Product Categories','Group products. Turn on Gauge for categories that need it, such as strings.',`<div>${cats}</div><form class="sku-row" id="addCatForm" style="margin-top:16px;max-width:460px"><input class="input" name="name" placeholder="New category, e.g. Bags" aria-label="New category name"><button class="btn" type="submit">${ic('plus','i i-sm')}Add Category</button></form><span class="err" id="catErr"></span>`)}
       ${sec('company','Company Information','Shown on invoices and purchase orders',`<div class="form-grid">${f('Company name','MSV Southeast Asia Pte. Ltd.')}${f('UEN','202412345K')}${f('Email','orders@msv-sea.com','email')}${f('Phone','+65 6123 4567')}<label class="field span-2"><span class="field-label">Address</span><input class="input" value="21 Kallang Avenue, #04-160, Singapore 339412"></label></div>`)}
-      ${sec('currency','Currency','All prices are in SGD for now',`<div class="form-grid">${sel('Base currency',['SGD – Singapore Dollar','MYR – Malaysian Ringgit','USD – US Dollar'],'SGD – Singapore Dollar')}${sel('Supplier currency',['EUR – Euro','USD – US Dollar','SGD – Singapore Dollar'],'EUR – Euro')}<div class="span-2 note">${ic('info','i i-sm')}Exchange rates will be set per purchase in the Purchases phase.</div></div>`)}
+      ${sec('currency','Currency','Stock is valued in SGD. Purchases can be recorded in any currency below.',`<div class="variants">${DB.currencies.map(c=>{const used=DB.purchases.some(p=>p.currency===c)||DB.suppliers.some(x=>x.currency===c);return `<span class="chip" style="height:32px">${esc(c)}${c===BASE_CURRENCY?' · base':''}${c!==BASE_CURRENCY&&!used?` <button class="link-btn" data-action="removeCurrency" data-code="${esc(c)}" style="font-size:12px">Remove</button>`:''}</span>`}).join('')}</div><form class="sku-row" id="addCurForm" style="margin-top:14px;max-width:360px"><input class="input" name="code" maxlength="3" placeholder="Add a code, e.g. AUD" aria-label="Currency code"><button class="btn" type="submit">${ic('plus','i i-sm')}Add Currency</button></form><span class="err" id="curErr"></span><div class="note" style="margin-top:10px">${ic('info','i i-sm')}Exchange rates and conversion to SGD come in a later phase.</div>`)}
       ${sec('markets','Countries / Markets','Where you sell',`<div class="variants">${['Singapore','Malaysia','Thailand','Indonesia','Vietnam','Philippines'].map(c=>`<span class="chip" style="height:32px">${ic('check','i i-sm')}${c}</span>`).join('')}<button class="btn sm ghost">${ic('plus','i i-sm')}Add market</button></div>`)}
       ${sec('inventory','Inventory Preferences','How stock is tracked',`${pref('Allow negative stock','Off: stock can never go below zero',false)}${pref('Include landed costs in cost price','Arrives with Purchases',false)}`)}
       ${sec('notifications','Notifications','What you get alerted about',`${pref('Low stock alerts','When a variant reaches its reorder level',true)}${pref('Overdue invoices','When a customer passes their payment terms',true)}${pref('Weekly summary email','Every Monday at 8:00',false)}`)}
       ${sec('profile','User Profile','Your account',`<div style="display:flex;gap:16px;align-items:center;margin-bottom:18px"><span class="avatar" style="width:52px;height:52px;font-size:17px">JK</span><div><b>Jasmine Koh</b><div class="muted" style="font-size:13px">Owner · jasmine@msv-sea.com</div></div></div><div class="form-grid">${f('Full name','Jasmine Koh')}${f('Email','jasmine@msv-sea.com','email')}</div>`)}
-      ${sec('data','Data','Products, stock and movements are saved in this browser only',`<div class="pref"><div><b>Restore sample data</b><small>Replace everything with the MSV sample catalogue</small></div><button class="btn sm" data-action="restoreSample">Restore</button></div><div class="pref"><div><b>Start with an empty catalogue</b><small>Remove all products, variants and movements. Categories are kept.</small></div><button class="btn sm danger-btn" data-action="clearData">Clear data</button></div>`)}
+      ${sec('data','Data','Products, stock, suppliers and purchases are saved in this browser only',`<div class="pref"><div><b>Restore sample data</b><small>Replace everything with the MSV sample catalogue, suppliers and purchases</small></div><button class="btn sm" data-action="restoreSample">Restore</button></div><div class="pref"><div><b>Start with an empty catalogue</b><small>Remove all products, suppliers, purchases and stock history. Categories and currencies are kept.</small></div><button class="btn sm danger-btn" data-action="clearData">Clear data</button></div>`)}
     </div>
   </div>`;
 };
@@ -1207,6 +1475,268 @@ function openAdjust(variantId){
     }});
 }
 
+/* --- Currency picker (shared by supplier and purchase forms) --- */
+function currencyField(name,val,{disabled}={}){
+  const known=DB.currencies.includes(val);
+  return `<div class="sku-row"><select class="select" name="${name}" ${disabled?'disabled':''} data-currency>${DB.currencies.map(c=>`<option ${c===val?'selected':''}>${c}</option>`).join('')}<option value="__other" ${val&&!known?'selected':''}>Other…</option></select><input class="input" name="${name}Other" placeholder="Code, e.g. AUD" maxlength="3" value="${val&&!known?esc(val):''}" style="max-width:120px;${val&&!known?'':'display:none'}" ${disabled?'disabled':''} aria-label="Currency code"></div>`;
+}
+function readCurrency(form,name){const s=F(form,name);return s.value==='__other'?F(form,name+'Other').value.trim().toUpperCase():s.value}
+function wireCurrency(form){form.addEventListener('change',e=>{if(e.target.matches('[data-currency]')){const o=F(form,e.target.name+'Other');o.style.display=e.target.value==='__other'?'':'none';if(e.target.value==='__other')o.focus()}})}
+function checkCurrency(form,name){const c=readCurrency(form,name);if(!/^[A-Z]{3}$/.test(c)){fieldError(F(form,F(form,name).value==='__other'?name+'Other':name),'Use a 3-letter currency code, e.g. AUD.');return null}if(!DB.currencies.includes(c))DB.currencies.push(c);return c}
+
+/* --- Supplier form --- */
+function openSupplierForm(id){
+  const s=id?DB.suppliers.find(x=>x.id===id):null;
+  showModal({title:s?'Edit Supplier':'Add Supplier',desc:s?esc(s.name):'Suppliers you buy stock from. The default currency fills in automatically on new purchases.',narrow:true,save:s?'Save Changes':'Save Supplier',
+    body:`<div class="form-grid">
+      ${fld('Supplier Name',`<input class="input" name="name" value="${esc(s?.name||'')}" placeholder="e.g. MSV GmbH" autocomplete="off">`,{req:1})}
+      ${fld('Contact Person',`<input class="input" name="contact" value="${esc(s?.contact||'')}">`)}
+      ${fld('Country',`<input class="input" name="country" list="dl-country" value="${esc(s?.country||'')}" placeholder="e.g. Germany" autocomplete="off"><datalist id="dl-country">${uniqSorted(['Germany','Singapore','Taiwan','China','Japan','Malaysia','Thailand','United Kingdom','United States',...DB.suppliers.map(x=>x.country)]).map(c=>`<option value="${esc(c)}">`).join('')}</datalist>`)}
+      ${fld('Default Currency',currencyField('currency',s?.currency||BASE_CURRENCY))}
+      ${fld('Email',`<input class="input" type="email" name="email" value="${esc(s?.email||'')}">`)}
+      ${fld('Phone',`<input class="input" type="tel" name="phone" value="${esc(s?.phone||'')}">`)}
+      ${fld('Address',`<input class="input" name="address" value="${esc(s?.address||'')}">`,{span:1})}
+      ${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional · lead times, payment terms">${esc(s?.notes||'')}</textarea>`,{span:1})}
+      ${fld('Status',`<select class="select" name="status">${['Active','Inactive'].map(x=>`<option ${x===(s?.status||'Active')?'selected':''}>${x}</option>`).join('')}</select>`)}
+    </div>`,
+    onMount:wireCurrency,
+    onSave:form=>{
+      const g=n=>F(form,n).value.trim(), name=g('name'); let ok=true;
+      if(!name){fieldError(F(form,'name'),'Supplier name is required.');ok=false}
+      else if(DB.suppliers.some(x=>x!==s&&x.name.toLowerCase()===name.toLowerCase())){fieldError(F(form,'name'),'A supplier with this name already exists.');ok=false}
+      if(g('email')&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g('email'))){fieldError(F(form,'email'),'Enter a valid email address, or leave it blank.');ok=false}
+      const currency=checkCurrency(form,'currency'); if(!currency) ok=false;
+      if(!ok){formAlert('Please fix the highlighted fields.');return false}
+      const data={name,contact:g('contact'),country:g('country'),email:g('email'),phone:g('phone'),address:g('address'),notes:g('notes'),currency,status:F(form,'status').value};
+      if(s){const was=s.status;Object.assign(s,data);persist();render();toast(was!==s.status?(s.status==='Active'?'Supplier reactivated':'Supplier deactivated'):'Supplier updated successfully',name);return true}
+      const ns={id:uid('s'),...data,createdAt:Date.now()}; DB.suppliers.push(ns);
+      logActivity(DB,{tone:'mute',icon:'factory',title:`Supplier ${name} added`,sub:[data.country,data.currency].filter(Boolean).join(' · '),link:'supplier-'+ns.id});
+      persist(); if(modal&&modal.returnTo){const r=modal.returnTo;closeModal();r(ns.id);toast('Supplier created successfully',`${name} is selected on the purchase.`);return false}
+      location.hash='supplier-'+ns.id; render(); toast('Supplier created successfully',name); return true;
+    }});
+}
+
+/* --- Purchase form --- */
+const variantChoiceLabel = v=>`${productOf(v).name} · ${variantLabel(v)}`;
+function lineMeta(v){return v?`${esc(v.sku)} · ${n0(v.qty)} in stock${v.lastPurchaseCost!=null?` · last bought at ${cur(v.lastPurchaseCost,v.lastPurchaseCurrency)}`:''}`:''}
+function pLineHtml(l={},c=BASE_CURRENCY){
+  const v=l.variantId&&variantById(l.variantId);
+  return `<div class="p-line" data-pline>
+    <div class="field combo-cell" style="gap:4px"><div class="combo"><input class="input" data-l="search" value="${v?esc(variantChoiceLabel(v)):''}" placeholder="Search name, SKU, gauge, colour, packaging" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-label="Product and variant"><input type="hidden" data-l="variant" value="${v?v.id:''}"><div class="combo-list" role="listbox" hidden></div></div><div class="line-meta" data-l="meta">${lineMeta(v)}</div><div class="line-warn" data-l="warn"></div><span class="err"></span></div>
+    <div class="field" style="gap:4px"><input class="input" data-l="qty" type="number" min="1" step="1" inputmode="numeric" value="${l.qty??''}" placeholder="0" aria-label="Quantity"><span class="err"></span></div>
+    <div class="field" style="gap:4px"><div class="input-affix"><span class="pre" data-curpre>${esc(c)}</span><input class="input" data-l="cost" type="number" min="0" step="0.01" inputmode="decimal" value="${l.unitCost??''}" placeholder="0.00" aria-label="Unit cost"></div><span class="err"></span></div>
+    <span class="line-total" data-l="total"></span>
+    <button type="button" class="icon-btn" data-action="removePLine" aria-label="Remove item" style="width:36px;height:40px">${ic('x','i i-sm')}</button>
+  </div>`;
+}
+function openPurchaseForm(id,{supplierId,copyFrom}={}){
+  const p=id?DB.purchases.find(x=>x.id===id):null, src=p||copyFrom||null;
+  const editing=!!p, locked=editing&&p.status==='Ordered';
+  const sups=DB.suppliers.filter(s=>s.status==='Active'||(src&&s.id===src.supplierId)).sort((a,b)=>a.name.localeCompare(b.name));
+  const sid=src?src.supplierId:supplierId||'', s0=DB.suppliers.find(s=>s.id===sid);
+  const c0=src?src.currency:(s0?s0.currency:BASE_CURRENCY);
+  const lines=src?src.lines.filter(l=>variantById(l.variantId)):[{}];
+  const costs=src?src.costs:emptyCosts();
+  showModal({title:editing?`Edit ${esc(p.no)}`:'Record Purchase',wide:true,save:editing?'Save Changes':'Save Purchase',
+    desc:editing?(locked?'Ordered purchases keep their supplier and currency. Stock changes only when the purchase is received.':'Draft purchases can be changed freely. Stock changes only when the purchase is received.'):'Record stock bought from a supplier. Stock is added only when the purchase is Received.',
+    body:`<div class="form-section"><h4>Purchase information</h4><div class="form-grid cols-3">
+      ${fld('Supplier',`<select class="select" name="supplierId" ${locked?'disabled':''}><option value="">Choose a supplier…</option>${sups.map(s=>`<option value="${s.id}" ${s.id===sid?'selected':''}>${esc(s.name)}${s.country?' · '+esc(s.country):''}</option>`).join('')}</select>`,{req:1,hint:locked?'Locked after ordering':editing?'':'<a href="#suppliers" data-action="newSupplierInline">Add a new supplier</a>'})}
+      ${fld('Purchase Date',`<input class="input" type="date" name="date" value="${src&&!copyFrom?src.date:todayISO()}">`,{req:1})}
+      ${fld('Expected Arrival Date',`<input class="input" type="date" name="expectedDate" value="${src&&!copyFrom?src.expectedDate||'':''}">`)}
+      ${fld('Invoice Number',`<input class="input" name="invoiceNo" value="${esc(src&&!copyFrom?src.invoiceNo:'')}" placeholder="Supplier's invoice or order no.">`)}
+      ${fld('Currency',currencyField('currency',c0,{disabled:locked}),{hint:locked?'Locked after ordering':'Filled from the supplier. Amounts are stored in this currency; no conversion yet.'})}
+      ${editing?fld('Status',`<div style="height:40px;display:flex;align-items:center">${badge(p.status)}</div>`,{hint:'Change status from the purchase page'}):fld('Status',`<select class="select" name="status">${['Draft','Ordered','Received'].map(x=>`<option ${x==='Draft'?'selected':''}>${x}</option>`).join('')}</select>`)}
+      ${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional · shipping method, order contact">${esc(src?src.notes:'')}</textarea>`,{span:1})}
+      </div>
+      <div id="recvBox" hidden><div class="notice" style="background:var(--ok-bg);color:var(--ok-fg)">${ic('package-check','i i-sm')}Saving as Received adds these quantities to stock straight away, dated on the purchase date.</div>
+      <label class="check" id="costBox" style="margin-top:10px;white-space:normal"><input type="checkbox" name="updateCost">Also set each item's cost price to this purchase's unit cost (changes inventory value)</label></div>
+    </div>
+    <div class="form-section"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h4>Items</h4><span class="muted" style="font-size:12.5px">Search by product name, SKU, gauge, colour or packaging</span></div>
+      <div class="p-line line-head"><span>Product / Variant / SKU</span><span>Quantity</span><span>Unit Cost</span><span style="text-align:right">Line Total</span><span></span></div>
+      <div class="lines" id="pLines">${lines.map(l=>pLineHtml(l,c0)).join('')}</div>
+      <div><button type="button" class="btn sm" data-action="addPLine">${ic('plus','i i-sm')}Add Item</button></div></div>
+    <div class="form-section"><h4>Additional costs</h4><div class="form-grid cols-3">
+      ${COST_FIELDS.map(([k,l])=>fld(l,`<div class="input-affix"><span class="pre" data-curpre>${esc(c0)}</span><input class="input" type="number" min="0" step="0.01" inputmode="decimal" name="cost_${k}" value="${+costs[k]?costs[k]:''}" placeholder="0.00"></div>`)).join('')}
+      ${fld('Other Cost Description',`<input class="input" name="otherDesc" value="${esc(costs.otherDesc||'')}" placeholder="e.g. Pallet wrap">`)}
+    </div></div>
+    <div class="summary" id="pSum"></div>`,
+    onMount:form=>{
+      wireCurrency(form);
+      const curNow=()=>{const c=readCurrency(form,'currency');return /^[A-Z]{3}$/.test(c)?c:'—'};
+      const recalcP=()=>{
+        const c=curNow(); form.querySelectorAll('[data-curpre]').forEach(e=>e.textContent=c);
+        let sub=0,units=0; const seen={};
+        form.querySelectorAll('[data-pline]').forEach((row,i)=>{
+          const q=parseInt0(row.querySelector('[data-l=qty]').value), uc=parseMoney(row.querySelector('[data-l=cost]').value), vid=row.querySelector('[data-l=variant]').value;
+          const lt=(!isNaN(q)&&!isNaN(uc))?round2(q*uc):0; sub+=lt; units+=isNaN(q)?0:q;
+          row.querySelector('[data-l=total]').textContent=(!isNaN(q)&&!isNaN(uc))?cur(lt,c):'—';
+          const w=row.querySelector('[data-l=warn]'); w.textContent='';
+          if(vid){ if(seen[vid]!==undefined) w.textContent=`Same SKU as item ${seen[vid]+1}. Lines with the same unit cost are combined when you save.`; else seen[vid]=i; }
+        });
+        const add=COST_FIELDS.reduce((a,[k])=>a+(parseMoney(F(form,'cost_'+k).value)||0),0);
+        $('#pSum').innerHTML=`<div><span>Purchase Subtotal · ${n0(units)} units</span><span>${cur(sub,c)}</span></div><div><span>Additional Costs</span><span>${cur(add,c)}</span></div><div class="total"><span>Total Purchase Cost</span><span>${cur(sub+add,c)}</span></div>`;
+        const st=F(form,'status'); const rec=st&&st.value==='Received';
+        $('#recvBox').hidden=!rec; $('#costBox').style.display=c===BASE_CURRENCY?'':'none';
+      };
+      const closeLists=except=>form.querySelectorAll('.combo-list').forEach(l=>{if(l!==except){l.hidden=true;l.parentElement.querySelector('[data-l=search]').setAttribute('aria-expanded','false')}});
+      const openList=inp=>{
+        const box=inp.closest('.combo'), list=box.querySelector('.combo-list'), cur0=box.querySelector('[data-l=variant]').value;
+        const q=box.querySelector('[data-l=variant]').value&&inp.value===variantChoiceLabel(variantById(cur0))?'':inp.value;
+        const items=DB.variants.filter(v=>isLive(v)||v.id===cur0).filter(v=>!q||matches(searchText(v),q)).sort((a,b)=>variantChoiceLabel(a).localeCompare(variantChoiceLabel(b),undefined,{numeric:true})).slice(0,10);
+        list.innerHTML=items.length?items.map((v,i)=>`<button type="button" class="combo-opt" role="option" data-opt="${v.id}" aria-selected="${i===0}"><span><b>${esc(variantChoiceLabel(v))}</b><small>${esc(v.sku)}</small></span><small style="white-space:nowrap">${n0(v.qty)} in stock</small></button>`).join(''):'<div class="combo-empty">No active SKU matches. Add it on the Products page first.</div>';
+        closeLists(list); list.hidden=false; inp.setAttribute('aria-expanded','true');
+      };
+      const pick=(row,vid)=>{
+        const v=variantById(vid), c=curNow();
+        row.querySelector('[data-l=variant]').value=vid; row.querySelector('[data-l=search]').value=variantChoiceLabel(v);
+        row.querySelector('[data-l=meta]').innerHTML=lineMeta(v);
+        const cost=row.querySelector('[data-l=cost]');
+        if(!cost.value){ if(c===BASE_CURRENCY) cost.value=v.lastPurchaseCurrency===c?v.lastPurchaseCost:v.cost; else if(v.lastPurchaseCurrency===c) cost.value=v.lastPurchaseCost; }
+        const s=row.querySelector('[data-l=search]'); s.classList.remove('invalid'); row.querySelector('.combo-cell .err').textContent='';
+        closeLists(); recalcP(); const q=row.querySelector('[data-l=qty]'); if(!q.value) q.focus();
+      };
+      form.addEventListener('input',e=>{
+        if(e.target.dataset.l==='search'){const row=e.target.closest('[data-pline]');row.querySelector('[data-l=variant]').value='';row.querySelector('[data-l=meta]').textContent='';openList(e.target)}
+        recalcP();
+      });
+      form.addEventListener('change',e=>{
+        if(e.target.name==='supplierId'&&!locked){const s=DB.suppliers.find(x=>x.id===e.target.value);if(s){const sel=F(form,'currency'),known=DB.currencies.includes(s.currency);sel.value=known?s.currency:'__other';F(form,'currencyOther').value=known?'':s.currency;F(form,'currencyOther').style.display=known?'none':''}}
+        recalcP();
+      });
+      form.addEventListener('focusin',e=>{if(e.target.dataset.l==='search') openList(e.target)});
+      form.addEventListener('focusout',()=>setTimeout(()=>{if(!form.contains(document.activeElement)||!document.activeElement.closest('.combo'))closeLists()},120));
+      form.addEventListener('mousedown',e=>{if(e.target.closest('[data-opt]'))e.preventDefault()});
+      form.addEventListener('click',e=>{
+        const o=e.target.closest('[data-opt]'); if(o){pick(o.closest('[data-pline]'),o.dataset.opt);return}
+        if(e.target.closest('[data-action=addPLine]')){$('#pLines').insertAdjacentHTML('beforeend',pLineHtml({},curNow()));refreshIcons();$('#pLines').lastElementChild.querySelector('[data-l=search]').focus();return}
+        const rm=e.target.closest('[data-action=removePLine]'); if(rm){rm.closest('[data-pline]').remove();if(!$('#pLines').children.length)$('#pLines').insertAdjacentHTML('beforeend',pLineHtml({},curNow()));refreshIcons();recalcP();return}
+        if(e.target.closest('[data-action=newSupplierInline]')){e.preventDefault();const snap=snapshotPurchaseForm(form);modal.returnTo=null;openSupplierForm();modal.returnTo=newId=>{openPurchaseForm(id,{supplierId:newId,copyFrom:snap?{...snap,supplierId:newId,currency:(DB.suppliers.find(s=>s.id===newId)||{}).currency||snap.currency}:null})}}
+      });
+      form.addEventListener('keydown',e=>{
+        if(e.target.dataset.l!=='search') return;
+        const list=e.target.closest('.combo').querySelector('.combo-list'), opts=[...list.querySelectorAll('[data-opt]')], i=opts.findIndex(o=>o.getAttribute('aria-selected')==='true');
+        if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(list.hidden){openList(e.target);return}const n=opts.length?(i+(e.key==='ArrowDown'?1:-1)+opts.length)%opts.length:-1;opts.forEach((o,k)=>o.setAttribute('aria-selected',k===n));opts[n]&&opts[n].scrollIntoView({block:'nearest'})}
+        else if(e.key==='Enter'&&!list.hidden){e.preventDefault();if(opts[i])pick(e.target.closest('[data-pline]'),opts[i].dataset.opt)}
+        else if(e.key==='Escape'&&!list.hidden){e.preventDefault();e.stopPropagation();closeLists()}
+      });
+      recalcP();
+    },
+    onSave:form=>{
+      const d=readPurchaseForm(form,{editing,locked}); if(!d) return false;
+      if(editing){
+        Object.assign(p,{supplierId:locked?p.supplierId:d.supplierId,currency:locked?p.currency:d.currency,date:d.date,expectedDate:d.expectedDate,invoiceNo:d.invoiceNo,notes:d.notes,costs:d.costs,
+          lines:d.lines.map(l=>({id:uid('pl'),variantId:l.variantId,qty:l.qty,unitCost:l.unitCost}))});
+        addHistory(p,'Edited','edited'); persist(); render();
+        toast('Purchase updated',`${p.no}${d.combined?` · ${d.combined} duplicate line${d.combined>1?'s':''} combined`:''}`); return true;
+      }
+      const np=createPurchaseRecord(DB,d);
+      let msg;
+      if(d.status==='Received'){
+        try{const u=receivePurchase(DB,np,{date:d.date,updateCost:d.updateCost});msg=['Purchase received successfully',`${np.no} · ${n0(u)} units added to inventory.`]}
+        catch(err){formAlert(err.message);DB.purchases=DB.purchases.filter(x=>x!==np);return false}
+      } else msg=[d.status==='Ordered'?'Purchase saved as ordered':'Purchase saved as draft',`${np.no} · stock is unchanged until it is received.`];
+      if(d.combined) msg[1]+=` ${d.combined} duplicate line${d.combined>1?'s were':' was'} combined.`;
+      persist(); location.hash='purchase-'+np.id; render(); toast(msg[0],msg[1]); return true;
+    }});
+}
+function snapshotPurchaseForm(form){
+  const lines=[...form.querySelectorAll('[data-pline]')].map(r=>({variantId:r.querySelector('[data-l=variant]').value,qty:parseInt0(r.querySelector('[data-l=qty]').value)||'',unitCost:r.querySelector('[data-l=cost]').value})).filter(l=>l.variantId);
+  return {supplierId:F(form,'supplierId').value,currency:readCurrency(form,'currency'),notes:F(form,'notes').value,lines:lines.length?lines:[{}],costs:{...emptyCosts(),...Object.fromEntries(COST_FIELDS.map(([k])=>[k,parseMoney(F(form,'cost_'+k).value)||0])),otherDesc:F(form,'otherDesc').value}};
+}
+function readPurchaseForm(form,{editing,locked}){
+  let ok=true; const bad=(el,m)=>{fieldError(el,m);ok=false};
+  const supplierId=F(form,'supplierId').value, date=F(form,'date').value, expectedDate=F(form,'expectedDate').value, status=editing?null:F(form,'status').value;
+  if(!supplierId) bad(F(form,'supplierId'),'Choose a supplier.');
+  if(!date) bad(F(form,'date'),'Purchase date is required.');
+  else if(status==='Received'&&date>todayISO()) bad(F(form,'date'),'A received purchase cannot be dated in the future.');
+  if(date&&expectedDate&&expectedDate<date) bad(F(form,'expectedDate'),'Expected arrival cannot be before the purchase date.');
+  const currency=locked?readCurrency(form,'currency'):checkCurrency(form,'currency'); if(!currency) ok=false;
+  const costs=emptyCosts();
+  COST_FIELDS.forEach(([k])=>{const el=F(form,'cost_'+k),raw=el.value.trim();if(!raw)return;const n=parseMoney(raw);if(isNaN(n)||n<0)bad(el,'Enter an amount of 0 or more.');else costs[k]=n});
+  costs.otherDesc=F(form,'otherDesc').value.trim();
+  const rows=[...form.querySelectorAll('[data-pline]')], lines=[];
+  rows.forEach(r=>{
+    const s=r.querySelector('[data-l=search]'), vid=r.querySelector('[data-l=variant]').value, qEl=r.querySelector('[data-l=qty]'), cEl=r.querySelector('[data-l=cost]');
+    if(!vid&&!s.value.trim()&&!qEl.value&&!cEl.value) return;
+    const q=parseInt0(qEl.value), uc=parseMoney(cEl.value);
+    if(!vid) bad(s,'Choose a product and variant from the list.');
+    if(isNaN(q)||q<=0) bad(qEl,'Quantity must be a whole number greater than 0.');
+    if(isNaN(uc)) bad(cEl,'Enter a unit cost.'); else if(uc<0) bad(cEl,'Unit cost cannot be negative.');
+    lines.push({row:r,variantId:vid,qty:q,unitCost:uc});
+  });
+  if(!lines.length){formAlert('Add at least one item to this purchase.');return null}
+  if(!ok){formAlert('Please fix the highlighted fields.');return null}
+  const merged=[]; let combined=0;
+  for(const l of lines){
+    const prev=merged.find(m=>m.variantId===l.variantId);
+    if(!prev){merged.push({...l});continue}
+    if(prev.unitCost===l.unitCost){prev.qty+=l.qty;combined++;continue}
+    bad(l.row.querySelector('[data-l=search]'),'This SKU is already on the purchase with a different unit cost. Use one line per SKU.');
+  }
+  if(!ok){formAlert('Please fix the highlighted fields.');return null}
+  return {supplierId,date,expectedDate,invoiceNo:F(form,'invoiceNo').value.trim(),currency,status,notes:F(form,'notes').value.trim(),costs,lines:merged.map(({row,...l})=>l),combined,updateCost:!!(F(form,'updateCost')&&F(form,'updateCost').checked)};
+}
+
+/* --- Status actions --- */
+function openReceive(id){
+  const p=DB.purchases.find(x=>x.id===id), t=purchaseTotals(p);
+  if(!['Draft','Ordered'].includes(p.status)){toast('Already received',`${p.no} is ${p.status.toLowerCase()}. Stock is only added once.`,'error');return}
+  showModal({title:`Receive ${esc(p.no)}`,desc:`Adds ${n0(t.units)} units from ${esc(supplierOf(p).name)} to inventory. This happens once and can only be undone with Reverse Purchase.`,save:'Receive Stock',saveIcon:'package-check',
+    body:`<div class="form-grid">${fld('Date Received',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}
+      <div class="field" style="justify-content:flex-end">${p.currency===BASE_CURRENCY?`<label class="check" style="white-space:normal"><input type="checkbox" name="updateCost">Also set each item's cost price to its unit cost here</label>`:`<span class="field-hint">Costs are in ${esc(p.currency)}, so item cost prices (SGD) are not changed. The unit cost is saved as each item's last purchase cost.</span>`}</div></div>
+      <div class="table-wrap" style="border:1px solid var(--line);border-radius:12px"><table><thead><tr><th>Item</th><th class="num">Receiving</th><th class="num">Stock now</th><th class="num">After</th></tr></thead><tbody>
+      ${p.lines.map(l=>{const L=purchaseLineLabel(l);return `<tr><td><span class="strong">${esc(L.name)}</span><span class="cell-sub">${esc(L.variant)} · ${esc(L.sku)}</span></td><td class="num strong chg-in">+${n0(l.qty)}</td><td class="num muted">${L.v?n0(L.v.qty):'—'}</td><td class="num strong">${L.v?n0(L.v.qty+l.qty):'—'}</td></tr>`}).join('')}
+      </tbody></table></div>`,
+    onSave:form=>{
+      const date=F(form,'date').value;
+      if(!date){fieldError(F(form,'date'),'Choose the date the stock arrived.');return false}
+      if(date>todayISO()){fieldError(F(form,'date'),'The date cannot be in the future.');return false}
+      if(date<p.date){fieldError(F(form,'date'),`Stock can't arrive before the purchase date (${fmtDate(p.date)}).`);return false}
+      try{const u=receivePurchase(DB,p,{date,updateCost:!!(F(form,'updateCost')&&F(form,'updateCost').checked)});persist();render();toast('Purchase received successfully',`${p.no} · ${n0(u)} units added to inventory.`);return true}
+      catch(err){formAlert(err.message);return false}
+    }});
+}
+function openReverse(id){
+  const p=DB.purchases.find(x=>x.id===id), short=reversalShortfalls(DB,p), t=purchaseTotals(p);
+  const REASONS=['Recorded in error','Wrong supplier or invoice','Goods returned to supplier','Duplicate entry','Other'];
+  showModal({title:`Reverse ${esc(p.no)}`,desc:`Removes the ${n0(t.units)} units this purchase added. The original receipt stays in the history and new reversal movements are recorded.`,save:'Reverse Purchase',saveIcon:'undo-2',danger:true,
+    body:`${short.length?`<div class="notice" style="background:var(--bad-bg);color:var(--bad-fg)">${ic('circle-alert','i i-sm')}Reversal is blocked: some of this stock has already left inventory, so reversing would make stock negative. Adjust stock or record the correction another way first.</div>`:''}
+      <div class="table-wrap" style="border:1px solid var(--line);border-radius:12px"><table><thead><tr><th>Item</th><th class="num">Removing</th><th class="num">Stock now</th><th class="num">After</th></tr></thead><tbody>
+      ${p.lines.map(l=>{const L=purchaseLineLabel(l),after=L.v?L.v.qty-l.qty:-1;return `<tr><td><span class="strong">${esc(L.name)}</span><span class="cell-sub">${esc(L.variant)} · ${esc(L.sku)}</span></td><td class="num strong chg-out">−${n0(l.qty)}</td><td class="num muted">${L.v?n0(L.v.qty):'—'}</td><td class="num strong ${after<0?'chg-out':''}">${after<0?`${n0(after)} · not allowed`:n0(after)}</td></tr>`}).join('')}
+      </tbody></table></div>
+      ${short.length?'':`<div class="form-grid">${fld('Reason',`<select class="select" name="reason"><option value="">Choose a reason…</option>${REASONS.map(r=>`<option>${r}</option>`).join('')}</select>`,{req:1})}${fld('Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional · what went wrong"></textarea>`,{span:1})}</div>`}`,
+    onSave:form=>{
+      if(reversalShortfalls(DB,p).length){formAlert('Reversal is blocked because it would make stock negative.');return false}
+      const reason=F(form,'reason').value, date=F(form,'date').value; let ok=true;
+      if(!reason){fieldError(F(form,'reason'),'Choose a reason for the reversal.');ok=false}
+      if(!date){fieldError(F(form,'date'),'Choose a date.');ok=false} else if(date>todayISO()){fieldError(F(form,'date'),'The date cannot be in the future.');ok=false} else if(p.receivedDate&&date<p.receivedDate){fieldError(F(form,'date'),`The reversal can't be before the receipt (${fmtDate(p.receivedDate)}).`);ok=false}
+      if(!ok){formAlert('Please fix the highlighted fields.');return false}
+      try{const u=reversePurchase(DB,p,{date,reason,notes:F(form,'notes').value.trim()});persist();render();toast('Purchase reversed successfully',`${p.no} · ${n0(u)} units removed from inventory.`);return true}
+      catch(err){formAlert(err.message);return false}
+    }});
+  if(short.length){const b=$('.modal-foot [data-action=save]');if(b)b.disabled=true}
+}
+function openCancel(id){
+  const p=DB.purchases.find(x=>x.id===id);
+  showModal({title:`Cancel ${esc(p.no)}?`,desc:'The purchase stays on record as Cancelled. No stock is affected.',narrow:true,save:'Cancel Purchase',saveIcon:'circle-x',danger:true,
+    body:`<div class="form-grid">${fld('Reason',`<select class="select" name="reason"><option value="">Choose a reason…</option>${['Supplier could not supply','Ordered by mistake','Replaced by another purchase','Other'].map(r=>`<option>${r}</option>`).join('')}</select>`,{req:1,span:1})}${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional"></textarea>`,{span:1})}</div>`,
+    onSave:form=>{
+      const reason=F(form,'reason').value; if(!reason){fieldError(F(form,'reason'),'Choose a reason.');return false}
+      if(p.status!=='Ordered'){formAlert('Only ordered purchases can be cancelled.');return false}
+      const notes=F(form,'notes').value.trim();
+      Object.assign(p,{status:'Cancelled',cancelledDate:todayISO(),cancelReason:reason});
+      addHistory(p,`Cancelled · ${reason}${notes?' · '+notes:''}`,'cancelled');
+      logActivity(DB,{tone:'bad',icon:'circle-x',title:`Purchase ${p.no} cancelled`,sub:`${supplierOf(p).name} · ${reason}`,link:'purchase-'+p.id});
+      persist();render();toast('Purchase cancelled',`${p.no} · no stock was affected.`);return true;
+    }});
+}
+function openPurchaseNote(id){
+  const p=DB.purchases.find(x=>x.id===id);
+  showModal({title:'Add Note',desc:`Added to the activity log of ${esc(p.no)}. Notes don't change items or stock.`,narrow:true,save:'Add Note',
+    body:fld('Note',`<textarea class="input" name="note" placeholder="e.g. 2 reels had dented spools, supplier crediting next order"></textarea>`,{req:1,span:1}),
+    onSave:form=>{const n=F(form,'note').value.trim();if(!n){fieldError(F(form,'note'),'Write a note first.');return false}addHistory(p,`Note: ${n}`,'note');persist();render();toast('Note added',p.no);return true}});
+}
+
 /* --- Confirm --- */
 function confirmDialog({title,body,confirm,onConfirm}){
   showModal({title,desc:body,narrow:true,save:confirm,saveIcon:'trash-2',danger:true,body:'',onSave:()=>{onConfirm();return true}});
@@ -1219,19 +1749,6 @@ function lineRow(kind,i,vid,qty,price){
 }
 const firstVid = n=>DB.variants.filter(isLive)[n]?.id||'';
 const DEMO = {
-  purchase:()=>({title:'Record Purchase',desc:'Purchases will add stock automatically in the Purchases phase. For now this form is a preview and nothing is saved.',body:`
-    <div class="form-section"><h4>Purchase details</h4><div class="form-grid">
-      <label class="field"><span class="field-label">Purchase Date</span><input class="input" type="date" value="${todayISO()}"></label>
-      <label class="field"><span class="field-label">Supplier</span><select class="select"><option>MSV GmbH · Germany</option><option>MSV Asia Logistics · Singapore</option></select></label>
-      <label class="field"><span class="field-label">Invoice Number</span><input class="input" value="MSV-RE-48812"></label>
-      <label class="field"><span class="field-label">Currency</span><select class="select"><option>EUR – Euro</option><option selected>SGD – Singapore Dollar</option><option>USD – US Dollar</option></select></label></div></div>
-    <div class="form-section"><h4>Products</h4><div class="lines" data-kind="purchase">
-      <div class="line-row line-head"><span>Product</span><span>Quantity</span><span>Unit Cost</span><span style="text-align:right">Line Total</span><span></span></div>
-      ${lineRow('purchase',0,firstVid(1),12,82)}${lineRow('purchase',1,firstVid(10),8,78)}</div>
-      <div><button type="button" class="btn sm ghost" data-action="addLine">${ic('plus','i i-sm')}Add product</button></div></div>
-    <div class="form-section"><h4>Additional costs</h4><div class="form-grid cols-3">
-      ${['Shipping Cost','Import Cost','Other Cost'].map((l,i)=>`<label class="field"><span class="field-label">${l}</span><div class="input-affix"><span class="pre">SGD</span><input class="input" type="number" data-x value="${[180,96,0][i]}"></div></label>`).join('')}</div>
-      <label class="field"><span class="field-label">Notes</span><textarea class="input" placeholder="Optional"></textarea></label></div><div class="summary" id="sum"></div>`,save:'Save Purchase'}),
   sale:()=>({title:'Record Sale',desc:'Sales will reduce stock automatically in the Sales phase. For now this form is a preview and nothing is saved.',body:`
     <div class="form-section"><h4>Sale details</h4><div class="form-grid">
       <label class="field"><span class="field-label">Date</span><input class="input" type="date" value="${todayISO()}"></label>
@@ -1254,7 +1771,7 @@ const DEMO = {
 };
 function openDemo(kind){
   const m=DEMO[kind]();
-  showModal({...m,kind:'demo',onMount:()=>recalc(),onSave:()=>{toast({purchase:'Purchase not saved',sale:'Sale not saved',customer:'Customer not saved',export:'Export not available yet'}[kind],'This form is a preview. It becomes live in a later phase.','info');return true}});
+  showModal({...m,kind:'demo',onMount:()=>recalc(),onSave:()=>{toast({sale:'Sale not saved',customer:'Customer not saved',export:'Export not available yet'}[kind],'This form is a preview. It becomes live in a later phase.','info');return true}});
 }
 function recalc(){
   const sum=$('#sum'); if(!sum) return;
@@ -1270,14 +1787,15 @@ function toast(title,msg,tone){
 }
 
 /* ---------- Router & render ---------- */
-const NAV=[['dashboard','Dashboard','layout-dashboard'],['inventory','Inventory','boxes'],['products','Products','package'],['purchases','Purchases','truck'],['sales','Sales','receipt'],['customers','Customers','users'],['reports','Reports','chart-column'],['settings','Settings','settings']];
-const PARENT={product:'products',variant:'products',customer:'customers'};
-function route(){ const h=location.hash.slice(1); const m=h.match(/^(product|variant)-(.+)$/); if(m) return [m[1],m[2]]; return [PAGES[h]?h:'dashboard',null]; }
+const NAV=[['dashboard','Dashboard','layout-dashboard'],['inventory','Inventory','boxes'],['products','Products','package'],['purchases','Purchases','truck'],['suppliers','Suppliers','factory'],['sales','Sales','receipt'],['customers','Customers','users'],['reports','Reports','chart-column'],['settings','Settings','settings']];
+const PARENT={product:'products',variant:'products',customer:'customers',purchase:'purchases',supplier:'suppliers'};
+function route(){ const h=location.hash.slice(1); const m=h.match(/^(product|variant|purchase|supplier)-(.+)$/); if(m) return [m[1],m[2]]; return [PAGES[h]?h:'dashboard',null]; }
 function render(){
   const [r,id]=route(), active=PARENT[r]||r, att=attention().length;
   $('#nav').innerHTML=NAV.map(([k,label,icon])=>`<a href="#${k}" ${k===active?'aria-current="page"':''}>${ic(icon)}<span>${label}</span>${k==='inventory'&&att?`<span class="count" title="Low or out of stock">${att}</span>`:''}</a>`).join('');
   $('#app').innerHTML=(Store.available?'':`<div class="notice">${ic('triangle-alert','i i-sm')}This browser is blocking storage. You can try things out, but changes will be lost when you close the page.</div>`)+PAGES[r](id);
   if(r==='inventory') renderInvTable();
+  if(r==='purchases') renderPurTable();
   renderNotifications();
   refreshIcons(); $('#shell').classList.remove('open');
 }
@@ -1288,6 +1806,23 @@ window.addEventListener('hashchange',()=>{const r=route()[0];if(r==='variant'&&l
 
 /* ---------- Events ---------- */
 const ACTIONS={
+  purchase:()=>openPurchaseForm(),
+  purchaseFor:d=>openPurchaseForm(null,{supplierId:d.id}),
+  editPurchase:d=>openPurchaseForm(d.id),
+  copyPurchase:d=>openPurchaseForm(null,{copyFrom:DB.purchases.find(x=>x.id===d.id)}),
+  receivePurchase:d=>openReceive(d.id),
+  reversePurchase:d=>openReverse(d.id),
+  cancelPurchase:d=>openCancel(d.id),
+  notePurchase:d=>openPurchaseNote(d.id),
+  orderPurchase:d=>{const p=DB.purchases.find(x=>x.id===d.id);if(!p||p.status!=='Draft')return;p.status='Ordered';addHistory(p,'Marked as ordered','ordered');logActivity(DB,{tone:'info',icon:'send',title:`Purchase ${p.no} marked as ordered`,sub:supplierOf(p).name,link:'purchase-'+p.id});persist();render();toast('Purchase marked as ordered',`${p.no} · stock changes when it is received.`)},
+  deletePurchase:d=>{const p=DB.purchases.find(x=>x.id===d.id);confirmDialog({title:`Delete ${esc(p.no)}?`,body:'Only drafts can be deleted, because they never affected stock. The purchase number will not be reused.',confirm:'Delete Draft',onConfirm:()=>{if(p.status!=='Draft'){toast('Purchase not deleted','Only draft purchases can be deleted.','error');return}DB.purchases=DB.purchases.filter(x=>x!==p);logActivity(DB,{tone:'mute',icon:'trash-2',title:`Draft ${p.no} deleted`,sub:supplierOf(p).name});persist();go('purchases');toast('Draft purchase deleted',p.no)}})},
+  addSupplier:()=>openSupplierForm(),
+  editSupplier:d=>openSupplierForm(d.id),
+  toggleSupplier:d=>{const s=DB.suppliers.find(x=>x.id===d.id);s.status=s.status==='Active'?'Inactive':'Active';persist();render();toast(s.status==='Active'?'Supplier reactivated':'Supplier deactivated',s.status==='Active'?`${s.name} can be used on new purchases.`:`${s.name} is hidden from new purchases. Its history is kept.`)},
+  deleteSupplier:d=>{const s=DB.suppliers.find(x=>x.id===d.id);confirmDialog({title:'Delete supplier?',body:`${esc(s.name)} has no purchases, so it can be deleted. This can't be undone.`,confirm:'Delete Supplier',onConfirm:()=>{if(DB.purchases.some(p=>p.supplierId===s.id)){toast('Supplier not deleted','It has purchases. Deactivate it instead.','error');return}DB.suppliers=DB.suppliers.filter(x=>x!==s);persist();go('suppliers');toast('Supplier deleted',s.name)}})},
+  gosuppliers:()=>go('suppliers'),
+  resetPur:()=>{Object.assign(S.pur,blankPurFilters());render()},
+  removeCurrency:d=>{DB.currencies=DB.currencies.filter(c=>c!==d.code);persist();render();toast('Currency removed',d.code)},
   close:()=>closeModal(), save:()=>submitModal(),
   addProduct:()=>openAddProduct(),
   editProduct:d=>openEditProduct(d.id),
@@ -1296,22 +1831,23 @@ const ACTIONS={
   adjust:d=>openAdjust(d.id),
   toggleProduct:d=>{const p=DB.products.find(x=>x.id===d.id);p.status=p.status==='Active'?'Inactive':'Active';persist();render();toast(p.status==='Active'?'Product reactivated':'Product deactivated',p.status==='Active'?`${p.name} is available again.`:`${p.name} is hidden from new transactions. Its history is kept.`)},
   toggleVariant:d=>{const v=DB.variants.find(x=>x.id===d.id);v.status=v.status==='Active'?'Inactive':'Active';persist();render();toast(v.status==='Active'?'Variant reactivated':'Variant deactivated',`${v.sku} · ${variantLabel(v)}`)},
-  deleteProduct:d=>{const p=DB.products.find(x=>x.id===d.id);confirmDialog({title:'Delete product?',body:`${esc(p.name)} and its ${variantsOf(p.id).length} variant(s) have no stock history, so they can be deleted. This can't be undone.`,confirm:'Delete Product',onConfirm:()=>{if(variantsOf(p.id).some(v=>movementsOf(v.id).length)){toast('Product not deleted','It now has stock history. Deactivate it instead.','error');return}DB.variants=DB.variants.filter(v=>v.productId!==p.id);DB.products=DB.products.filter(x=>x.id!==p.id);persist();go('products');toast('Product deleted',p.name)}})},
-  deleteVariant:d=>{const v=DB.variants.find(x=>x.id===d.id);confirmDialog({title:'Delete variant?',body:`${esc(v.sku)} has no stock history, so it can be deleted. This can't be undone.`,confirm:'Delete Variant',onConfirm:()=>{if(movementsOf(v.id).length){toast('Variant not deleted','It has stock history. Deactivate it instead.','error');return}DB.variants=DB.variants.filter(x=>x.id!==v.id);persist();go('product-'+v.productId);toast('Variant deleted',v.sku)}})},
+  deleteProduct:d=>{const p=DB.products.find(x=>x.id===d.id);confirmDialog({title:'Delete product?',body:`${esc(p.name)} and its ${variantsOf(p.id).length} variant(s) have no stock or purchase history, so they can be deleted. This can't be undone.`,confirm:'Delete Product',onConfirm:()=>{if(variantsOf(p.id).some(v=>movementsOf(v.id).length||usedInPurchases(v.id))){toast('Product not deleted','It has stock or purchase history. Deactivate it instead.','error');return}DB.variants=DB.variants.filter(v=>v.productId!==p.id);DB.products=DB.products.filter(x=>x.id!==p.id);persist();go('products');toast('Product deleted',p.name)}})},
+  deleteVariant:d=>{const v=DB.variants.find(x=>x.id===d.id);confirmDialog({title:'Delete variant?',body:`${esc(v.sku)} has no stock or purchase history, so it can be deleted. This can't be undone.`,confirm:'Delete Variant',onConfirm:()=>{if(movementsOf(v.id).length||usedInPurchases(v.id)){toast('Variant not deleted','It has stock or purchase history. Deactivate it instead.','error');return}DB.variants=DB.variants.filter(x=>x.id!==v.id);persist();go('product-'+v.productId);toast('Variant deleted',v.sku)}})},
   resetInv:()=>{Object.assign(S.inv,blankInvFilters());render()},
   renameCat:d=>{const c=DB.categories.find(x=>x.id===d.id);showModal({title:'Rename category',narrow:true,save:'Save',body:fld('Category name',`<input class="input" name="name" value="${esc(c.name)}">`,{req:1}),onSave:form=>{const n=F(form,'name').value.trim();if(!n){fieldError(F(form,'name'),'Name cannot be blank.');return false}if(DB.categories.some(x=>x.id!==c.id&&x.name.toLowerCase()===n.toLowerCase())){fieldError(F(form,'name'),'That category already exists.');return false}c.name=n;persist();render();toast('Category updated',n);return true}})},
   deleteCat:d=>{const c=DB.categories.find(x=>x.id===d.id);confirmDialog({title:'Delete category?',body:`${esc(c.name)} has no products.`,confirm:'Delete Category',onConfirm:()=>{DB.categories=DB.categories.filter(x=>x.id!==c.id);persist();render();toast('Category deleted',c.name)}})},
-  restoreSample:()=>confirmDialog({title:'Restore sample data?',body:'This replaces all products, variants and stock movements in this browser with the MSV sample catalogue.',confirm:'Restore Sample Data',onConfirm:()=>{DB=seedDb();persist();render();toast('Sample data restored','')}}),
-  clearData:()=>confirmDialog({title:'Clear all data?',body:'This removes every product, variant and stock movement saved in this browser. Categories are kept. This can\'t be undone.',confirm:'Clear Data',onConfirm:()=>{DB=emptyDb();persist();go('products');toast('Data cleared','Add your first product to get started.')}}),
+  restoreSample:()=>confirmDialog({title:'Restore sample data?',body:'This replaces all products, suppliers, purchases and stock movements in this browser with the MSV sample data.',confirm:'Restore Sample Data',onConfirm:()=>{DB=seedDb();persist();render();toast('Sample data restored','')}}),
+  clearData:()=>confirmDialog({title:'Clear all data?',body:'This removes every product, supplier, purchase and stock movement saved in this browser. Categories and currencies are kept. This can\'t be undone.',confirm:'Clear Data',onConfirm:()=>{DB=emptyDb();persist();go('products');toast('Data cleared','Add your first product to get started.')}}),
   addLine:(d,el)=>{const box=el.closest('.form-section').querySelector('.lines');const i=box.querySelectorAll('[data-line]').length;box.insertAdjacentHTML('beforeend',lineRow(box.dataset.kind,i,'',1,''));refreshIcons();recalc()},
   removeLine:(d,el)=>{el.closest('.line-row').remove();recalc()},
-  purchase:()=>openDemo('purchase'), sale:()=>openDemo('sale'), customer:()=>openDemo('customer'), export:()=>openDemo('export'),
+  sale:()=>openDemo('sale'), customer:()=>openDemo('customer'), export:()=>openDemo('export'),
 };
 document.addEventListener('click',e=>{
-  const el=e.target.closest('[data-action],[data-go],[data-variant],[data-product],[data-customer],[data-vtab],[data-rtab],[data-range],[data-sf],[data-pf],[data-ct],[data-sort],[data-scroll],[data-pstatus],[data-invview],[data-setstatus]');
+  if(e.target.closest('a[href^="#"]:not([data-action])')&&!e.target.closest('#mForm')) return;
+  const el=e.target.closest('[data-action],[data-go],[data-variant],[data-product],[data-customer],[data-vtab],[data-rtab],[data-range],[data-sf],[data-pf],[data-ct],[data-sort],[data-scroll],[data-pstatus],[data-invview],[data-setstatus],[data-psort],[data-sstatus]');
   if(!el) return;
   const d=el.dataset;
-  if(d.action){ if(['suggestSku','addVariantCard','removeVariantCard'].includes(d.action)) return; const fn=ACTIONS[d.action]; if(fn){ if(el.tagName==='A'&&d.action==='close'){closeModal();return} e.preventDefault(); fn(d,el);} return; }
+  if(d.action){ if(['suggestSku','addVariantCard','removeVariantCard','addPLine','removePLine','newSupplierInline'].includes(d.action)) return; const fn=ACTIONS[d.action]; if(fn){ if(el.tagName==='A'&&d.action==='close'){closeModal();return} e.preventDefault(); fn(d,el);} return; }
   if(d.go){ if(d.status!==undefined) Object.assign(S.inv,blankInvFilters(),{status:d.status,view:'levels'}); if(d.view) S.inv.view=d.view; return go(d.go); }
   if(d.variant) return go('variant-'+d.variant);
   if(d.product) return go('product-'+d.product);
@@ -1325,6 +1861,8 @@ document.addEventListener('click',e=>{
   if(d.pstatus){S.prod.status=d.pstatus;return render();}
   if(d.invview){S.inv.view=d.invview;return render();}
   if(d.setstatus){Object.assign(S.inv,{status:d.setstatus,view:'levels'});return render();}
+  if(d.psort){const f=S.pur;f.dir=f.sort===d.psort?-f.dir:1;f.sort=d.psort;return renderPurTable();}
+  if(d.sstatus){S.sup.status=d.sstatus;return render();}
   if(d.sort){const f=S.inv;f.dir=f.sort===d.sort?-f.dir:1;f.sort=d.sort;return renderInvTable();}
   if(d.scroll){e.preventDefault();document.getElementById(d.scroll).scrollIntoView({behavior:'smooth',block:'start'});}
 });
@@ -1332,6 +1870,7 @@ function rerenderKeepFocus(id){const el=$('#'+id),pos=el?el.selectionStart:0;ren
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.dataset.filter){S.inv[t.dataset.filter]=t.value;rerenderKeepFocus('invQ');return}
+  if(t.dataset.pfilter){S.pur[t.dataset.pfilter]=t.value;rerenderKeepFocus('purQ');return}
   if(t.id==='showInactive'){S.inv.showInactive=t.checked;render();return}
   if(t.id==='prodCat'){S.prod.cat=t.value;render();return}
   if(t.dataset.catgauge){const c=DB.categories.find(x=>x.id===t.dataset.catgauge);c.usesGauge=t.checked;persist();render();toast('Category updated',`${c.name} ${c.usesGauge?'now shows':'no longer shows'} the gauge field.`);return}
@@ -1340,12 +1879,18 @@ document.addEventListener('change',e=>{
 document.addEventListener('input',e=>{
   const t=e.target;
   if(t.id==='invQ'){S.inv.q=t.value;renderInvTable();const rb=document.querySelector('[data-action=resetInv]');if(rb)rb.disabled=!filtersActive();return}
+  if(t.id==='purQ'){S.pur.q=t.value;renderPurTable();const rb=document.querySelector('[data-action=resetPur]');if(rb)rb.disabled=!purFiltersActive();return}
+  if(t.id==='supQ'){S.sup.q=t.value;rerenderKeepFocus('supQ');return}
   if(t.id==='prodQ'){S.prod.q=t.value;rerenderKeepFocus('prodQ');return}
   if(t.id==='custQ'){S.custQ=t.value;rerenderKeepFocus('custQ');return}
   if(t.closest('#mForm')&&modal&&modal.kind==='demo') recalc();
 });
 document.addEventListener('submit',e=>{
   if(e.target.id==='mForm'){e.preventDefault();submitModal();return}
+  if(e.target.id==='addCurForm'){e.preventDefault();const c=e.target.querySelector('[name=code]').value.trim().toUpperCase(),err=$('#curErr');
+    if(!/^[A-Z]{3}$/.test(c)){err.textContent='Use a 3-letter code, e.g. AUD.';return}
+    if(DB.currencies.includes(c)){err.textContent='That currency is already on the list.';return}
+    DB.currencies.push(c);persist();render();toast('Currency added',c);return}
   if(e.target.id==='addCatForm'){e.preventDefault();const n=e.target.querySelector('[name=name]').value.trim(),err=$('#catErr');
     if(!n){err.textContent='Enter a category name.';return}
     if(DB.categories.some(c=>c.name.toLowerCase()===n.toLowerCase())){err.textContent='That category already exists.';return}
@@ -1364,6 +1909,7 @@ function renderNotifications(){
   $('#notifDot').hidden=!att.length;
   $('#notifPop').innerHTML=`<div class="pop-head">Notifications</div>
   ${att.length?`<button class="pop-item" data-go="inventory" data-status="attention"><span class="act-icon" style="background:var(--warn-bg);color:var(--warn-fg)">${ic('triangle-alert','i i-sm')}</span><span><b style="font-size:13.5px">${att.length} SKU${att.length===1?' needs':'s need'} reordering</b><small>${out} out of stock</small></span></button>`:`<div class="pop-item" style="cursor:default"><span class="act-icon" style="background:var(--ok-bg);color:var(--ok-fg)">${ic('circle-check','i i-sm')}</span><span><b style="font-size:13.5px">Stock levels look good</b><small>No SKU is at its reorder level</small></span></div>`}
+  ${DB.purchases.some(p=>p.status==='Ordered')?`<button class="pop-item" data-go="purchases"><span class="act-icon" style="background:var(--info-bg);color:var(--info-fg)">${ic('ship','i i-sm')}</span><span><b style="font-size:13.5px">${DB.purchases.filter(p=>p.status==='Ordered').length} purchase${DB.purchases.filter(p=>p.status==='Ordered').length===1?'':'s'} on order</b><small>Mark as Received when the stock arrives</small></span></button>`:''}
   <button class="pop-item" data-go="sales"><span class="act-icon" style="background:var(--bad-bg);color:var(--bad-fg)">${ic('clock','i i-sm')}</span><span><b style="font-size:13.5px">INV-1087 is overdue</b><small>Sample data · Jakarta Tennis Supply</small></span></button>`;
 }
 $('#profilePop').innerHTML=`<div class="pop-head" style="flex-direction:column;align-items:flex-start;gap:0">Jasmine Koh<small class="muted" style="font-weight:500;font-size:12px">jasmine@msv-sea.com</small></div><div class="pop-sep"></div>
