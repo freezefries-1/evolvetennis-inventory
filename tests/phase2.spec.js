@@ -133,17 +133,17 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
   });
 
   console.log('Stock adjustments and ledger');
-  await check('decrease by 2 (Damaged Item) gives 20 → 18 and a ledger row', async () => {
+  await check('decrease by 2 (Damaged Stock) gives 20 → 18 and a ledger row', async () => {
     const v = await variantBySku('MSV-TS-123-BLK-R');
     await page.goto(FILE + '#variant-' + v.id);
     await page.click(`.page-head [data-action=adjust][data-id="${v.id}"]`);
     await page.fill('#mForm [name=qty]', '2');
-    await page.selectOption('#mForm [name=reason]', 'Damaged Item');
+    await page.selectOption('#mForm [name=reason]', 'Damaged Stock');
     await page.fill('#mForm [name=notes]', 'Crushed box');
     await save();
     eq((await variantBySku('MSV-TS-123-BLK-R')).qty, 18);
     const m = (await db()).movements.filter(x => x.variantId === v.id).pop();
-    eq(m.type, 'adjustment'); eq(m.change, -2); eq(m.prevQty, 20); eq(m.newQty, 18); eq(m.reason, 'Damaged Item');
+    eq(m.type, 'damaged'); eq(m.change, -2); eq(m.prevQty, 20); eq(m.newQty, 18); eq(m.reason, 'Damaged Stock'); ok(/^MOV-\d{4}-\d{6}$/.test(m.ref), 'movement ID');
     ok((await toastText()).includes('Stock adjusted successfully'));
   });
 
@@ -161,7 +161,8 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     const v = await variantBySku('MSV-TS-123-BLK-R');
     await page.click(`.page-head [data-action=adjust][data-id="${v.id}"]`);
     await page.fill('#mForm [name=qty]', '50');
-    await page.selectOption('#mForm [name=reason]', 'Lost Item');
+    await page.selectOption('#mForm [name=reason]', 'Lost Stock');
+    await page.fill('#mForm [name=notes]', 'Missing after move');
     await save();
     ok((await page.textContent('#mForm')).includes('Only 18 in stock'));
     await page.click('.modal-foot [data-action=close]');
@@ -173,13 +174,15 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     await page.click(`.page-head [data-action=adjust][data-id="${v.id}"]`);
     await page.click('[data-adjtype=increase]');
     await page.fill('#mForm [name=qty]', '4');
-    await page.selectOption('#mForm [name=reason]', 'Returned Stock');
+    await page.selectOption('#mForm [name=reason]', 'Data Correction');
+    await page.fill('#mForm [name=notes]', 'Found extra reels');
     await save();
     eq((await variantBySku('MSV-TS-123-BLK-R')).qty, 22);
     await page.click(`.page-head [data-action=adjust][data-id="${v.id}"]`);
     await page.click('[data-adjtype=set]');
     await page.fill('#mForm [name=qty]', '0');
-    await page.selectOption('#mForm [name=reason]', 'Stock Count Correction');
+    await page.selectOption('#mForm [name=reason]', 'Physical Count Correction');
+    await page.fill('#mForm [name=notes]', 'Shelf is empty');
     await save();
     const m = (await db()).movements.filter(x => x.variantId === v.id).pop();
     eq(m.change, -22); eq(m.newQty, 0);
@@ -196,9 +199,9 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     await page.click('[data-vtab="Stock Movement"]');
     const rows = await page.$$eval('.card tbody tr', trs => trs.map(tr => [...tr.cells].map(c => c.innerText.trim())));
     eq(rows.length, 4, 'four movements');
-    eq(rows[0][1], 'Opening Stock'); eq(rows[0][2], '+20'); eq(rows[0][3] + '→' + rows[0][4], '0→20');
-    eq(rows[1][2], '−2'); eq(rows[1][3] + '→' + rows[1][4], '20→18');
-    eq(rows[3][4], '0');
+    eq(rows[0][2], 'Opening Stock'); eq(rows[0][3], '+20'); eq(rows[0][4] + '→' + rows[0][5], '0→20');
+    eq(rows[1][3], '−2'); eq(rows[1][4] + '→' + rows[1][5], '20→18');
+    eq(rows[3][5], '0');
   });
 
   console.log('Inventory page');

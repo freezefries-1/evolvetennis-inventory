@@ -439,7 +439,7 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
       <div><b>MSV Southeast Asia</b><span>Inventory Management</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
-    <div class="side-foot"><strong>Phase 4</strong>Inventory, purchasing and sales are live</div>
+    <div class="side-foot"><strong>Phase 5</strong>Stock ledger, returns and audit trail are live</div>
   </aside>
   <div class="backdrop" id="backdrop"></div>
   <div class="main">
@@ -451,7 +451,7 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
         <span class="kbd">/</span>
       </form>
       <div class="top-right">
-        <span class="proto-tag">Phase 4 · saved in this browser</span>
+        <span class="proto-tag">Phase 5 · saved in this browser</span>
         <div style="position:relative">
           <button class="icon-btn" id="notifBtn" aria-label="Notifications" aria-haspopup="true"><i data-lucide="bell" class="i"></i><span class="dot" id="notifDot"></span></button>
           <div class="pop" id="notifPop" hidden></div>
@@ -512,14 +512,24 @@ const Store={
                type: 'opening' | 'adjustment' | later 'purchase' | 'sale' | 'return' */
 const MOVEMENT_TYPES={
   opening:{label:'Opening Stock',tone:'mute'},
-  adjustment:{label:'Manual Adjustment',tone:'warn'},
   purchase:{label:'Purchase',tone:'ok'},
   purchase_reversal:{label:'Purchase Reversal',tone:'bad'},
   sale:{label:'Sale',tone:'info'},
   sale_reversal:{label:'Sale Reversal',tone:'ok'},
-  return:{label:'Return',tone:'ok'},         // later: customer returns
+  customer_return:{label:'Customer Return',tone:'ok'},
+  customer_return_reversal:{label:'Customer Return Reversal',tone:'bad'},
+  damaged_return:{label:'Damaged Return',tone:'mute',recordOnly:true},
+  supplier_return:{label:'Supplier Return',tone:'warn'},
+  supplier_return_reversal:{label:'Supplier Return Reversal',tone:'ok'},
+  adjustment:{label:'Manual Adjustment',tone:'warn'},
+  damaged:{label:'Damaged Stock',tone:'bad'},
+  lost:{label:'Lost Stock',tone:'bad'},
+  sample:{label:'Sample / Giveaway',tone:'warn'},
+  count:{label:'Stock Count Correction',tone:'warn'},
+  other:{label:'Other',tone:'mute'},
 };
-const ADJ_REASONS=['Opening Balance','Stock Count Correction','Damaged Item','Lost Item','Sample / Giveaway','Returned Stock','Other'];
+const ADJ_REASONS=['Physical Count Correction','Damaged Stock','Lost Stock','Sample / Giveaway','Internal Use','Opening Balance Correction','Data Correction','Other'];
+const ADJ_TYPE={'Physical Count Correction':'count','Damaged Stock':'damaged','Lost Stock':'lost','Sample / Giveaway':'sample'};
 const GAUGES=['1.18','1.20','1.23','1.25','1.27','1.30'];
 const COLOURS={Black:'#1E2421',White:'#FFFFFF',Red:'#C8473D',Blue:'#3567B5',Yellow:'#E8D23C',Green:'#3D9B5F',Natural:'#E9E0C9',Silver:'#C7CDD1'};
 const PACKAGING=['Reel','Set','Other'];
@@ -535,6 +545,7 @@ const MARKETS=['Singapore','Malaysia','Thailand','Indonesia','Philippines','Viet
 const COST_FIELDS=[['shipping','Shipping / Freight'],['duties','Import Duties'],['customs','Customs Fees'],['handling','Handling Fees'],['other','Other Costs']];
 const emptyCosts = ()=>({shipping:0,duties:0,customs:0,handling:0,other:0,otherDesc:''});
 const emptyCharges = ()=>({discount:0,shipping:0,other:0,otherDesc:''});
+const ENTITY_OF={purchase:'Purchase',sale:'Sale',return:'Customer Return',sreturn:'Supplier Return',supplier:'Supplier',customer:'Customer',variant:'Variant',product:'Product',movement:'Stock Movement',stockcount:'Stock Count'};
 function isoAddDays(iso,n){const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 function seedRng(a){return ()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
@@ -562,7 +573,7 @@ function seedCustomers(t0){
 
 function seedDb(){
   const t0=Date.UTC(2026,3,1), day=86400000;
-  const db={version:4,categories:[],products:[],variants:[],movements:[],seq:0,suppliers:seedSuppliers(t0),purchases:[],customers:seedCustomers(t0),sales:[],activity:[],counters:{},currencies:DEFAULT_CURRENCIES.slice(),fxRates:{...DEFAULT_FX}};
+  const db={version:5,user:'Jasmine Koh',categories:[],products:[],variants:[],movements:[],seq:0,suppliers:seedSuppliers(t0),purchases:[],customers:seedCustomers(t0),sales:[],returns:[],supplierReturns:[],counts:[],activity:[],audit:[],counters:{},currencies:DEFAULT_CURRENCIES.slice(),fxRates:{...DEFAULT_FX}};
   const cat=(id,name,usesGauge)=>db.categories.push({id,name,usesGauge});
   cat('cat-strings','Tennis Strings',true);cat('cat-grips','Grips',false);cat('cat-acc','Accessories',false);cat('cat-equip','Equipment',false);cat('cat-other','Other',false);
   const P=[
@@ -636,58 +647,241 @@ function seedDb(){
   });
   const finalQty=Object.fromEntries(plan.map(x=>[x.v.id,x.qty]));
   const rev=SEEDS.find(s=>s.date>='2026-09-10'&&s.status==='Completed'&&s.lines.every(l=>finalQty[l.variantId]>=l.qty+10)); if(rev){rev.reverse=isoAddDays(rev.date,1);rev.payment='Refunded'}
+  // Sample returns: one resellable unit back from a customer, one defective unit not restocked, and 6 sets sent back to MSV.
+  const RETS=[], cand=SEEDS.filter(s=>s.status==='Completed'&&!s.reverse&&s.date>='2026-08-01'&&s.date<='2026-09-28');
+  const okLine=l=>l.qty>=2&&finalQty[l.variantId]>=10, r1=cand.find(s=>s.lines.some(okLine));
+  if(r1){const l=r1.lines.find(okLine);RETS.push({s:r1,vid:l.variantId,qty:1,condition:'Resellable',restock:true,reason:'Customer Changed Mind',date:isoAddDays(r1.date,4),notes:'Unopened, came back with the courier'})}
+  const r2=cand.slice().reverse().find(s=>s!==r1);
+  if(r2) RETS.push({s:r2,vid:r2.lines[0].variantId,qty:1,condition:'Damaged',restock:false,reason:'Defective',date:isoAddDays(r2.date,3),notes:'Packaging torn and string kinked'});
+  const restockRet={}; RETS.filter(x=>x.restock).forEach(x=>restockRet[x.vid]=(restockRet[x.vid]||0)+x.qty);
+  const supplierRet={'MSV-FH-123-BLK-S':6};
   const received={}, sold={};
   SEEDP.filter(s=>s.status==='Received').forEach(s=>s.lines.forEach(([sku,q])=>received[sku]=(received[sku]||0)+q));
   SEEDS.filter(s=>s.status==='Completed'&&!s.reverse).forEach(s=>s.lines.forEach(l=>sold[l.variantId]=(sold[l.variantId]||0)+l.qty));
   // Opening balance = today's quantity − receipts − adjustments + sales, so the history replays to today's stock.
-  plan.forEach(({v,qty,adj},i)=>{const opening=qty-adj-(received[v.sku]||0)+(sold[v.id]||0);
+  plan.forEach(({v,qty,adj},i)=>{const opening=qty-adj-(received[v.sku]||0)+(sold[v.id]||0)-(restockRet[v.id]||0)+(supplierRet[v.sku]||0);
     if(opening>0) postMovement(db,v.id,{type:'opening',change:opening,date:'2026-04-01',reason:'Opening Balance',notes:'Stock on hand at system setup',createdAt:t0+i*10});});
   const ev=[];
   SEEDP.forEach(s=>{
-    let p; ev.push({date:s.date,o:0,fn:()=>{p=createPurchaseRecord(db,{...s,lines:s.lines.map(([sku,qty,unitCost])=>({variantId:bySku(sku),qty,unitCost}))},{at:Date.parse(s.date+'T09:00:00Z'),year:2026})}});
+    let p; ev.push({date:s.date,o:0,fn:()=>{p=s._p=createPurchaseRecord(db,{...s,lines:s.lines.map(([sku,qty,unitCost])=>({variantId:bySku(sku),qty,unitCost}))},{at:Date.parse(s.date+'T09:00:00Z'),year:2026})}});
     if(s.status==='Received') ev.push({date:s.receivedDate,o:1,fn:()=>receivePurchase(db,p,{date:s.receivedDate,at:Date.parse(s.receivedDate+'T10:00:00Z')})});
   });
   SEEDS.forEach((s,i)=>{
     let sale; const at=Date.parse(s.date+'T11:00:00Z')+i;
-    ev.push({date:s.date,o:2,fn:()=>{sale=createSaleRecord(db,{customerId:s.customer.id,date:s.date,country:s.customer.country,currency:s.customer.currency,fxRate:s.customer.currency==='SGD'?1:DEFAULT_FX[s.customer.currency],status:s.status==='Confirmed'?'Confirmed':s.status==='Draft'?'Draft':'Completed',payment:s.payment,reference:s.reference,notes:'',lines:s.lines,charges:s.charges},{at,year:2026});
+    ev.push({date:s.date,o:2,fn:()=>{sale=s._sale=createSaleRecord(db,{customerId:s.customer.id,date:s.date,country:s.customer.country,currency:s.customer.currency,fxRate:s.customer.currency==='SGD'?1:DEFAULT_FX[s.customer.currency],status:s.status==='Confirmed'?'Confirmed':s.status==='Draft'?'Draft':'Completed',payment:s.payment,reference:s.reference,notes:'',lines:s.lines,charges:s.charges},{at,year:2026});
       if(s.status==='Completed') completeSale(db,sale,{date:s.date,at:at+5});
       sale.payment=s.payment;}});
     if(s.reverse) ev.push({date:s.reverse,o:3,fn:()=>reverseSale(db,sale,{date:s.reverse,reason:'Recorded in error',notes:'Order was entered twice',at:Date.parse(s.reverse+'T12:00:00Z')})});
   });
-  plan.forEach(({v,adj},i)=>{ if(adj){const d='2026-10-0'+(5+i%3);ev.push({date:d,o:4,fn:()=>postMovement(db,v.id,{type:'adjustment',change:adj,date:d,reason:'Damaged Item',notes:'Found during weekly stock check',createdAt:Date.parse(d+'T16:00:00Z')+i})})} });
+  plan.forEach(({v,adj},i)=>{ if(adj){const d='2026-10-0'+(5+i%3);ev.push({date:d,o:4,fn:()=>{const at=Date.parse(d+'T16:00:00Z')+i;
+    if(v.sku==='MSV-FH-123-BLK-R') applyStockCount(db,{date:d,notes:'Weekly shelf count',lines:[{variantId:v.id,physical:v.qty+adj}],at,year:2026});
+    else postMovement(db,v.id,{type:'damaged',change:adj,date:d,reason:'Damaged Stock',notes:'Found during weekly stock check',createdAt:at});}})} });
+  RETS.forEach(x=>ev.push({date:x.date,o:5,fn:()=>{const sale=x.s._sale,sl=sale.lines.find(l=>l.variantId===x.vid);
+    const r=createCustomerReturn(db,{saleId:sale.id,date:x.date,reason:x.reason,notes:x.notes,lines:[{saleLineId:sl.id,qty:x.qty,condition:x.condition,restock:x.restock}]},{at:Date.parse(x.date+'T14:00:00Z'),year:2026});
+    completeCustomerReturn(db,r,{date:x.date,at:Date.parse(x.date+'T14:05:00Z')});}}));
+  ev.push({date:'2026-09-24',o:6,fn:()=>{const pu=SEEDP[0]._p,pl=pu.lines.find(l=>l.variantId===bySku('MSV-FH-123-BLK-S'));
+    const r=createSupplierReturn(db,{purchaseId:pu.id,date:'2026-09-24',reason:'Damaged on Arrival',notes:'Carton crushed in transit; MSV agreed to credit',lines:[{purchaseLineId:pl.id,qty:6}]},{at:Date.parse('2026-09-24T09:00:00Z'),year:2026});
+    completeSupplierReturn(db,r,{date:'2026-09-24',at:Date.parse('2026-09-24T09:05:00Z')});}});
   ev.sort((a,b)=>a.date.localeCompare(b.date)||a.o-b.o).forEach(e=>e.fn());
   return db;
 }
-function emptyDb(){const s=seedDb();return {version:4,categories:s.categories,products:[],variants:[],movements:[],seq:0,suppliers:[],purchases:[],customers:[],sales:[],activity:[],counters:DB&&DB.counters?{...DB.counters}:{},currencies:DB&&DB.currencies?DB.currencies.slice():DEFAULT_CURRENCIES.slice(),fxRates:DB&&DB.fxRates?{...DB.fxRates}:{...DEFAULT_FX}}}
+function emptyDb(){const s=seedDb();return {version:5,user:DB&&DB.user||'Jasmine Koh',categories:s.categories,products:[],variants:[],movements:[],seq:0,suppliers:[],purchases:[],customers:[],sales:[],returns:[],supplierReturns:[],counts:[],activity:[],audit:[],counters:DB&&DB.counters?{...DB.counters}:{},currencies:DB&&DB.currencies?DB.currencies.slice():DEFAULT_CURRENCIES.slice(),fxRates:DB&&DB.fxRates?{...DB.fxRates}:{...DEFAULT_FX}}}
 function migrate(db){
   if(!db) return seedDb();
   if(db.version===2) Object.assign(db,{version:3,suppliers:seedSuppliers(Date.now()),purchases:[],activity:[],counters:{},currencies:DEFAULT_CURRENCIES.slice()});
-  if(db.version===3){ // Phase 3 data: keep everything; add customers, sales and exchange rates.
+  if(db.version===3){
     Object.assign(db,{version:4,customers:seedCustomers(Date.now()),sales:[],fxRates:{...DEFAULT_FX}});
     ['IDR','PHP'].forEach(c=>{if(!db.currencies.includes(c))db.currencies.push(c)});
-    return db;
   }
-  return db.version===4?db:seedDb();
+  if(db.version===4){ // Phase 4 data: keep everything; give every movement a permanent ID and author, add returns, counts and audit trail.
+    db.movements.slice().sort((a,b)=>a.seq-b.seq).forEach(m=>{
+      if(!m.ref){const k='MOV-'+new Date(m.createdAt||Date.now()).getUTCFullYear();db.counters[k]=(db.counters[k]||0)+1;m.ref=`${k}-${String(db.counters[k]).padStart(6,'0')}`}
+      if(!m.by) m.by='Jasmine Koh'; if(m.type==='return') m.type='customer_return';
+    });
+    Object.assign(db,{version:5,user:'Jasmine Koh',returns:[],supplierReturns:[],counts:[]});
+    db.audit=db.activity.map(a=>auditFromActivity(a,db.user));
+  }
+  return db.version===5?db:seedDb();
 }
-
-let DB=migrate(Store.load());
+let DB=freezeLedger(migrate(Store.load()));
 let storageWarned=false;
 function persist(){ const ok=Store.save(DB); if(!ok&&!storageWarned){storageWarned=true;toast('Changes not saved','This browser is blocking storage, so changes will be lost when you close the page.','error');} }
 
 /* ---------- Inventory engine ---------- */
 /* The one place stock quantities change. Purchases, sales and returns
    (later phases) call this with their own type and reference. */
-function postMovement(db,variantId,{type,change,date,reason='',notes='',reference='',unitCost=null,currency=BASE_CURRENCY,createdAt=Date.now(),...links}){
+function postMovement(db,variantId,{type,change,date,reason='',notes='',reference='',unitCost=null,currency=BASE_CURRENCY,createdAt=Date.now(),unitsNoted,...links}){
   const v=db.variants.find(x=>x.id===variantId);
   if(!v) throw new Error('Variant not found');
-  if(!MOVEMENT_TYPES[type]) throw new Error('Unknown movement type');
-  change=Math.round(+change);
-  if(!change) throw new Error('Quantity change cannot be zero');
+  const T=MOVEMENT_TYPES[type];
+  if(!T) throw new Error('Unknown movement type');
+  change=Math.round(+change)||0;
+  if(T.recordOnly&&change) throw new Error('This movement type is a record only and cannot change stock.');
+  if(!T.recordOnly&&!change) throw new Error('Quantity change cannot be zero');
   const prev=v.qty, next=prev+change;
   if(next<0) throw new Error(`Only ${prev} in stock, so you can't remove ${-change}.`);
-  // links: purchaseId, lineId, supplierId (purchases); later saleId, customerId, etc.
-  const m={id:uid('m'),seq:++db.seq,date:date||todayISO(),variantId,sku:v.sku,type,change,prevQty:prev,newQty:next,unitCost:unitCost??v.cost,currency,reason,notes,reference:reference||(type==='opening'?'Opening':'ADJ-'+String(db.seq).padStart(4,'0')),createdAt,...links};
-  db.movements.push(m); v.qty=next; return m;
+  const k='MOV-'+new Date(createdAt).getUTCFullYear(); db.counters[k]=(db.counters[k]||0)+1;
+  // links: purchaseId, saleId, returnId, supplierReturnId, countId, lineId, customerId, supplierId
+  const m={id:uid('m'),ref:`${k}-${String(db.counters[k]).padStart(6,'0')}`,seq:++db.seq,date:date||todayISO(),variantId,sku:v.sku,type,change,prevQty:prev,newQty:next,unitCost:unitCost??v.cost,currency,reason,notes,
+    reference:reference||(type==='opening'?'Opening':'ADJ-'+String(db.seq).padStart(4,'0')),createdAt,by:db.user||'Owner',...(unitsNoted!=null?{unitsNoted}:{}),...links};
+  db.movements.push(Object.freeze(m)); v.qty=next; return m;
+}
+/* Movements are immutable: corrections are always new movements. */
+function freezeLedger(db){db.movements.forEach(m=>Object.freeze(m));return db}
+function vOf(db,id){return db.variants.find(x=>x.id===id)}
+function nextNo(db,prefix,year,pad=4){const k=`${prefix}-${year}`;db.counters[k]=(db.counters[k]||0)+1;return `${k}-${String(db.counters[k]).padStart(pad,'0')}`}
+
+/* ---------- Ledger integrity ----------
+   variant.qty is the single stock figure; the movement ledger must explain it.
+   Checks that each SKU's movements chain (previous → new) and add up to qty. */
+function ledgerCheck(db=DB){
+  const by={}; db.movements.forEach(m=>(by[m.variantId]=by[m.variantId]||[]).push(m));
+  const issues=[];
+  db.variants.forEach(v=>{
+    const ms=(by[v.id]||[]).slice().sort((a,b)=>a.seq-b.seq); let bal=0, brokenAt=null;
+    ms.forEach(m=>{if(brokenAt==null&&(m.prevQty!==bal||m.newQty!==bal+m.change))brokenAt=m.ref;bal+=m.change});
+    if(bal!==v.qty||brokenAt) issues.push({v,ledger:bal,stored:v.qty,brokenAt});
+  });
+  return issues;
+}
+
+/* ---------- Audit trail ---------- */
+function audit(db,{action,entity,ref='',link='',desc='',at=Date.now()}){
+  db.audit.push({id:uid('au'),at,action,entity:entity||ENTITY_OF[(link||'').split('-')[0]]||'Other',ref,link,desc,user:db.user||'Owner'});
+  if(db.audit.length>2000) db.audit.splice(0,db.audit.length-2000);
+}
+function auditFromActivity(a,user){
+  const ref=((a.title||'').match(/(PUR|SAL|SRET|RET|CNT)-\d{4}-\d+/)||[''])[0];
+  let action=a.action||(a.title||'').replace(ref,'').replace(/\s+/g,' ').trim();
+  if(/^Received\s+from/.test(action)) action='Purchase received';
+  return {id:uid('au'),at:a.at,action,entity:a.entity||ENTITY_OF[(a.link||'').split('-')[0]]||'Other',ref,link:a.link||'',desc:a.sub||'',user};
+}
+function logActivity(db,a){
+  const e={id:uid('a'),at:Date.now(),...a}; db.activity.push(e);
+  if(db.activity.length>300) db.activity.splice(0,db.activity.length-300);
+  if(db.audit) db.audit.push(auditFromActivity(e,db.user||'Owner'));
+}
+
+/* ---------- Customer returns ----------
+   Start from a completed sale. Resellable units go back into stock as a
+   'customer_return' movement; damaged or unusable units are recorded with a
+   'damaged_return' entry that does not change saleable stock. Returns never
+   edit the original sale; they are tracked against each sale line. */
+const RETURN_REASONS=['Wrong Item','Customer Changed Mind','Defective','Damaged','Incorrect Quantity','Shipping Error','Other'];
+const RETURN_CONDITIONS=['Resellable','Damaged','Unusable','Other'];
+const SUPPLIER_RETURN_REASONS=['Defective','Wrong Product','Over Shipment','Damaged on Arrival','Quality Issue','Supplier Recall','Other'];
+const RETURN_STATUSES=['Draft','Completed','Cancelled','Reversed'];
+function returnedQty(db,saleLineId,exceptId){return db.returns.filter(r=>r.status==='Completed'&&r.id!==exceptId).reduce((a,r)=>a+r.lines.filter(l=>l.saleLineId===saleLineId).reduce((q,l)=>q+l.qty,0),0)}
+function returnTotals(r){
+  let units=0,restocked=0,value=0,revBase=0,cogs=0;
+  r.lines.forEach(l=>{units+=l.qty;if(l.restock)restocked+=l.qty;value+=l.qty*l.unitRevenue;revBase+=l.qty*l.unitRevenueBase;if(l.restock)cogs+=l.qty*l.unitCost});
+  return {units,restocked,notRestocked:units-restocked,value:round2(value),revBase:round2(revBase),cogs:round2(cogs),gpImpact:round2(cogs-revBase)};
+}
+function createCustomerReturn(db,d,{at=Date.now(),year=new Date().getFullYear()}={}){
+  const s=db.sales.find(x=>x.id===d.saleId);
+  if(!s||s.status!=='Completed') throw new Error('Returns can only be made against a completed sale.');
+  const lines=d.lines.filter(l=>l.qty>0).map(l=>{const sl=s.lines.find(x=>x.id===l.saleLineId);if(!sl)throw new Error('That item is not on the original sale.');
+    const restock=(l.condition==='Resellable'||l.condition==='Other')&&!!l.restock;
+    return {id:uid('rl'),saleLineId:sl.id,variantId:sl.variantId,qty:l.qty,condition:l.condition,restock,unitRevenue:round2(sl.revenue/sl.qty),unitRevenueBase:round2(sl.revenueBase/sl.qty),unitCost:sl.unitCost}});
+  if(!lines.length) throw new Error('Enter a return quantity for at least one item.');
+  lines.forEach(l=>{const sl=s.lines.find(x=>x.id===l.saleLineId),max=sl.qty-returnedQty(db,sl.id);if(l.qty>max)throw new Error(`Cannot return more than quantity sold: ${vOf(db,l.variantId)?.sku||'item'} has ${max} left to return.`)});
+  const r={id:uid('ret'),no:nextNo(db,'RET',year),saleId:s.id,customerId:s.customerId,date:d.date,status:'Draft',reason:d.reason,notes:d.notes||'',currency:s.currency,lines,createdAt:at,history:[]};
+  db.returns.push(r); addHistory(r,'Created as Draft','created',at);
+  logActivity(db,{at,tone:'mute',icon:'undo-2',title:`Return ${r.no} created`,sub:`${(db.customers.find(c=>c.id===r.customerId)||{}).name||''} · ${s.no}`,link:'return-'+r.id,action:'Return created'});
+  return r;
+}
+function completeCustomerReturn(db,r,{date,at=Date.now()}){
+  if(r.status==='Completed') throw new Error('This return has already been completed.');
+  if(r.status!=='Draft') throw new Error(`This return is ${r.status.toLowerCase()} and cannot be completed.`);
+  const s=db.sales.find(x=>x.id===r.saleId);
+  if(!s||s.status!=='Completed') throw new Error('The original sale is no longer completed, so this return cannot be completed.');
+  r.lines.forEach(l=>{const sl=s.lines.find(x=>x.id===l.saleLineId),max=sl.qty-returnedQty(db,sl.id,r.id);if(l.qty>max)throw new Error(`Cannot return more than quantity sold: ${vOf(db,l.variantId)?.sku||'item'} has ${max} left to return.`)});
+  const c=db.customers.find(x=>x.id===r.customerId), t=returnTotals(r);
+  r.lines.forEach((l,i)=>{
+    const base={date,reference:r.no,returnId:r.id,saleId:r.saleId,customerId:r.customerId,lineId:l.id,unitCost:l.unitCost,createdAt:at+i};
+    if(l.restock) postMovement(db,l.variantId,{...base,type:'customer_return',change:l.qty,reason:`Returned by ${c?c.name:'customer'}: ${r.reason}`,notes:`Condition: ${l.condition} · from ${s.no}`});
+    else postMovement(db,l.variantId,{...base,type:'damaged_return',change:0,unitsNoted:l.qty,reason:`Returned by ${c?c.name:'customer'}: ${r.reason}`,notes:`${l.qty} ${l.condition.toLowerCase()} unit${l.qty===1?'':'s'} not restocked · from ${s.no}`});
+  });
+  Object.assign(r,{status:'Completed',completedDate:date,completedAt:at});
+  addHistory(r,`Completed · ${t.restocked} unit${t.restocked===1?'':'s'} back in stock${t.notRestocked?` · ${t.notRestocked} not restocked`:''}`,'completed',at);
+  logActivity(db,{at,tone:'ok',icon:'undo-2',title:`Return ${r.no} completed`,sub:`${t.units} unit${t.units===1?'':'s'} returned by ${c?c.name:'customer'}${t.restocked?` · +${t.restocked} to stock`:''}`,link:'return-'+r.id,action:'Return completed'});
+  return t;
+}
+function reverseCustomerReturn(db,r,{date,reason,notes='',at=Date.now()}){
+  if(r.status!=='Completed') throw new Error('Only completed returns can be reversed.');
+  const need={}; r.lines.filter(l=>l.restock).forEach(l=>need[l.variantId]=(need[l.variantId]||0)+l.qty);
+  const short=Object.entries(need).filter(([id,q])=>(vOf(db,id)||{qty:0}).qty<q);
+  if(short.length) throw new Error(`Insufficient inventory to reverse this return: ${short.map(([id,q])=>`${vOf(db,id).sku} has ${vOf(db,id).qty}, needs ${q}`).join('; ')}.`);
+  r.lines.forEach((l,i)=>{
+    const base={date,reference:r.no,returnId:r.id,saleId:r.saleId,customerId:r.customerId,lineId:l.id,unitCost:l.unitCost,createdAt:at+i,notes};
+    if(l.restock) postMovement(db,l.variantId,{...base,type:'customer_return_reversal',change:-l.qty,reason:`Return reversed: ${reason}`});
+    else postMovement(db,l.variantId,{...base,type:'damaged_return',change:0,unitsNoted:-l.qty,reason:`Return reversed: ${reason}`});
+  });
+  Object.assign(r,{status:'Reversed',reversedDate:date,reversedAt:at,reverseReason:reason});
+  addHistory(r,`Reversed · ${reason}${notes?' · '+notes:''}`,'reversed',at);
+  logActivity(db,{at,tone:'bad',icon:'undo-2',title:`Return ${r.no} reversed`,sub:reason,link:'return-'+r.id,action:'Return reversed'});
+}
+
+/* ---------- Supplier returns ----------
+   Start from a received purchase. Completing removes the units from stock
+   with a 'supplier_return' movement linked to the purchase and supplier. */
+function supplierReturnedQty(db,purchaseLineId,exceptId){return db.supplierReturns.filter(r=>r.status==='Completed'&&r.id!==exceptId).reduce((a,r)=>a+r.lines.filter(l=>l.purchaseLineId===purchaseLineId).reduce((q,l)=>q+l.qty,0),0)}
+function sreturnTotals(r){return {units:r.lines.reduce((a,l)=>a+l.qty,0),value:round2(r.lines.reduce((a,l)=>a+l.qty*l.unitCost,0))}}
+function checkSupplierReturn(db,r,exceptId){
+  const p=db.purchases.find(x=>x.id===r.purchaseId);
+  if(!p||p.status!=='Received') throw new Error('Supplier returns can only be made against a received purchase.');
+  const need={};
+  r.lines.forEach(l=>{const pl=p.lines.find(x=>x.id===l.purchaseLineId);if(!pl)throw new Error('That item is not on the original purchase.');
+    const max=pl.qty-supplierReturnedQty(db,pl.id,exceptId);
+    if(l.qty>max) throw new Error(`Cannot return more than quantity purchased: ${vOf(db,l.variantId)?.sku||'item'} has ${max} left to return on ${p.no}.`);
+    need[l.variantId]=(need[l.variantId]||0)+l.qty});
+  Object.entries(need).forEach(([id,q])=>{const v=vOf(db,id);if(!v||v.qty<q)throw new Error(`Insufficient inventory for supplier return: ${v?v.sku:'item'} has ${v?v.qty:0} in stock, needs ${q}.`)});
+  return p;
+}
+function createSupplierReturn(db,d,{at=Date.now(),year=new Date().getFullYear()}={}){
+  const p=db.purchases.find(x=>x.id===d.purchaseId);
+  if(!p||p.status!=='Received') throw new Error('Supplier returns can only be made against a received purchase.');
+  const lines=d.lines.filter(l=>l.qty>0).map(l=>{const pl=p.lines.find(x=>x.id===l.purchaseLineId);return {id:uid('srl'),purchaseLineId:pl.id,variantId:pl.variantId,qty:l.qty,unitCost:pl.unitCost}});
+  if(!lines.length) throw new Error('Enter a return quantity for at least one item.');
+  const r={id:uid('sr'),no:nextNo(db,'SRET',year),purchaseId:p.id,supplierId:p.supplierId,date:d.date,status:'Draft',reason:d.reason,notes:d.notes||'',currency:p.currency,lines,createdAt:at,history:[]};
+  const pl=lines.find(l=>l.qty>p.lines.find(x=>x.id===l.purchaseLineId).qty-supplierReturnedQty(db,l.purchaseLineId));
+  if(pl) throw new Error(`Cannot return more than quantity purchased: ${vOf(db,pl.variantId)?.sku||'item'}.`);
+  db.supplierReturns.push(r); addHistory(r,'Created as Draft','created',at);
+  logActivity(db,{at,tone:'mute',icon:'package-minus',title:`Supplier return ${r.no} created`,sub:`${(db.suppliers.find(x=>x.id===r.supplierId)||{}).name||''} · ${p.no}`,link:'sreturn-'+r.id,action:'Supplier return created'});
+  return r;
+}
+function completeSupplierReturn(db,r,{date,at=Date.now()}){
+  if(r.status==='Completed') throw new Error('This return has already been completed.');
+  if(r.status!=='Draft') throw new Error(`This return is ${r.status.toLowerCase()} and cannot be completed.`);
+  const p=checkSupplierReturn(db,r,r.id), s=db.suppliers.find(x=>x.id===r.supplierId), t=sreturnTotals(r);
+  r.lines.forEach((l,i)=>postMovement(db,l.variantId,{type:'supplier_return',change:-l.qty,date,reason:`Returned to ${s?s.name:'supplier'}: ${r.reason}`,notes:`From ${p.no}${r.notes?' · '+r.notes:''}`,reference:r.no,unitCost:l.unitCost,currency:r.currency,supplierReturnId:r.id,purchaseId:p.id,supplierId:r.supplierId,lineId:l.id,createdAt:at+i}));
+  Object.assign(r,{status:'Completed',completedDate:date,completedAt:at});
+  addHistory(r,`Completed · ${t.units} unit${t.units===1?'':'s'} removed from inventory`,'completed',at);
+  logActivity(db,{at,tone:'warn',icon:'package-minus',title:`Supplier return ${r.no} completed`,sub:`−${t.units} units returned to ${s?s.name:'supplier'}`,link:'sreturn-'+r.id,action:'Supplier return completed'});
+  return t;
+}
+function reverseSupplierReturn(db,r,{date,reason,notes='',at=Date.now()}){
+  if(r.status!=='Completed') throw new Error('Only completed returns can be reversed.');
+  r.lines.forEach((l,i)=>postMovement(db,l.variantId,{type:'supplier_return_reversal',change:l.qty,date,reason:`Supplier return reversed: ${reason}`,notes,reference:r.no,unitCost:l.unitCost,currency:r.currency,supplierReturnId:r.id,purchaseId:r.purchaseId,supplierId:r.supplierId,lineId:l.id,createdAt:at+i}));
+  Object.assign(r,{status:'Reversed',reversedDate:date,reversedAt:at,reverseReason:reason});
+  addHistory(r,`Reversed · ${reason}${notes?' · '+notes:''}`,'reversed',at);
+  logActivity(db,{at,tone:'bad',icon:'undo-2',title:`Supplier return ${r.no} reversed`,sub:reason,link:'sreturn-'+r.id,action:'Supplier return reversed'});
+}
+
+/* ---------- Stock counts ----------
+   Physical count vs system quantity. Each non-zero variance posts a
+   'count' movement; the count record keeps every line, including matches. */
+function applyStockCount(db,{date,lines,notes='',at=Date.now(),year=new Date().getFullYear()}){
+  if(!lines.length) throw new Error('Enter at least one physical count.');
+  const rows=lines.map(l=>{const v=db.variants.find(x=>x.id===l.variantId);if(!v)throw new Error('A counted item no longer exists.');
+    if(!(Number.isInteger(l.physical)&&l.physical>=0))throw new Error(`Physical count for ${v.sku} must be a whole number, 0 or more.`);
+    return {variantId:v.id,sku:v.sku,system:v.qty,physical:l.physical,variance:l.physical-v.qty}});
+  const c={id:uid('cnt'),no:nextNo(db,'CNT',year),date,notes,lines:rows,createdAt:at,by:db.user||'Owner'};
+  db.counts.push(c);
+  rows.filter(r=>r.variance).forEach((r,i)=>postMovement(db,r.variantId,{type:'count',change:r.variance,date,reason:'Physical Count Correction',notes:`System ${r.system}, counted ${r.physical}${notes?' · '+notes:''}`,reference:c.no,countId:c.id,createdAt:at+i}));
+  const changed=rows.filter(r=>r.variance).length;
+  logActivity(db,{at,tone:changed?'warn':'ok',icon:'clipboard-list',title:`Stock count ${c.no} applied`,sub:`${rows.length} SKU${rows.length===1?'':'s'} counted · ${changed} corrected`,link:'stockcount',action:'Stock count applied',entity:'Stock Count'});
+  return c;
 }
 
 /* ---------- Purchasing engine ----------
@@ -701,7 +895,6 @@ function purchaseTotals(p){
   return {items:p.lines.length,units:p.lines.reduce((a,l)=>a+l.qty,0),sub,add,total:round2(sub+add)};
 }
 function nextPurchaseNo(db,year){const k='PUR-'+year;db.counters[k]=(db.counters[k]||0)+1;return `${k}-${String(db.counters[k]).padStart(4,'0')}`}
-function logActivity(db,a){db.activity.push({id:uid('a'),at:Date.now(),...a});if(db.activity.length>300)db.activity.splice(0,db.activity.length-300)}
 function addHistory(p,text,kind,at=Date.now()){p.history.push({at,text,kind})}
 function createPurchaseRecord(db,d,{at=Date.now(),year=new Date().getFullYear()}={}){
   const s=db.suppliers.find(x=>x.id===d.supplierId);
@@ -741,6 +934,7 @@ function reversalShortfalls(db,p){
 }
 function reversePurchase(db,p,{date,reason,notes='',at=Date.now()}){
   if(p.status!=='Received') throw new Error('Only received purchases can be reversed.');
+  if((db.supplierReturns||[]).some(r=>r.purchaseId===p.id&&r.status==='Completed')) throw new Error('This purchase has completed supplier returns. Reverse those returns first, so stock is not removed twice.');
   const short=reversalShortfalls(db,p);
   if(short.length) throw new Error(`Not enough stock to reverse: ${short.map(x=>`${x.v?x.v.sku:'deleted item'} has ${x.v?x.v.qty:0}, needs ${x.q}`).join('; ')}.`);
   let units=0;
@@ -758,7 +952,7 @@ function reversePurchase(db,p,{date,reason,notes='',at=Date.now()}){
    one 'sale' movement per line. reverseSale() posts 'sale_reversal' movements
    and keeps the originals. Callers wrap both in transact() so a failure leaves
    no partial changes. */
-function transact(fn){const snap=JSON.stringify(DB);try{return fn()}catch(e){DB=JSON.parse(snap);throw e}}
+function transact(fn){const snap=JSON.stringify(DB);try{return fn()}catch(e){DB=freezeLedger(JSON.parse(snap));throw e}}
 function fxOf(db,c){return c===BASE_CURRENCY?1:(+(db.fxRates||{})[c]||0)}
 function nextSaleNo(db,year){const k='SAL-'+year;db.counters[k]=(db.counters[k]||0)+1;return `${k}-${String(db.counters[k]).padStart(4,'0')}`}
 function saleLineCalc(l){const gross=round2(l.qty*l.unitPrice), disc=round2(+l.discount||0);return {gross,disc,net:round2(gross-disc)}}
@@ -825,6 +1019,7 @@ function completeSale(db,s,{date,at=Date.now()}){
 }
 function reverseSale(db,s,{date,reason,notes='',at=Date.now()}){
   if(s.status!=='Completed') throw new Error('Only completed sales can be reversed.');
+  if((db.returns||[]).some(r=>r.saleId===s.id&&r.status==='Completed')) throw new Error('This sale has completed customer returns. Reverse those returns first, so stock is not added back twice.');
   if(s.lines.some(l=>!db.variants.some(v=>v.id===l.variantId))) throw new Error('An item on this sale no longer exists.');
   let units=0;
   s.lines.forEach((l,i)=>{postMovement(db,l.variantId,{type:'sale_reversal',change:l.qty,date,reason:`Reversal: ${reason}`,notes,reference:s.no,unitCost:l.unitCost,currency:BASE_CURRENCY,saleId:s.id,lineId:l.id,customerId:s.customerId,createdAt:at+i});units+=l.qty});
@@ -916,10 +1111,261 @@ const crumbs = (...parts)=>`<div class="crumb">${parts.map((p,i)=>i<parts.length
 
 /* ---------- View state ---------- */
 const blankInvFilters = ()=>({q:'',cat:'',prod:'',gauge:'',colour:'',pack:'',status:'',showInactive:false});
-const S = {sal:{...blankSalFilters(),sort:'no',dir:-1}, cus:{q:'',type:'All',status:'Active'}, dash:{range:'6 Months',top:'Revenue'}, rfrom:'', rto:'', pur:{...blankPurFilters(),sort:'no',dir:-1}, sup:{q:'',status:'Active'}, inv:{...blankInvFilters(),sort:'product',dir:1,view:'levels'}, prod:{q:'',cat:'',status:'Active'}, vtab:'Overview', range:'Last 3 Months', rtab:'Sales'};
+const S = {mov:blankMovFilters(), movLimit:150, vmov:blankVmovFilters(), vmovFor:'', cnt:{q:'',prod:'',counts:{}}, ret:{tab:'Customer Returns',q:'',status:''}, aud:{q:'',entity:''}, audLimit:200, sal:{...blankSalFilters(),sort:'no',dir:-1}, cus:{q:'',type:'All',status:'Active'}, dash:{range:'6 Months',top:'Revenue'}, rfrom:'', rto:'', pur:{...blankPurFilters(),sort:'no',dir:-1}, sup:{q:'',status:'Active'}, inv:{...blankInvFilters(),sort:'product',dir:1,view:'levels'}, prod:{q:'',cat:'',status:'Active'}, vtab:'Overview', range:'Last 3 Months', rtab:'Sales'};
 
 /* ---------- Pages ---------- */
 const PAGES = {};
+/* ----- Stock ledger (shared) ----- */
+const MOVE_GROUPS=[['Opening Stock',['opening']],['Purchases',['purchase']],['Purchase Reversals',['purchase_reversal']],['Sales',['sale']],['Sale Reversals',['sale_reversal']],['Customer Returns',['customer_return']],['Customer Return Reversals',['customer_return_reversal']],['Damaged Returns (not restocked)',['damaged_return']],['Supplier Returns',['supplier_return']],['Supplier Return Reversals',['supplier_return_reversal']],['Stock Count Corrections',['count']],['Damaged Stock',['damaged']],['Lost Stock',['lost']],['Sample / Giveaway',['sample']],['Manual Adjustments',['adjustment','other']]];
+function counterparty(m){
+  if(m.customerId){const c=DB.customers.find(x=>x.id===m.customerId);return c?{name:c.name,link:'customer-'+c.id,kind:'Customer'}:null}
+  if(m.supplierId){const s=DB.suppliers.find(x=>x.id===m.supplierId);return s?{name:s.name,link:'supplier-'+s.id,kind:'Supplier'}:null}
+  return null;
+}
+function sourceOf(m){
+  if(m.returnId){const r=DB.returns.find(x=>x.id===m.returnId);if(r)return {label:'Customer return',no:r.no,link:'return-'+r.id}}
+  if(m.supplierReturnId){const r=DB.supplierReturns.find(x=>x.id===m.supplierReturnId);if(r)return {label:'Supplier return',no:r.no,link:'sreturn-'+r.id}}
+  if(m.saleId){const s=DB.sales.find(x=>x.id===m.saleId);if(s)return {label:'Sale',no:s.no,link:'sale-'+s.id}}
+  if(m.purchaseId){const p=DB.purchases.find(x=>x.id===m.purchaseId);if(p)return {label:'Purchase',no:p.no,link:'purchase-'+p.id}}
+  if(m.countId){const c=DB.counts.find(x=>x.id===m.countId);if(c)return {label:'Stock count',no:c.no,link:'stockcount'}}
+  return null;
+}
+const refCell = m=>{const s=sourceOf(m);return s?`<a class="ref-link" href="#${s.link}">${esc(s.no)}</a>`:esc(m.reference)};
+const partyCell = m=>{const c=counterparty(m);return c?`<a class="ref-link" href="#${c.link}" style="font-weight:500">${esc(c.name)}</a>`:'<span class="muted">—</span>'};
+function qtyCell(m){
+  if(MOVEMENT_TYPES[m.type].recordOnly) return `<span class="strong muted">0</span><span class="cell-sub">${m.unitsNoted>=0?`${n0(m.unitsNoted)} not restocked`:`${n0(-m.unitsNoted)} reversed`}</span>`;
+  return `<span class="strong ${m.change>0?'chg-in':'chg-out'}">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</span>`;
+}
+const typeBadge = m=>{const t=MOVEMENT_TYPES[m.type]||{label:m.type,tone:'mute'};return badge(t.label,t.tone)};
+function movementSearch(m){const v=variantById(m.variantId),p=v&&productOf(v),c=counterparty(m),src=sourceOf(m);return [m.ref,m.sku,p&&p.name,v&&variantLabel(v),m.reference,src&&src.no,c&&c.name,m.reason,m.notes,MOVEMENT_TYPES[m.type].label,m.by].join(' ').toLowerCase()}
+function integrityNotice(compact){
+  const issues=ledgerCheck();
+  if(!issues.length) return compact?'':`<div class="notice" style="background:var(--ok-bg);color:var(--ok-fg)">${ic('shield-check','i i-sm')}Ledger check passed: every SKU's stock (${n0(DB.variants.length)} SKUs) equals the sum of its ${n0(DB.movements.length)} movements, and every previous/new quantity chains correctly.</div>`;
+  return `<div class="notice" style="background:var(--bad-bg);color:var(--bad-fg);flex-wrap:wrap">${ic('triangle-alert','i i-sm')}<b>Inventory discrepancy detected on ${issues.length} SKU${issues.length===1?'':'s'}.</b> Nothing has been changed automatically. ${issues.slice(0,4).map(x=>`<a class="ref-link" href="#variant-${x.v.id}" style="color:inherit">${esc(x.v.sku)}: stored ${x.stored}, ledger ${x.ledger}${x.brokenAt?`, chain breaks at ${x.brokenAt}`:''}</a>`).join(' · ')}${issues.length>4?` · and ${issues.length-4} more`:''}. Open the SKU's Stock Movement tab to investigate, then correct it with a stock count.</div>`;
+}
+
+/* ----- Stock Movements page ----- */
+function blankMovFilters(){return {q:'',type:'',from:'',to:'',product:'',customer:'',supplier:'',dir:''}}
+function movRows(){
+  const f=S.mov;
+  return DB.movements.filter(m=>{const v=variantById(m.variantId);
+    return (!f.q||matches(movementSearch(m),f.q))&&(!f.type||m.type===f.type)&&(!f.from||m.date>=f.from)&&(!f.to||m.date<=f.to)&&(!f.product||(v&&v.productId===f.product))
+      &&(!f.customer||m.customerId===f.customer)&&(!f.supplier||m.supplierId===f.supplier)&&(!f.dir||(f.dir==='in'?m.change>0:f.dir==='out'?m.change<0:m.change===0))})
+    .sort((a,b)=>b.date.localeCompare(a.date)||b.seq-a.seq);
+}
+const movFiltersActive = ()=>Object.entries(S.mov).some(([k,v])=>k!=='limit'&&v);
+PAGES.movements = ()=>{
+  const f=S.mov;
+  return head('Stock Movements','Every change to stock, newest first. Movements can\'t be edited; corrections are recorded as new movements.',btn('Stock Count','gostockcount','clipboard-list')+btn('Adjust Stock','adjust','sliders-horizontal')+btn('Export CSV','exportMovements','download','primary'),crumbs(['Inventory','inventory'],['Stock Movements']))+
+  integrityNotice(false)+
+  `<div class="grid kpis" id="movKpis"></div>
+  <div class="card" style="overflow:hidden">
+    <div class="toolbar">
+      <div class="field-search">${ic('search')}<input class="input" id="movQ" placeholder="Search movement ID, SKU, product, SAL/PUR/RET number, customer, supplier, notes" value="${esc(f.q)}" aria-label="Search movements"></div>
+      <select class="select" data-mfilter="type" aria-label="Movement type">${opt(Object.entries(MOVEMENT_TYPES).filter(([k])=>k!=='return'&&k!=='other').map(([k,t])=>[k,t.label]),f.type,'All movement types')}</select>
+      <select class="select" data-mfilter="dir" aria-label="Direction">${opt([['in','Stock in (+)'],['out','Stock out (−)'],['zero','Record only (0)']],f.dir,'In and out')}</select>
+      <select class="select" data-mfilter="product" aria-label="Product">${opt(DB.products.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>[p.id,p.name]),f.product,'All products')}</select>
+      <select class="select" data-mfilter="customer" aria-label="Customer">${opt(DB.customers.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>[c.id,c.name]),f.customer,'All customers')}</select>
+      <select class="select" data-mfilter="supplier" aria-label="Supplier">${opt(DB.suppliers.map(s=>[s.id,s.name]),f.supplier,'All suppliers')}</select>
+      <label class="check" style="font-weight:500">From <input type="date" class="input" data-mfilter="from" value="${f.from}" style="width:auto;height:38px" aria-label="From date"></label>
+      <label class="check" style="font-weight:500">To <input type="date" class="input" data-mfilter="to" value="${f.to}" style="width:auto;height:38px" aria-label="To date"></label>
+      <button class="btn sm ghost" data-action="resetMov" ${movFiltersActive()?'':'disabled'}>${ic('rotate-ccw','i i-sm')}Reset Filters</button>
+    </div>
+    <div id="movTable"></div>
+  </div>`;
+};
+function renderMovTable(){
+  const box=$('#movTable'); if(!box) return;
+  const rows=movRows(), shown=rows.slice(0,S.movLimit), inU=rows.filter(m=>m.change>0).reduce((a,m)=>a+m.change,0), outU=rows.filter(m=>m.change<0).reduce((a,m)=>a-m.change,0);
+  $('#movKpis').innerHTML=`${kpi('Movements',n0(rows.length),movFiltersActive()?'Matching the filters':'All time','list')}${kpi('Units In',`<span class="chg-in">+${n0(inU)}</span>`,'Purchases, returns, increases','arrow-down-to-line')}${kpi('Units Out',`<span class="chg-out">−${n0(outU)}</span>`,'Sales, supplier returns, decreases','arrow-up-from-line')}${kpi('Net Change',`${inU-outU>=0?'+':'−'}${n0(Math.abs(inU-outU))}`,'Units in − units out','scale')}`;
+  box.innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Movement ID</th><th>Movement Type</th><th>Product</th><th class="num">Quantity Change</th><th class="num">Previous Stock</th><th class="num">New Stock</th><th>Reference</th><th>Customer / Supplier</th><th>Reason</th><th>Created By</th></tr></thead><tbody>
+    ${shown.map(m=>{const v=variantById(m.variantId),p=v&&productOf(v);return `<tr class="click" data-go="movement-${m.id}"><td class="muted" style="white-space:nowrap">${fmtDate(m.date)}</td><td class="mono">${esc(m.ref)}</td><td>${typeBadge(m)}</td><td style="white-space:nowrap"><span class="strong">${esc(p?p.name:'Deleted product')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')} · ${esc(m.sku)}</span></td><td class="num">${qtyCell(m)}</td><td class="num muted">${n0(m.prevQty)}</td><td class="num strong">${n0(m.newQty)}</td><td class="mono">${refCell(m)}</td><td style="white-space:nowrap">${partyCell(m)}</td><td style="min-width:200px">${esc(m.reason)}${m.notes?`<span class="cell-sub">${esc(m.notes)}</span>`:''}</td><td class="muted" style="white-space:nowrap">${esc(m.by||'—')}</td></tr>`}).join('')}
+    </tbody></table></div><div class="table-foot"><span>Showing ${shown.length} of ${n0(rows.length)} movements</span>${rows.length>shown.length?`<button class="btn sm" data-action="moreMov">Show 150 more</button>`:'<span>End of list</span>'}</div>`
+    :`<div class="empty"><b>No movements match those filters</b><button class="link-btn" data-action="resetMov">Reset the filters</button></div>`;
+  refreshIcons();
+}
+function exportMovementsCSV(){
+  const rows=movRows(), q=v=>`"${String(v??'').replace(/"/g,'""')}"`;
+  const head=['Date','Movement ID','Movement Type','Product','Variant','SKU','Quantity Change','Units Noted','Previous Stock','New Stock','Reference','Source','Customer / Supplier','Reason','Notes','Unit Cost','Currency','Created By','Created At'];
+  const body=rows.map(m=>{const v=variantById(m.variantId),p=v&&productOf(v),c=counterparty(m),s=sourceOf(m);return [m.date,m.ref,MOVEMENT_TYPES[m.type].label,p?p.name:'',v?variantLabel(v):'',m.sku,m.change,m.unitsNoted??'',m.prevQty,m.newQty,s?s.no:m.reference,s?s.label:'',c?c.name:'',m.reason,m.notes,m.unitCost,m.currency,m.by,new Date(m.createdAt).toISOString()].map(q).join(',')});
+  const csv=[head.map(q).join(','),...body].join('\r\n');
+  try{const url=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=`stock-movements-${todayISO()}.csv`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+    toast('Export started',`${n0(rows.length)} movement${rows.length===1?'':'s'}${movFiltersActive()?' matching your filters':''}. If nothing downloads, this viewer blocks downloads; use the live website instead.`,'info');}
+  catch(e){toast('Export failed','This browser blocked the download.','error')}
+  return csv;
+}
+
+PAGES.movement = id=>{
+  const m=DB.movements.find(x=>x.id===id); if(!m) return notFound('movement');
+  const v=variantById(m.variantId), p=v&&productOf(v), src=sourceOf(m), c=counterparty(m), T=MOVEMENT_TYPES[m.type];
+  return head(`${esc(m.ref)} <span style="vertical-align:5px">${typeBadge(m)}</span>`,`${esc(p?p.name:'Deleted product')} ${esc(v?variantLabel(v):'')} · ${fmtDate(m.date)}`,(v?btn('Open SKU','govariant','external-link','',`data-id="${v.id}"`)+btn('Record a Correction','adjust','sliders-horizontal','primary',`data-id="${v.id}"`):''),crumbs(['Stock Movements','movements'],[m.ref]))+
+  `<div class="notice">${ic('lock','i i-sm')}This movement can't be edited. If it's wrong, record a correction: a new adjustment, stock count, or a reversal of the transaction that created it.</div>
+  <div class="stat-strip">
+    <div><span>Quantity Change</span><b>${T.recordOnly?`0 <span style="display:inline;font-size:13px">· ${n0(Math.abs(m.unitsNoted||0))} not restocked</span>`:`<span class="${m.change>0?'chg-in':'chg-out'}">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</span>`}</b></div>
+    <div><span>Previous Stock</span><b>${n0(m.prevQty)}</b></div>
+    <div><span>New Stock</span><b>${n0(m.newQty)}</b></div>
+    <div><span>SKU Stock Today</span><b>${v?n0(v.qty):'—'}</b></div>
+    <div><span>Unit Cost</span><b>${m.unitCost!=null?cur(m.unitCost,m.currency||BASE_CURRENCY):'—'}</b></div>
+    <div><span>Created By</span><b style="font-size:16px">${esc(m.by||'—')}</b></div>
+  </div>
+  <div class="grid g-1-1">
+    <div class="card"><div class="card-head"><h3>Movement</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:150px minmax(0,1fr)">
+      <dt>Movement ID</dt><dd>${esc(m.ref)}</dd><dt>Date</dt><dd>${fmtDate(m.date)}</dd><dt>Created at</dt><dd>${fmtStamp(m.createdAt)}</dd><dt>Movement type</dt><dd>${typeBadge(m)}</dd>
+      <dt>Product</dt><dd>${p?`<a href="#product-${p.id}">${esc(p.name)}</a>`:'Deleted product'}</dd><dt>Variant</dt><dd>${v?`<a href="#variant-${v.id}">${esc(variantLabel(v))}</a>`:'—'}</dd><dt>SKU</dt><dd>${esc(m.sku)}</dd>
+      <dt>Reason</dt><dd>${esc(m.reason)||'—'}</dd><dt>Notes</dt><dd style="font-weight:500">${esc(m.notes)||'—'}</dd></dl></div></div>
+    <div class="card"><div class="card-head"><h3>Where it came from</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:150px minmax(0,1fr)">
+      <dt>Reference</dt><dd>${src?`${esc(src.label)} <a class="ref-link" href="#${src.link}">${esc(src.no)}</a>`:esc(m.reference)}</dd>
+      ${m.saleId&&m.returnId?`<dt>Original sale</dt><dd>${(()=>{const s=DB.sales.find(x=>x.id===m.saleId);return s?`<a class="ref-link" href="#sale-${s.id}">${esc(s.no)}</a>`:'—'})()}</dd>`:''}
+      ${m.purchaseId&&m.supplierReturnId?`<dt>Original purchase</dt><dd>${(()=>{const x=DB.purchases.find(y=>y.id===m.purchaseId);return x?`<a class="ref-link" href="#purchase-${x.id}">${esc(x.no)}</a>`:'—'})()}</dd>`:''}
+      <dt>${c?c.kind:'Customer / supplier'}</dt><dd>${c?`<a href="#${c.link}">${esc(c.name)}</a>`:'—'}</dd>
+      <dt>Created by</dt><dd>${esc(m.by||'—')}</dd></dl>
+      <p class="note" style="margin-top:12px">${ic('info','i i-sm')}${T.recordOnly?'Record-only entry: the units are noted in the history but saleable stock did not change.':m.change>0?'Stock entering inventory.':'Stock leaving inventory.'}</p></div></div>
+  </div>`;
+};
+
+/* ----- Variant ledger tab ----- */
+function blankVmovFilters(){return {type:'',from:'',to:'',q:''}}
+function variantLedger(v){
+  const f=S.vmov, all=movementsOf(v.id);
+  const list=all.filter(m=>(!f.type||m.type===f.type)&&(!f.from||m.date>=f.from)&&(!f.to||m.date<=f.to)&&(!f.q||matches(movementSearch(m),f.q)));
+  const ledger=all.reduce((a,m)=>a+m.change,0), okBal=ledger===v.qty;
+  const types=uniqSorted(all.map(m=>m.type)).map(k=>[k,MOVEMENT_TYPES[k].label]);
+  return `<div class="toolbar">
+      <div class="field-search">${ic('search')}<input class="input" id="vmovQ" placeholder="Reference, customer or supplier" value="${esc(f.q)}" aria-label="Search this SKU's movements"></div>
+      <select class="select" data-vmfilter="type" aria-label="Movement type">${opt(types,f.type,'All movement types')}</select>
+      <label class="check" style="font-weight:500">From <input type="date" class="input" data-vmfilter="from" value="${f.from}" style="width:auto;height:38px" aria-label="From date"></label>
+      <label class="check" style="font-weight:500">To <input type="date" class="input" data-vmfilter="to" value="${f.to}" style="width:auto;height:38px" aria-label="To date"></label>
+      ${f.type||f.from||f.to||f.q?`<button class="btn sm ghost" data-action="resetVmov">${ic('rotate-ccw','i i-sm')}Reset</button>`:''}
+      <span style="margin-left:auto" class="badge b-${okBal?'ok':'bad'}">${okBal?`Ledger balance ${n0(ledger)} = stock ${n0(v.qty)}`:`Discrepancy: ledger ${n0(ledger)}, stock ${n0(v.qty)}`}</span>
+    </div>
+    ${list.length?`<div class="table-wrap"><table><thead><tr><th>Date</th><th>Movement ID</th><th>Movement Type</th><th class="num">Quantity</th><th class="num">Previous Stock</th><th class="num">Balance</th><th>Reason</th><th>Reference</th><th>Customer / Supplier</th><th>By</th></tr></thead><tbody>
+    ${list.map(m=>`<tr class="click" data-go="movement-${m.id}"><td class="muted" style="white-space:nowrap">${fmtDate(m.date)}</td><td class="mono">${esc(m.ref)}</td><td>${typeBadge(m)}</td><td class="num">${qtyCell(m)}</td><td class="num muted">${n0(m.prevQty)}</td><td class="num strong">${n0(m.newQty)}</td><td style="min-width:180px">${esc(m.reason)}${m.notes?`<span class="cell-sub">${esc(m.notes)}</span>`:''}</td><td class="mono">${refCell(m)}</td><td style="white-space:nowrap">${partyCell(m)}</td><td class="muted" style="white-space:nowrap">${esc(m.by||'—')}</td></tr>`).join('')}
+    </tbody></table></div><div class="table-foot"><span>${list.length===all.length?`All ${all.length} movements, oldest first. Balance after the last one is ${n0(all.length?all[all.length-1].newQty:0)}.`:`${list.length} of ${all.length} movements match the filters`}</span><span>Balance = stock after each movement</span></div>`
+    :`<div class="empty"><b>${all.length?'No movements match those filters':'No stock movements yet'}</b>${all.length?'':'Opening stock, purchases, sales, returns and adjustments appear here.'}</div>`}`;
+}
+
+/* ----- Stock count ----- */
+PAGES.stockcount = ()=>{
+  const f=S.cnt, counted=Object.keys(f.counts).filter(id=>f.counts[id]!==''&&variantById(id));
+  const rows=DB.variants.filter(v=>isLive(v)&&(!f.q||matches(searchText(v),f.q))&&(!f.prod||v.productId===f.prod)).sort((a,b)=>(productOf(a).name+variantLabel(a)).localeCompare(productOf(b).name+variantLabel(b),undefined,{numeric:true}));
+  const past=DB.counts.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,8);
+  return head('Stock Count','Compare what the system says with what is on the shelf. Enter physical counts, review the differences, then apply them as Stock Count Corrections.',btn('Clear Counts','clearCounts','eraser','ghost',counted.length?'':'disabled')+btn(`Review and Apply${counted.length?` (${counted.length})`:''}`,'applyCounts','clipboard-check','primary',counted.length?'':'disabled'),crumbs(['Inventory','inventory'],['Stock Movements','movements'],['Stock Count']))+
+  `<div class="card" style="overflow:hidden">
+    <div class="toolbar"><div class="field-search">${ic('search')}<input class="input" id="cntQ" placeholder="Search SKU, product, gauge, colour" value="${esc(f.q)}" aria-label="Search SKUs to count"></div>
+      <select class="select" id="cntProd" style="width:auto;min-width:180px" aria-label="Product">${opt(DB.products.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>[p.id,p.name]),f.prod,'All products')}</select>
+      <span class="muted" style="margin-left:auto;font-size:13px">${counted.length} SKU${counted.length===1?'':'s'} counted so far</span></div>
+    ${rows.length?`<div class="table-wrap"><table><thead><tr><th>SKU</th><th>Product</th><th class="num">System Qty</th><th class="num" style="width:150px">Physical Qty</th><th class="num">Variance</th><th>Action</th></tr></thead><tbody>
+    ${rows.map(v=>{const val=f.counts[v.id]??'';return `<tr data-cntrow="${v.id}"><td class="mono">${esc(v.sku)}</td><td style="white-space:nowrap"><span class="strong">${esc(productOf(v).name)}</span><span class="cell-sub">${esc(variantLabel(v))}</span></td><td class="num strong">${n0(v.qty)}</td><td class="num"><input class="input" type="number" min="0" step="1" inputmode="numeric" data-count="${v.id}" value="${esc(val)}" placeholder="—" style="height:36px;text-align:right" aria-label="Physical count for ${esc(v.sku)}"></td><td class="num strong" data-var="${v.id}">${varianceHtml(v,val)}</td><td><button class="btn sm ghost" data-action="applyOneCount" data-id="${v.id}" ${val===''?'disabled':''}>Apply</button></td></tr>`}).join('')}
+    </tbody></table></div>`:'<div class="empty"><b>No active SKUs match</b></div>'}
+  </div>
+  <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Recent counts</h3><span class="sub">Every applied count is kept, including items that matched</span></div></div>
+    ${past.length?`<div class="table-wrap"><table><thead><tr><th>Count</th><th>Date</th><th class="num">SKUs Counted</th><th class="num">Matched</th><th class="num">Corrected</th><th class="num">Net Variance</th><th>Notes</th><th>By</th></tr></thead><tbody>
+    ${past.map(c=>{const net=c.lines.reduce((a,l)=>a+l.variance,0);return `<tr><td class="mono strong" style="color:var(--fg)">${esc(c.no)}</td><td class="muted">${fmtDate(c.date)}</td><td class="num">${c.lines.length}</td><td class="num">${c.lines.filter(l=>!l.variance).length}</td><td class="num">${c.lines.filter(l=>l.variance).length}</td><td class="num strong ${net>0?'chg-in':net<0?'chg-out':''}">${net>0?'+':net<0?'−':''}${n0(Math.abs(net))}</td><td>${esc(c.notes)||'—'}<span class="cell-sub">${c.lines.filter(l=>l.variance).map(l=>`${esc(l.sku)} ${l.system}→${l.physical}`).join(' · ')}</span></td><td class="muted">${esc(c.by||'—')}</td></tr>`}).join('')}
+    </tbody></table></div>`:'<div class="empty"><b>No stock counts yet</b>Counts you apply appear here.</div>'}</div>`;
+};
+function varianceHtml(v,val){const p=parseInt0(val);if(val===''||isNaN(p)||p<0)return '<span class="muted">—</span>';const d=p-v.qty;return d===0?'<span class="chg-in">0 · matches</span>':`<span class="${d>0?'chg-in':'chg-out'}">${d>0?'+':'−'}${n0(Math.abs(d))}</span>`}
+
+/* ----- Returns ----- */
+const returnStatusBadge = s=>badge(s,{Draft:'mute',Completed:'ok',Cancelled:'bad',Reversed:'bad'}[s]);
+PAGES.returns = ()=>{
+  const tab=S.ret.tab, today=todayISO(), m0=monthStart(today);
+  const custM=DB.returns.filter(r=>r.status==='Completed'&&r.completedDate>=m0), supM=DB.supplierReturns.filter(r=>r.status==='Completed'&&r.completedDate>=m0);
+  const ct=custM.map(returnTotals), st=supM.map(sreturnTotals);
+  const dmg=DB.returns.filter(r=>r.status==='Completed').reduce((a,r)=>a+returnTotals(r).notRestocked,0);
+  const f=S.ret, q=f.q;
+  const list=tab==='Customer Returns'
+    ? DB.returns.filter(r=>(!f.status||r.status===f.status)&&(!q||matches([r.no,(DB.sales.find(s=>s.id===r.saleId)||{}).no,customerOf(r).name,r.reason,r.notes,...r.lines.map(l=>(variantById(l.variantId)||{}).sku)].join(' ').toLowerCase(),q)))
+    : DB.supplierReturns.filter(r=>(!f.status||r.status===f.status)&&(!q||matches([r.no,(DB.purchases.find(p=>p.id===r.purchaseId)||{}).no,supplierOf(r).name,r.reason,r.notes,...r.lines.map(l=>(variantById(l.variantId)||{}).sku)].join(' ').toLowerCase(),q)));
+  list.sort((a,b)=>b.date.localeCompare(a.date)||b.no.localeCompare(a.no));
+  return head('Returns','Goods coming back from customers and going back to suppliers. Only completed returns change stock.',btn('Customer Return','pickCustomerReturn','undo-2')+btn('Supplier Return','pickSupplierReturn','package-minus','primary'))+
+  `<div class="grid kpis">
+    ${kpi('Customer Returns This Month',n0(ct.reduce((a,t)=>a+t.units,0)),`${custM.length} return${custM.length===1?'':'s'} · ${sgd(Math.round(ct.reduce((a,t)=>a+t.revBase,0)))} of sales`,'undo-2')}
+    ${kpi('Restocked This Month',n0(ct.reduce((a,t)=>a+t.restocked,0)),'Resellable units back in stock','package-plus')}
+    ${kpi('Not Restocked',n0(dmg),'Damaged or unusable units, all time','package-x',dmg>0)}
+    ${kpi('Supplier Returns This Month',n0(st.reduce((a,t)=>a+t.units,0)),`${supM.length} return${supM.length===1?'':'s'} sent back`,'package-minus')}
+  </div>
+  <div class="card" style="overflow:hidden">
+    <div class="tabs" role="tablist" style="padding:0 12px">${['Customer Returns','Supplier Returns'].map(t=>`<button role="tab" aria-selected="${tab===t}" data-rettab="${t}">${t} <span class="muted" style="font-weight:500">${(t==='Customer Returns'?DB.returns:DB.supplierReturns).length}</span></button>`).join('')}</div>
+    <div class="toolbar"><div class="field-search">${ic('search')}<input class="input" id="retQ" placeholder="Search return number, ${tab==='Customer Returns'?'sale, customer':'purchase, supplier'}, SKU, reason" value="${esc(q)}" aria-label="Search returns"></div>${filterSeg(['',...RETURN_STATUSES].map(x=>x),f.status,'retstatus').replace('data-retstatus="">','data-retstatus="">All')}</div>
+    ${list.length?(tab==='Customer Returns'?`<div class="table-wrap"><table><thead><tr><th>Return</th><th>Date</th><th>Customer</th><th>Original Sale</th><th>Reason</th><th class="num">Units</th><th class="num">Restocked</th><th class="num">Value</th><th>Status</th></tr></thead><tbody>
+      ${list.map(r=>{const t=returnTotals(r),s=DB.sales.find(x=>x.id===r.saleId);return `<tr class="click" data-go="return-${r.id}"><td class="mono strong" style="color:var(--fg)">${esc(r.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(r.completedDate||r.date)}</td><td style="white-space:nowrap">${esc(customerOf(r).name)}</td><td class="mono">${s?`<a class="ref-link" href="#sale-${s.id}">${esc(s.no)}</a>`:'—'}</td><td>${esc(r.reason)}</td><td class="num strong">${n0(t.units)}</td><td class="num">${n0(t.restocked)}${t.notRestocked?`<span class="cell-sub">${t.notRestocked} not restocked</span>`:''}</td><td class="num" style="white-space:nowrap">${cur(t.value,r.currency)}</td><td>${returnStatusBadge(r.status)}</td></tr>`}).join('')}</tbody></table></div>`
+      :`<div class="table-wrap"><table><thead><tr><th>Return</th><th>Date</th><th>Supplier</th><th>Original Purchase</th><th>Reason</th><th class="num">Units</th><th class="num">Value</th><th>Status</th></tr></thead><tbody>
+      ${list.map(r=>{const t=sreturnTotals(r),p=DB.purchases.find(x=>x.id===r.purchaseId);return `<tr class="click" data-go="sreturn-${r.id}"><td class="mono strong" style="color:var(--fg)">${esc(r.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(r.completedDate||r.date)}</td><td style="white-space:nowrap">${esc(supplierOf(r).name)}</td><td class="mono">${p?`<a class="ref-link" href="#purchase-${p.id}">${esc(p.no)}</a>`:'—'}</td><td>${esc(r.reason)}</td><td class="num strong">${n0(t.units)}</td><td class="num" style="white-space:nowrap">${cur(t.value,r.currency)}</td><td>${returnStatusBadge(r.status)}</td></tr>`}).join('')}</tbody></table></div>`)
+    :`<div class="empty"><b>No ${tab.toLowerCase()} ${q||f.status?'match':'yet'}</b>${tab==='Customer Returns'?'Start a return from a completed sale.':'Start a supplier return from a received purchase.'}</div>`}
+  </div>`;
+};
+function returnTimeline(r){return `<div class="timeline">${r.history.slice().reverse().map(h=>`<div class="tl-item"><span class="tl-dot" style="background:var(--${{completed:'ok-fg',reversed:'bad-fg',cancelled:'bad-fg',note:'warn-fg'}[h.kind]||'fg-3'})"></span><span>${esc(h.text)}</span><span class="muted" style="white-space:nowrap;font-size:12.5px">${fmtStamp(h.at)}</span></div>`).join('')}</div>`}
+PAGES.return = id=>{
+  const r=DB.returns.find(x=>x.id===id); if(!r) return notFound('return');
+  const s=DB.sales.find(x=>x.id===r.saleId), c=customerOf(r), t=returnTotals(r), mv=DB.movements.filter(m=>m.returnId===r.id);
+  const A=(l,a,i,k='')=>btn(l,a,i,k,`data-id="${r.id}"`);
+  const actions={Draft:A('Delete','deleteReturn','trash-2','ghost danger-btn')+A('Complete Return','completeReturn','package-check','primary'),Completed:A('Reverse Return','reverseReturn','undo-2','ghost danger-btn')+A('Add Note','noteReturn','message-square-plus'),Cancelled:A('Add Note','noteReturn','message-square-plus'),Reversed:A('Add Note','noteReturn','message-square-plus')}[r.status];
+  return head(`${esc(r.no)} <span style="vertical-align:5px">${returnStatusBadge(r.status)}</span>`,`Customer return · ${esc(c.name)} · original sale ${s?`<a class="ref-link" href="#sale-${s.id}">${esc(s.no)}</a>`:'—'} · ${fmtDate(r.date)}`,actions,crumbs(['Returns','returns'],[r.no]))+
+  `<div class="notice" style="background:var(--${{Draft:'info',Completed:'ok',Cancelled:'mute',Reversed:'bad'}[r.status]}-bg);color:var(--${{Draft:'info',Completed:'ok',Cancelled:'mute',Reversed:'bad'}[r.status]}-fg)">${ic('info','i i-sm')}${{Draft:'Draft. Stock has not changed. Completing adds resellable units back to stock once.',Completed:`Completed ${fmtDate(r.completedDate)}. ${t.restocked} unit${t.restocked===1?'':'s'} went back into stock${t.notRestocked?`; ${t.notRestocked} damaged or unusable unit${t.notRestocked===1?' was':'s were'} recorded but not restocked`:''}. The original sale is unchanged.`,Cancelled:'Cancelled. No stock was affected.',Reversed:`Reversed ${fmtDate(r.reversedDate)} · ${esc(r.reverseReason||'')}. The return and its reversal both stay in the stock history.`}[r.status]}</div>
+  <div class="stat-strip">
+    <div><span>Units Returned</span><b>${n0(t.units)}</b></div><div><span>Back in Stock</span><b class="chg-in">${n0(t.restocked)}</b></div><div><span>Not Restocked</span><b>${n0(t.notRestocked)}</b></div>
+    <div><span>Return Value</span><b>${cur(t.value,r.currency)}</b></div><div><span>Sales Reduced By</span><b>${sgd(t.revBase,2)}</b></div><div><span>Gross Profit Impact</span><b class="${t.gpImpact<0?'chg-out':''}">${t.gpImpact<0?'−':''}${sgd(Math.abs(t.gpImpact),2)}</b></div>
+  </div>
+  <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Returned items</h3><span class="sub">Values come from the original sale line, so returns never change its revenue or cost snapshot</span></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th class="num">Qty</th><th>Condition</th><th>Stock Action</th><th class="num">Unit Value</th><th class="num">Value</th><th class="num">Unit Cost</th>${mv.length?'<th>Movement</th>':''}</tr></thead><tbody>
+    ${r.lines.map(l=>{const v=variantById(l.variantId),ms=mv.filter(m=>m.lineId===l.id);return `<tr ${v?`class="click" data-variant="${v.id}"`:''}><td style="white-space:nowrap"><span class="strong">${esc(v?productOf(v).name:'Deleted item')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')}</span></td><td class="mono">${esc(v?v.sku:'')}</td><td class="num strong">${n0(l.qty)}</td><td>${badge(l.condition,{Resellable:'ok',Damaged:'bad',Unusable:'bad',Other:'mute'}[l.condition])}</td><td>${l.restock?'<span class="chg-in strong">Back to stock</span>':'<span class="muted">Not restocked</span>'}</td><td class="num">${cur(l.unitRevenue,r.currency)}</td><td class="num strong">${cur(l.qty*l.unitRevenue,r.currency)}</td><td class="num">${sgd(l.unitCost,2)}</td>${mv.length?`<td style="white-space:nowrap">${ms.map(m=>`<a class="ref-link" href="#movement-${m.id}">${esc(m.ref)}</a> <span class="muted">${MOVEMENT_TYPES[m.type].recordOnly?'record only':`${m.prevQty} → ${m.newQty}`}</span>`).join('<br>')}</td>`:''}</tr>`}).join('')}
+    </tbody></table></div></div>
+  <div class="grid g-1-1">
+    <div class="card"><div class="card-head"><h3>Details</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:130px minmax(0,1fr)">
+      <dt>Customer</dt><dd>${c.id?`<a href="#customer-${c.id}">${esc(c.name)}</a>`:esc(c.name)}</dd><dt>Original sale</dt><dd>${s?`<a href="#sale-${s.id}">${esc(s.no)}</a> · ${fmtDate(s.completedDate)}`:'—'}</dd><dt>Return date</dt><dd>${fmtDate(r.date)}</dd><dt>Completed</dt><dd>${fmtDate(r.completedDate)}</dd>
+      <dt>Reason</dt><dd>${esc(r.reason)}</dd><dt>Notes</dt><dd style="font-weight:500">${esc(r.notes)||'—'}</dd><dt>Status</dt><dd>${returnStatusBadge(r.status)}</dd></dl>
+      <p class="note" style="margin-top:12px">${ic('info','i i-sm')}Refunds are not handled here yet. Record any refund on the original sale's payment status.</p></div></div>
+    <div class="card"><div class="card-head"><h3>Activity</h3></div><div class="card-body">${returnTimeline(r)}</div></div>
+  </div>`;
+};
+PAGES.sreturn = id=>{
+  const r=DB.supplierReturns.find(x=>x.id===id); if(!r) return notFound('supplier return');
+  const p=DB.purchases.find(x=>x.id===r.purchaseId), s=supplierOf(r), t=sreturnTotals(r), mv=DB.movements.filter(m=>m.supplierReturnId===r.id);
+  const A=(l,a,i,k='')=>btn(l,a,i,k,`data-id="${r.id}"`);
+  const actions={Draft:A('Delete','deleteSReturn','trash-2','ghost danger-btn')+A('Complete Return','completeSReturn','package-check','primary'),Completed:A('Reverse Return','reverseSReturn','undo-2','ghost danger-btn')+A('Add Note','noteSReturn','message-square-plus'),Cancelled:A('Add Note','noteSReturn','message-square-plus'),Reversed:A('Add Note','noteSReturn','message-square-plus')}[r.status];
+  return head(`${esc(r.no)} <span style="vertical-align:5px">${returnStatusBadge(r.status)}</span>`,`Supplier return · ${esc(s.name)} · original purchase ${p?`<a class="ref-link" href="#purchase-${p.id}">${esc(p.no)}</a>`:'—'} · ${fmtDate(r.date)}`,actions,crumbs(['Returns','returns'],[r.no]))+
+  `<div class="notice" style="background:var(--${{Draft:'info',Completed:'ok',Cancelled:'mute',Reversed:'bad'}[r.status]}-bg);color:var(--${{Draft:'info',Completed:'ok',Cancelled:'mute',Reversed:'bad'}[r.status]}-fg)">${ic('info','i i-sm')}${{Draft:'Draft. Stock has not changed. Completing removes these units from stock once.',Completed:`Completed ${fmtDate(r.completedDate)}. ${t.units} unit${t.units===1?' was':'s were'} removed from inventory. The original purchase is unchanged.`,Cancelled:'Cancelled. No stock was affected.',Reversed:`Reversed ${fmtDate(r.reversedDate)} · ${esc(r.reverseReason||'')}. Both movements stay in the stock history.`}[r.status]}</div>
+  <div class="stat-strip"><div><span>Units Returned</span><b class="chg-out">${n0(t.units)}</b></div><div><span>Return Value</span><b>${cur(t.value,r.currency)}</b></div><div><span>Supplier</span><b style="font-size:16px">${esc(s.name)}</b></div><div><span>Original Purchase</span><b style="font-size:16px">${p?esc(p.no):'—'}</b></div><div><span>Reason</span><b style="font-size:16px">${esc(r.reason)}</b></div><div><span>Status</span><b>${returnStatusBadge(r.status)}</b></div></div>
+  <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Returned items</h3><span class="sub">Valued at the purchase's unit cost. Supplier credit notes come in a later phase.</span></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th class="num">Qty</th><th class="num">Unit Cost</th><th class="num">Value</th>${mv.length?'<th>Movement</th>':''}</tr></thead><tbody>
+    ${r.lines.map(l=>{const v=variantById(l.variantId),ms=mv.filter(m=>m.lineId===l.id);return `<tr ${v?`class="click" data-variant="${v.id}"`:''}><td style="white-space:nowrap"><span class="strong">${esc(v?productOf(v).name:'Deleted item')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')}</span></td><td class="mono">${esc(v?v.sku:'')}</td><td class="num strong">${n0(l.qty)}</td><td class="num">${cur(l.unitCost,r.currency)}</td><td class="num strong">${cur(l.qty*l.unitCost,r.currency)}</td>${mv.length?`<td style="white-space:nowrap">${ms.map(m=>`<a class="ref-link" href="#movement-${m.id}">${esc(m.ref)}</a> <span class="muted">${m.prevQty} → ${m.newQty}</span>`).join('<br>')}</td>`:''}</tr>`}).join('')}
+    </tbody></table></div></div>
+  <div class="grid g-1-1">
+    <div class="card"><div class="card-head"><h3>Details</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:130px minmax(0,1fr)"><dt>Supplier</dt><dd>${s.id?`<a href="#supplier-${s.id}">${esc(s.name)}</a>`:esc(s.name)}</dd><dt>Original purchase</dt><dd>${p?`<a href="#purchase-${p.id}">${esc(p.no)}</a> · received ${fmtDate(p.receivedDate)}`:'—'}</dd><dt>Return date</dt><dd>${fmtDate(r.date)}</dd><dt>Reason</dt><dd>${esc(r.reason)}</dd><dt>Notes</dt><dd style="font-weight:500">${esc(r.notes)||'—'}</dd></dl></div></div>
+    <div class="card"><div class="card-head"><h3>Activity</h3></div><div class="card-body">${returnTimeline(r)}</div></div>
+  </div>`;
+};
+function returnsCard(list,kind){
+  if(!list.length) return '';
+  return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>${kind==='customer'?'Returns against this sale':'Returns to supplier'}</h3><span class="sub">${list.length} record${list.length===1?'':'s'}</span></div><div class="table-wrap"><table><thead><tr><th>Return</th><th>Date</th><th>Reason</th><th class="num">Units</th>${kind==='customer'?'<th class="num">Restocked</th>':''}<th>Status</th></tr></thead><tbody>
+  ${list.map(r=>{const t=kind==='customer'?returnTotals(r):sreturnTotals(r);return `<tr class="click" data-go="${kind==='customer'?'return':'sreturn'}-${r.id}"><td class="mono strong" style="color:var(--fg)">${esc(r.no)}</td><td class="muted">${fmtDate(r.completedDate||r.date)}</td><td>${esc(r.reason)}</td><td class="num strong">${n0(t.units)}</td>${kind==='customer'?`<td class="num">${n0(t.restocked)}</td>`:''}<td>${returnStatusBadge(r.status)}</td></tr>`}).join('')}</tbody></table></div></div>`;
+}
+
+/* ----- Audit trail ----- */
+PAGES.audit = ()=>{
+  const f=S.aud, ents=uniqSorted(DB.audit.map(a=>a.entity));
+  const list=DB.audit.filter(a=>(!f.entity||a.entity===f.entity)&&(!f.q||matches([a.action,a.entity,a.ref,a.desc,a.user].join(' ').toLowerCase(),f.q))).sort((a,b)=>b.at-a.at);
+  const shown=list.slice(0,S.audLimit);
+  return head('Audit Trail','A plain record of important actions: who did what, and when. Entries cannot be edited.',btn('Stock Movements','gomovements','history'))+
+  `<div class="card" style="overflow:hidden">
+    <div class="toolbar"><div class="field-search">${ic('search')}<input class="input" id="audQ" placeholder="Search action, reference, description, user" value="${esc(f.q)}" aria-label="Search audit trail"></div>
+      <select class="select" id="audEnt" style="width:auto;min-width:170px" aria-label="Record type">${opt(ents,f.entity,'All record types')}</select></div>
+    ${list.length?`<div class="table-wrap"><table><thead><tr><th>Timestamp</th><th>Action</th><th>Record</th><th>Reference</th><th>Description</th><th>User</th></tr></thead><tbody>
+    ${shown.map(a=>`<tr ${a.link?`class="click" data-go="${esc(a.link)}"`:''}><td class="muted" style="white-space:nowrap">${fmtStamp(a.at)}</td><td class="strong" style="white-space:nowrap">${esc(a.action)}</td><td><span class="chip">${esc(a.entity)}</span></td><td class="mono">${a.ref?(a.link?`<a class="ref-link" href="#${esc(a.link)}">${esc(a.ref)}</a>`:esc(a.ref)):'—'}</td><td style="min-width:240px">${esc(a.desc)}</td><td class="muted" style="white-space:nowrap">${esc(a.user)}</td></tr>`).join('')}
+    </tbody></table></div><div class="table-foot"><span>Showing ${shown.length} of ${n0(list.length)} entries</span>${list.length>shown.length?`<button class="btn sm" data-action="moreAud">Show 200 more</button>`:''}</div>`:`<div class="empty"><b>No audit entries match</b></div>`}
+  </div>`;
+};
+
+/* ----- Inventory movements report ----- */
+function movementReport(from,to){
+  const list=DB.movements.filter(m=>m.date>=from&&m.date<=to);
+  const sum=types=>{const ms=list.filter(m=>types.includes(m.type));return {n:ms.length,inU:ms.filter(m=>m.change>0).reduce((a,m)=>a+m.change,0),outU:ms.filter(m=>m.change<0).reduce((a,m)=>a-m.change,0),noted:ms.reduce((a,m)=>a+(m.unitsNoted||0),0)}};
+  const rows=MOVE_GROUPS.map(([label,types])=>({label,...sum(types)})).filter(r=>r.n);
+  const g=(...t)=>{const x=sum(t);return x.inU-x.outU};
+  const stockIn=list.filter(m=>m.change>0).reduce((a,m)=>a+m.change,0), stockOut=list.filter(m=>m.change<0).reduce((a,m)=>a-m.change,0);
+  return {rows,stockIn,stockOut,net:stockIn-stockOut,returns:g('customer_return','customer_return_reversal','supplier_return','supplier_return_reversal'),adjust:g('adjustment','other','damaged','lost','sample','count')};
+}
+
 /* ----- Purchasing helpers ----- */
 const cur = (n,c,d=2)=>`${c} ${(+n||0).toLocaleString('en-SG',{minimumFractionDigits:d,maximumFractionDigits:d})}`;
 const supplierOf = p=>DB.suppliers.find(s=>s.id===p.supplierId)||{id:'',name:'Unknown supplier',country:'',currency:''};
@@ -934,7 +1380,7 @@ function purchaseLineLabel(l){const v=variantById(l.variantId);return v?{name:pr
 /* ----- Dashboard ----- */
 function activityFeed(n){
   const acts=DB.activity.map(a=>({...a}));
-  const mv=DB.movements.filter(m=>m.type==='opening'||m.type==='adjustment').map(m=>{const v=variantById(m.variantId),p=v&&productOf(v),up=m.change>0;
+  const mv=DB.movements.filter(m=>['opening','adjustment','damaged','lost','sample','other'].includes(m.type)).map(m=>{const v=variantById(m.variantId),p=v&&productOf(v),up=m.change>0;
     return {at:m.createdAt,tone:up?'ok':'warn',icon:m.type==='opening'?'package-plus':'sliders-horizontal',title:`${MOVEMENT_TYPES[m.type].label} · ${up?'+':'−'}${n0(Math.abs(m.change))}`,sub:`${p?p.name:''} ${v?variantLabel(v):m.sku} · ${m.reason}`,link:v?'variant-'+v.id:''}});
   return acts.concat(mv).sort((a,b)=>b.at-a.at).slice(0,n);
 }
@@ -943,11 +1389,18 @@ const activityList = items=>`<div class="list">${items.map(a=>`<div class="list-
 const customerOf = s=>DB.customers.find(c=>c.id===s.customerId)||{id:'',name:'Unknown customer',type:'',country:'',currency:''};
 const pct = x=>isFinite(x)?Math.round(x*100)+'%':'—';
 const completedBetween = (from,to)=>DB.sales.filter(s=>s.status==='Completed'&&s.completedDate>=from&&s.completedDate<=to);
-function salesStats(list){
-  let total=0,rev=0,cogs=0,gp=0,units=0;
-  list.forEach(s=>{const t=saleTotals(s);total+=t.totalBase;rev+=t.revBase;cogs+=t.cogs;gp+=t.gp;units+=t.units});
-  return {count:list.length,total:round2(total),rev:round2(rev),cogs:round2(cogs),gp:round2(gp),units,margin:rev?gp/rev:NaN,avg:list.length?round2(total/list.length):0};
+const returnsBetween = (from,to)=>DB.returns.filter(r=>r.status==='Completed'&&r.completedDate>=from&&r.completedDate<=to);
+/* Gross sales − customer returns = net sales. Returns are valued from the original sale line, so sale snapshots never change.
+   Restocked units also reverse their cost of goods; damaged returns keep their cost as a loss. */
+function salesStats(list,rets=[]){
+  let gross=0,rev=0,cogs=0,units=0, rRev=0,rCogs=0,rUnits=0;
+  list.forEach(s=>{const t=saleTotals(s);gross+=t.totalBase;rev+=t.revBase;cogs+=t.cogs;units+=t.units});
+  rets.forEach(r=>{const t=returnTotals(r);rRev+=t.revBase;rCogs+=t.cogs;rUnits+=t.units});
+  const nRev=round2(rev-rRev), nCogs=round2(cogs-rCogs), gp=round2(nRev-nCogs);
+  return {count:list.length,gross:round2(gross),returns:round2(rRev),returnCount:rets.length,total:round2(gross-rRev),rev:nRev,cogs:nCogs,gp,units:units-rUnits,margin:nRev?gp/nRev:NaN,avg:list.length?round2(gross/list.length):0};
 }
+function netGroup(list,rets,keyOf){const m={};list.forEach(s=>{const k=keyOf(s)||'Not set';m[k]=(m[k]||0)+saleTotals(s).totalBase});rets.forEach(r=>{const s=DB.sales.find(x=>x.id===r.saleId);if(!s)return;const k=keyOf(s)||'Not set';m[k]=(m[k]||0)-returnTotals(r).revBase});return Object.entries(m).map(([k,v])=>[k,round2(v)]).filter(r=>r[1]>0).sort((a,b)=>b[1]-a[1])}
+const returnSeries = (b,rets)=>series(b,rets,r=>r.completedDate,r=>returnTotals(r).revBase);
 const monthStart = (iso,back=0)=>{const d=new Date(Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-1-back,1));return d.toISOString().slice(0,10)};
 function buckets(from,to){
   const days=Math.round((Date.parse(to)-Date.parse(from))/864e5)+1, keys=[], labels=[];
@@ -959,9 +1412,10 @@ function buckets(from,to){
 }
 function series(b,items,dateOf,valOf){const m=Object.fromEntries(b.keys.map(k=>[k,0]));items.forEach(x=>{const k=b.keyOf(dateOf(x));if(k in m)m[k]+=valOf(x)});return b.keys.map(k=>round2(m[k]))}
 function chartFor(b,seriesList,opts={}){return columnChart({labels:b.labels,tips:b.full,series:seriesList,...opts})}
-function topVariants(list){
+function topVariants(list,rets=[]){
   const m={};
   list.forEach(s=>saleTotals(s).lines.forEach(x=>{const id=x.l.variantId;m[id]=m[id]||{id,units:0,rev:0,gp:0};m[id].units+=x.l.qty;m[id].rev+=x.revBase;m[id].gp+=x.gp}));
+  rets.forEach(r=>r.lines.forEach(l=>{const id=l.variantId;m[id]=m[id]||{id,units:0,rev:0,gp:0};const rv=l.qty*l.unitRevenueBase,cg=l.restock?l.qty*l.unitCost:0;m[id].units-=l.qty;m[id].rev-=rv;m[id].gp-=rv-cg}));
   return Object.values(m).map(r=>{const v=variantById(r.id);return {...r,rev:round2(r.rev),gp:round2(r.gp),v,name:v?productOf(v).name:'Deleted item',label:v?variantLabel(v):'',sku:v?v.sku:''}});
 }
 function groupSum(list,keyOf,valOf=s=>saleTotals(s).totalBase){const m={};list.forEach(s=>{const k=keyOf(s)||'Not set';m[k]=(m[k]||0)+valOf(s)});return Object.entries(m).map(([k,v])=>[k,round2(v)]).sort((a,b)=>b[1]-a[1])}
@@ -980,24 +1434,24 @@ PAGES.dashboard = ()=>{
   const lowRows=att.slice().sort((a,b)=>a.qty/(a.reorder||1)-b.qty/(b.reorder||1)).slice(0,6);
   const recentP=DB.purchases.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,5);
   const recentS=DB.sales.filter(s=>s.status==='Completed'||s.status==='Confirmed').sort((a,b)=>(b.completedDate||b.date).localeCompare(a.completedDate||a.date)||b.no.localeCompare(a.no)).slice(0,6);
-  const month=salesStats(completedBetween(monthStart(today),today));
-  const from=DASH_RANGES[S.dash.range](today), b=buckets(from,today), inRange=completedBetween(from,today);
+  const month=salesStats(completedBetween(monthStart(today),today),returnsBetween(monthStart(today),today));
+  const from=DASH_RANGES[S.dash.range](today), b=buckets(from,today), inRange=completedBetween(from,today), retRange=returnsBetween(from,today);
   const b6=buckets(monthStart(today,5),today), flow=stockFlow(b6);
   const last90=completedBetween(isoAddDays(today,-89),today);
-  const top=topVariants(last90).sort((a,c)=>S.dash.top==='Units'?c.units-a.units:c.rev-a.rev).slice(0,6);
-  const countries=groupSum(last90,s=>s.country);
+  const ret90=returnsBetween(isoAddDays(today,-89),today), top=topVariants(last90,ret90).filter(r=>r.units>0).sort((a,c)=>S.dash.top==='Units'?c.units-a.units:c.rev-a.rev).slice(0,6);
+  const countries=netGroup(last90,ret90,s=>s.country);
   const feed=activityFeed(7);
   const dateHead=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  return head('Dashboard',`${dateHead} · overview of stock and sales across Southeast Asia`,btn('Record Purchase','purchase','package-plus')+btn('Record Sale','sale','receipt','primary'))+
+  return head('Dashboard',`${dateHead} · overview of stock and sales across Southeast Asia`,btn('Record Purchase','purchase','package-plus')+btn('Record Sale','sale','receipt','primary'))+integrityNotice(true)+
   `<div class="grid kpis">
     ${kpi('Inventory Value',money(Math.round(t.value)),`At cost · ${sgd(Math.round(t.retail))} at selling price`,'wallet')}
-    ${kpi('Sales This Month',money(Math.round(month.total)),month.count?`${month.count} completed · gross profit ${sgd(Math.round(month.gp))} (${pct(month.margin)})`:'No completed sales yet this month','trending-up')}
+    ${kpi('Sales This Month',money(Math.round(month.total)),month.count?`Net of returns · ${month.count} completed${month.returns?` · ${sgd(Math.round(month.returns))} returned`:''} · gross profit ${sgd(Math.round(month.gp))} (${pct(month.margin)})`:'No completed sales yet this month','trending-up')}
     ${kpi('Units in Stock',n0(t.units),`Across ${DB.variants.length} SKUs of ${DB.products.length} products`,'boxes')}
     ${kpi('Low Stock Products',att.length,`${att.filter(v=>v.qty<=0).length} out of stock · <button class="link-btn" data-go="inventory" data-status="attention">Review</button>`,'triangle-alert',true)}
   </div>
   <div class="grid g-2-1">
-    <div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>Sales Overview</h3><span class="sub">Completed sales, SGD · ${sgd(Math.round(salesStats(inRange).total))} in this period</span></div>${filterSeg(Object.keys(DASH_RANGES),S.dash.range,'drange')}</div>
-      <div class="card-body">${chartFor(b,[{key:'in',name:'Sales',data:series(b,inRange,s=>s.completedDate,s=>saleTotals(s).totalBase)}],{fmt:x=>sgd(x),cap:b.keys.length<=13})}</div></div>
+    <div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>Sales Overview</h3><span class="sub">Net sales (completed sales − returns), SGD · ${sgd(Math.round(salesStats(inRange,retRange).total))} in this period</span></div>${filterSeg(Object.keys(DASH_RANGES),S.dash.range,'drange')}</div>
+      <div class="card-body">${(()=>{const g=series(b,inRange,s=>s.completedDate,s=>saleTotals(s).totalBase),rr=returnSeries(b,retRange);return chartFor(b,[{key:'in',name:'Net sales',data:g.map((x,i)=>round2(x-rr[i]))}],{fmt:x=>sgd(x),cap:b.keys.length<=13})})()}</div></div>
     <div class="card"><div class="card-head"><div><h3>Stock Movement</h3><span class="sub">Units purchased vs sold, last 6 months</span></div></div>
       <div class="card-body" style="display:flex;flex-direction:column;gap:14px">${legend()}${chartFor(b6,[{key:'in',name:'Purchased',data:flow.inU},{key:'out',name:'Sold',data:flow.outU}],{height:212})}</div></div>
   </div>
@@ -1022,7 +1476,7 @@ PAGES.dashboard = ()=>{
       ${recentP.length?`<div class="table-wrap"><table><thead><tr><th>Purchase</th><th>Supplier</th><th>Status</th><th class="num">Units</th><th class="num">Total Cost</th></tr></thead><tbody>
       ${recentP.map(p=>{const t=purchaseTotals(p);return `<tr class="click" data-go="purchase-${p.id}"><td class="mono strong" style="color:var(--fg)">${esc(p.no)}<span class="cell-sub">${fmtDate(p.date)}</span></td><td>${esc(supplierOf(p).name)}</td><td>${badge(p.status)}</td><td class="num">${n0(t.units)}</td><td class="num strong">${cur(t.total,p.currency)}</td></tr>`}).join('')}
       </tbody></table></div>`:`<div class="empty"><b>No purchases yet</b><button class="link-btn" data-action="purchase">Record your first purchase</button></div>`}</div>
-    <div class="card"><div class="card-head"><h3>Recent Activity</h3><button class="btn sm ghost" data-go="inventory" data-view="history">Stock history ${ic('arrow-right','i i-sm')}</button></div>
+    <div class="card"><div class="card-head"><h3>Recent Activity</h3><button class="btn sm ghost" data-go="movements">Stock movements ${ic('arrow-right','i i-sm')}</button></div>
       <div class="card-body">${feed.length?activityList(feed):`<div class="empty" style="padding:24px"><b>No activity yet</b>Add products or record a purchase to get started.</div>`}</div></div>
   </div>`;
 };
@@ -1040,12 +1494,12 @@ function salRows(){
 }
 const salFiltersActive = ()=>Object.entries(S.sal).some(([k,v])=>!['sort','dir'].includes(k)&&v);
 PAGES.sales = ()=>{
-  const f=S.sal, today=todayISO(), month=salesStats(completedBetween(monthStart(today),today));
+  const f=S.sal, today=todayISO(), month=salesStats(completedBetween(monthStart(today),today),returnsBetween(monthStart(today),today));
   const open=DB.sales.filter(s=>s.status==='Confirmed'), unpaid=DB.sales.filter(s=>s.status==='Completed'&&(s.payment==='Unpaid'||s.payment==='Partially Paid'));
   const products=DB.products.filter(p=>DB.sales.some(s=>s.lines.some(l=>variantById(l.variantId)?.productId===p.id))).sort((a,b)=>a.name.localeCompare(b.name));
-  return head('Sales',`${DB.sales.length} sales to ${new Set(DB.sales.map(s=>s.customerId)).size} customers. Stock is removed only when a sale is Completed.`,btn('Customers','gocustomers','users')+btn('Record Sale','sale','receipt','primary'))+
+  return head('Sales',`${DB.sales.length} sales to ${new Set(DB.sales.map(s=>s.customerId)).size} customers. Stock is removed only when a sale is Completed.`,btn('Customers','gocustomers','users')+btn('Create Return','pickCustomerReturn','undo-2')+btn('Record Sale','sale','receipt','primary'))+
   `<div class="grid kpis">
-    ${kpi('Sales This Month',money(Math.round(month.total)),`${month.count} completed · ${n0(month.units)} units`,'trending-up')}
+    ${kpi('Net Sales This Month',money(Math.round(month.total)),`${month.count} completed${month.returnCount?` · ${month.returnCount} return${month.returnCount===1?'':'s'} (${sgd(Math.round(month.returns))})`:''} · ${n0(month.units)} units`,'trending-up')}
     ${kpi('Gross Profit This Month',money(Math.round(month.gp)),month.count?`${pct(month.margin)} margin on product revenue`:'No completed sales yet','percent')}
     ${kpi('Confirmed Orders',open.length,open.length?`${n0(open.reduce((a,s)=>a+saleTotals(s).units,0))} units waiting to ship`:'Nothing waiting to ship','clipboard-check')}
     ${kpi('Awaiting Payment',money(Math.round(unpaid.reduce((a,s)=>a+saleTotals(s).totalBase,0))),`${unpaid.length} completed sale${unpaid.length===1?'':'s'} unpaid or part-paid`,'clock',unpaid.length>0)}
@@ -1085,7 +1539,7 @@ PAGES.sale = id=>{
   const later=A('Update Payment','paySale','wallet')+A('Add Note','noteSale','message-square-plus')+A('Copy as New','copySale','copy');
   const actions={Draft:A('Edit','editSale','pencil')+A('Delete','deleteSale','trash-2','ghost danger-btn')+A('Confirm','confirmSale','clipboard-check')+A('Complete Sale','completeSale','package-check','primary'),
     Confirmed:A('Edit','editSale','pencil')+A('Cancel Sale','cancelSale','circle-x','ghost danger-btn')+A('Update Payment','paySale','wallet')+A('Complete Sale','completeSale','package-check','primary'),
-    Completed:A('Reverse Sale','reverseSale','undo-2','ghost danger-btn')+later,Cancelled:later,Reversed:later}[s.status];
+    Completed:A('Reverse Sale','reverseSale','undo-2','ghost danger-btn')+A('Create Return','createReturn','undo-2')+later,Cancelled:later,Reversed:later}[s.status];
   const notice={Draft:['info','file-pen-line','Draft. This sale has not changed stock. Stock is removed once, when you complete it.'],
     Confirmed:['info','clipboard-check','Confirmed order. Stock is removed once, when you complete the sale (handed over or shipped).'],
     Completed:['ok','package-check',`Completed ${fmtDate(s.completedDate)}. ${n0(t.units)} units were removed from inventory. Items, prices and costs are now locked; to undo, use Reverse Sale.`],
@@ -1106,6 +1560,7 @@ PAGES.sale = id=>{
     <div class="table-wrap"><table><thead><tr><th>Product</th><th>Variant</th><th>SKU</th><th class="num">Quantity</th><th class="num">Unit Selling Price</th>${t.lineDisc?'<th class="num">Discount</th>':''}<th class="num">Line Revenue</th><th class="num">Unit Cost</th><th class="num">Gross Profit</th>${mv.length?'<th>Stock</th>':''}</tr></thead><tbody>
     ${t.lines.map(x=>{const L=purchaseLineLabel(x.l),ms=mv.filter(m=>m.lineId===x.l.id);return `<tr ${L.v?`class="click" data-variant="${L.v.id}"`:''}><td class="strong" style="white-space:nowrap">${esc(L.name)}</td><td style="white-space:nowrap">${L.v&&L.v.colour?sw(L.v.colour)+' ':''}${esc(L.variant)}</td><td class="mono">${esc(L.sku)}</td><td class="num strong">${n0(x.l.qty)}</td><td class="num">${amt(x.l.unitPrice)}</td>${t.lineDisc?`<td class="num muted">${x.disc?'−'+amt(x.disc):'—'}</td>`:''}<td class="num strong">${amt(x.rev)}</td><td class="num">${sgd(x.unitCost,2)}${x.estimated?' <span class="muted">est.</span>':''}</td><td class="num strong ${x.gp<0?'chg-out':''}">${t.hasFx?sgd(x.gp,2):'—'}</td>${mv.length?`<td style="white-space:nowrap">${ms.map(m=>`<span class="${m.change>0?'chg-in':'chg-out'} strong">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</span> <span class="muted">${m.prevQty} → ${m.newQty}</span>`).join('<br>')}</td>`:''}</tr>`}).join('')}
     </tbody></table></div></div>
+  ${returnsCard(DB.returns.filter(r=>r.saleId===s.id),'customer')}
   <div class="grid g-3">
     <div class="card"><div class="card-head"><h3>Details</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:130px minmax(0,1fr)">
       <dt>Customer</dt><dd>${c.id?`<a href="#customer-${c.id}">${esc(c.name)}</a>`:esc(c.name)}</dd><dt>Customer type</dt><dd>${esc(c.type)||'—'}</dd><dt>Country</dt><dd>${esc(s.country)||'—'}</dd>
@@ -1126,8 +1581,8 @@ PAGES.sale = id=>{
 
 /* ----- Customers ----- */
 function customerStats(c){
-  const all=DB.sales.filter(s=>s.customerId===c.id), done=all.filter(s=>s.status==='Completed'), st=salesStats(done);
-  return {all,done,...st,last:done.map(s=>s.completedDate).sort().pop()||''};
+  const all=DB.sales.filter(s=>s.customerId===c.id), done=all.filter(s=>s.status==='Completed'), rets=DB.returns.filter(r=>r.customerId===c.id&&r.status==='Completed'), st=salesStats(done,rets);
+  return {all,done,rets,...st,last:done.map(s=>s.completedDate).sort().pop()||''};
 }
 PAGES.customers = ()=>{
   const f=S.cus, types=['All',...CUSTOMER_TYPES];
@@ -1146,7 +1601,7 @@ PAGES.customer = id=>{
   const actions=btn('Edit Customer','editCustomer','pencil','',`data-id="${c.id}"`)+
     (c.status==='Active'?btn('Deactivate','toggleCustomer','circle-pause','ghost',`data-id="${c.id}"`):btn('Reactivate','toggleCustomer','circle-play','',`data-id="${c.id}"`))+
     (!st.all.length?btn('Delete','deleteCustomer','trash-2','ghost danger-btn',`data-id="${c.id}"`):'')+
-    (c.status==='Active'?btn('Record Sale','saleFor','receipt','primary',`data-id="${c.id}"`):'');
+    btn('Create Return','pickCustomerReturn','undo-2','',`data-id="${c.id}"`)+(c.status==='Active'?btn('Record Sale','saleFor','receipt','primary',`data-id="${c.id}"`):'');
   return head(esc(c.name),`${esc(c.type)} · ${esc(c.country)||'No country'} · default currency ${esc(c.currency)}`,actions,crumbs(['Customers','customers'],[c.name]))+
   (c.status!=='Active'?`<div class="notice">${ic('circle-pause','i i-sm')}This customer is inactive. Past sales stay visible, but they won't be offered on new sales.</div>`:'')+
   `<div class="stat-strip">
@@ -1177,7 +1632,7 @@ function variantSalesTab(v){
 }
 
 /* ----- Reports (live) ----- */
-const RTABS=['Sales','Inventory','Purchases','Product Performance','Customers','Sales by Country','Gross Profit'];
+const RTABS=['Sales','Inventory','Inventory Movements','Purchases','Product Performance','Customers','Sales by Country','Gross Profit'];
 function reportRange(){
   const t=todayISO();
   switch(S.range){
@@ -1195,29 +1650,35 @@ PAGES.reports = ()=>{const [from,to]=reportRange();return head('Reports','Live f
   ${reportBody(from,to)}`};
 function reportBody(from,to){
   const card=(title,sub,body,extra='')=>`<div class="card"><div class="card-head"><div><h3>${title}</h3>${sub?`<span class="sub">${sub}</span>`:''}</div>${extra}</div><div class="card-body">${body}</div></div>`;
-  const list=completedBetween(from,to), st=salesStats(list), b=buckets(from,to), none='<div class="empty" style="padding:24px"><b>No completed sales in this period</b></div>';
+  const list=completedBetween(from,to), rets=returnsBetween(from,to), st=salesStats(list,rets), b=buckets(from,to), none='<div class="empty" style="padding:24px"><b>No completed sales in this period</b></div>';
   const money0=x=>sgd(Math.round(x));
   switch(S.rtab){
-    case 'Sales': return `<div class="grid kpis">${kpi('Sales',money(Math.round(st.total)),`${st.count} completed sales`,'trending-up')}${kpi('Units Sold',n0(st.units),'Across all SKUs','boxes')}${kpi('Average Order',money(Math.round(st.avg)),'Sale total incl. shipping','receipt')}${kpi('Gross Profit',money(Math.round(st.gp)),`${pct(st.margin)} margin`,'percent')}</div>
-      <div class="grid g-2-1">${card('Sales over time','Completed sales, SGD',chartFor(b,[{key:'in',name:'Sales',data:series(b,list,s=>s.completedDate,s=>saleTotals(s).totalBase)}],{fmt:money0,cap:b.keys.length<=13}))}${card('Top Customers','Sales, SGD',list.length?hbars(groupSum(list,s=>customerOf(s).name).slice(0,6),money0):none)}</div>`;
+    case 'Sales': return `<div class="grid kpis">${kpi('Gross Sales',money(Math.round(st.gross)),`${st.count} completed sales`,'trending-up')}${kpi('Returns',money(Math.round(st.returns)),`${st.returnCount} completed customer return${st.returnCount===1?'':'s'}`,'undo-2',st.returns>0)}${kpi('Net Sales',money(Math.round(st.total)),`${n0(st.units)} units net of returns`,'wallet')}${kpi('Gross Profit',money(Math.round(st.gp)),`${pct(st.margin)} margin`,'percent')}</div>
+      <div class="grid g-2-1">${(()=>{const g=series(b,list,s=>s.completedDate,s=>saleTotals(s).totalBase),rr=returnSeries(b,rets);return card('Net sales over time','Completed sales − returns, SGD',chartFor(b,[{key:'in',name:'Net sales',data:g.map((x,i)=>round2(x-rr[i]))}],{fmt:money0,cap:b.keys.length<=13}))})()}${card('Top Customers','Net sales, SGD',list.length?hbars(netGroup(list,rets,s=>customerOf(s).name).slice(0,6),money0):none)}</div>`;
     case 'Inventory': {const t=totals(), byP=DB.products.map(p=>[p.name,Math.round(totals(variantsOf(p.id)).value)]).filter(r=>r[1]>0).sort((a,c)=>c[1]-a[1]);
       const mb=buckets(monthStart(todayISO(),5),todayISO()), ends=mb.keys.map((k,i)=>i===mb.keys.length-1?todayISO():isoAddDays(monthStart(k+'-01',-1),-1));
       const val=ends.map(d=>Math.round(DB.variants.reduce((a,v)=>a+DB.movements.filter(m=>m.variantId===v.id&&m.date<=d).reduce((q,m)=>q+m.change,0)*v.cost,0)));
       return `<div class="grid kpis">${kpi('Inventory Value',money(Math.round(t.value)),'At cost, today','wallet')}${kpi('At Selling Price',money(Math.round(t.retail)),'If everything sold at selling price','tag')}${kpi('Units in Stock',n0(t.units),`${DB.variants.length} SKUs`,'boxes')}${kpi('Low or Out of Stock',t.low+t.out,`${t.out} out of stock`,'triangle-alert',true)}</div>
       <div class="grid g-2-1">${card('Inventory Value','Month-end stock × current cost price',lineChart(mb.labels,val,money0))}${card('Value by Product','At cost, today',byP.length?hbars(byP,money0):'<div class="empty">No stock on hand</div>')}</div>`;}
+    case 'Inventory Movements': {const r=movementReport(from,to), sg=x=>`${x>0?'+':x<0?'−':''}${n0(Math.abs(x))}`;
+      return `<div class="grid kpis">${kpi('Stock In',`<span class="chg-in">+${n0(r.stockIn)}</span>`,'Units added: purchases, returns, increases','arrow-down-to-line')}${kpi('Stock Out',`<span class="chg-out">−${n0(r.stockOut)}</span>`,'Units removed: sales, supplier returns, decreases','arrow-up-from-line')}${kpi('Returns',sg(r.returns),'Customer returns − supplier returns, net','undo-2')}${kpi('Net Change',sg(r.net),`Adjustments and counts: ${sg(r.adjust)}`,'scale')}</div>
+      <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Movement breakdown</h3><span class="sub">Units by movement type, ${fmtDate(from)} – ${fmtDate(to)}</span></div><button class="btn sm ghost" data-go="movements">Open ledger ${ic('arrow-right','i i-sm')}</button></div>
+      ${r.rows.length?`<div class="table-wrap"><table><thead><tr><th>Movement type</th><th class="num">Movements</th><th class="num">Units In</th><th class="num">Units Out</th><th class="num">Net</th></tr></thead><tbody>
+      ${r.rows.map(x=>`<tr><td class="strong">${x.label}</td><td class="num">${n0(x.n)}</td><td class="num chg-in">${x.inU?'+'+n0(x.inU):'—'}</td><td class="num chg-out">${x.outU?'−'+n0(x.outU):'—'}</td><td class="num strong">${x.noted?`0 <span class="muted" style="font-weight:500">· ${n0(x.noted)} not restocked</span>`:sg(x.inU-x.outU)}</td></tr>`).join('')}
+      <tr style="border-top:1.5px solid var(--fg-2)"><td class="strong">Net change</td><td class="num">${n0(r.rows.reduce((a,x)=>a+x.n,0))}</td><td class="num chg-in strong">+${n0(r.stockIn)}</td><td class="num chg-out strong">−${n0(r.stockOut)}</td><td class="num strong">${sg(r.net)}</td></tr></tbody></table></div>`:'<div class="empty"><b>No stock movements in this period</b></div>'}</div>`;}
     case 'Purchases': {const flow=stockFlow(b), rec=DB.purchases.filter(p=>p.status==='Received'&&p.receivedDate>=from&&p.receivedDate<=to);
       const bySup=Object.entries(rec.reduce((m,p)=>{const n=supplierOf(p).name;m[n]=(m[n]||0)+purchaseTotals(p).units;return m},{})).sort((a,c)=>c[1]-a[1]);
       return `<div class="grid g-2-1">${card('Stock Purchased vs Sold','Units, net of reversals',chartFor(b,[{key:'in',name:'Purchased',data:flow.inU},{key:'out',name:'Sold',data:flow.outU}]),legend())}${card('Units Received by Supplier',`${rec.length} purchases received`,bySup.length?hbars(bySup,x=>n0(x)+' units'):'<div class="empty" style="padding:24px"><b>No purchases received in this period</b></div>')}</div>`;}
-    case 'Product Performance': {const top=topVariants(list).sort((a,c)=>c.rev-a.rev), cut=isoAddDays(todayISO(),-45);
+    case 'Product Performance': {const top=topVariants(list,rets).filter(r=>r.units>0).sort((a,c)=>c.rev-a.rev), cut=isoAddDays(todayISO(),-45);
       const slow=DB.variants.filter(v=>isLive(v)&&v.qty>0&&!DB.movements.some(m=>m.variantId===v.id&&m.type==='sale'&&m.date>=cut)).slice(0,6);
       return `<div class="grid g-2-1">${card('Top Products','Product revenue, SGD',top.length?hbars(top.slice(0,8).map(r=>[r.name,r.rev,r.label]),money0):none)}${card('Slow Movers','In stock, no sale in 45 days',slow.length?`<div class="list">${slow.map(v=>`<div class="list-item click" data-go="variant-${v.id}" style="cursor:pointer"><span class="act-icon" style="background:var(--mute-bg);color:var(--mute-fg)">${ic('hourglass','i i-sm')}</span><div><div class="t">${esc(productOf(v).name)} <span class="muted" style="font-weight:500">${esc(variantLabel(v))}</span></div><div class="d">${n0(v.qty)} in stock · ${sgd(Math.round(v.qty*v.cost))} at cost</div></div></div>`).join('')}</div>`:'<div class="empty" style="padding:24px"><b>Every SKU in stock sold in the last 45 days</b></div>')}</div>
       <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>By SKU</h3><span class="sub">Completed sales in this period</span></div>${top.length?`<div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th class="num">Units Sold</th><th class="num">Revenue</th><th class="num">COGS</th><th class="num">Gross Profit</th><th class="num">Margin</th></tr></thead><tbody>
       ${top.map(r=>`<tr class="click" data-go="variant-${r.id}"><td><span class="strong">${esc(r.name)}</span><span class="cell-sub">${esc(r.label)}</span></td><td class="mono">${esc(r.sku)}</td><td class="num">${n0(r.units)}</td><td class="num">${sgd(r.rev,2)}</td><td class="num muted">${sgd(round2(r.rev-r.gp),2)}</td><td class="num strong">${sgd(r.gp,2)}</td><td class="num">${pct(r.rev?r.gp/r.rev:NaN)}</td></tr>`).join('')}</tbody></table></div>`:none}</div>`;}
-    case 'Customers': return `<div class="grid g-1-1">${card('Top Customers','Sales, SGD',list.length?hbars(groupSum(list,s=>customerOf(s).name).slice(0,8).map(([n,v])=>[n,v,(DB.customers.find(c=>c.name===n)||{}).country]),money0):none)}${card('Sales by Customer Type','Sales, SGD',list.length?hbars(groupSum(list,s=>customerOf(s).type),money0):none)}</div>`;
-    case 'Sales by Country': {const rows=groupSum(list,s=>s.country), tot=rows.reduce((a,r)=>a+r[1],0);
+    case 'Customers': return `<div class="grid g-1-1">${card('Top Customers','Sales, SGD',list.length?hbars(netGroup(list,rets,s=>customerOf(s).name).slice(0,8).map(([n,v])=>[n,v,(DB.customers.find(c=>c.name===n)||{}).country]),money0):none)}${card('Sales by Customer Type','Sales, SGD',list.length?hbars(netGroup(list,rets,s=>customerOf(s).type),money0):none)}</div>`;
+    case 'Sales by Country': {const rows=netGroup(list,rets,s=>s.country), tot=rows.reduce((a,r)=>a+r[1],0);
       return `<div class="grid g-2-1">${card('Sales by Country','Completed sales, SGD',rows.length?hbars(rows,money0):none)}${card('Share of Sales','',rows.length?`<div class="list">${rows.map(r=>`<div class="list-item" style="align-items:center"><div class="t" style="flex:1">${esc(r[0])}</div><span class="muted" style="font-size:13px">${money0(r[1])}</span><span class="strong" style="min-width:44px;text-align:right">${pct(r[1]/tot)}</span></div>`).join('')}</div>`:none)}</div>`;}
-    case 'Gross Profit': return `<div class="grid kpis">${kpi('Product Revenue',money(Math.round(st.rev)),'After discounts, excl. shipping','trending-up')}${kpi('Cost of Goods Sold',money(Math.round(st.cogs)),'Cost snapshot at each sale','package')}${kpi('Gross Profit',money(Math.round(st.gp)),'','wallet')}${kpi('Margin',pct(st.margin),'Gross profit ÷ product revenue','percent')}</div>
-      ${card('Gross Profit over time','SGD',chartFor(b,[{key:'in',name:'Gross profit',data:series(b,list,s=>s.completedDate,s=>saleTotals(s).gp)}],{fmt:money0,cap:b.keys.length<=13}))}`;
+    case 'Gross Profit': return `<div class="grid kpis">${kpi('Product Revenue',money(Math.round(st.rev)),`After discounts and ${sgd(Math.round(st.returns))} of returns, excl. shipping`,'trending-up')}${kpi('Cost of Goods Sold',money(Math.round(st.cogs)),'Cost snapshot at each sale, less restocked returns','package')}${kpi('Gross Profit',money(Math.round(st.gp)),'','wallet')}${kpi('Margin',pct(st.margin),'Gross profit ÷ product revenue','percent')}</div>
+      ${card('Gross Profit over time','SGD',chartFor(b,[{key:'in',name:'Gross profit',data:series(b,list,s=>s.completedDate,s=>saleTotals(s).gp).map((x,i,a)=>round2(x-series(b,rets,r=>r.completedDate,r=>-returnTotals(r).gpImpact)[i]))}],{fmt:money0,cap:b.keys.length<=13}))}`;
   }
 }
 
@@ -1280,7 +1741,7 @@ PAGES.purchase = id=>{
   const later=A('Add Note','notePurchase','message-square-plus')+A('Copy as New','copyPurchase','copy');
   const actions={Draft:A('Edit','editPurchase','pencil')+A('Delete','deletePurchase','trash-2','ghost danger-btn')+A('Mark as Ordered','orderPurchase','send')+A('Mark as Received','receivePurchase','package-check','primary'),
     Ordered:A('Edit','editPurchase','pencil')+A('Cancel Purchase','cancelPurchase','circle-x','ghost danger-btn')+A('Mark as Received','receivePurchase','package-check','primary'),
-    Received:A('Reverse Purchase','reversePurchase','undo-2','ghost danger-btn')+later,Cancelled:later,Reversed:later}[p.status];
+    Received:A('Reverse Purchase','reversePurchase','undo-2','ghost danger-btn')+A('Return to Supplier','returnToSupplier','package-minus')+later,Cancelled:later,Reversed:later}[p.status];
   const notice={Draft:['info','file-pen-line','Draft. This purchase has not changed stock. Stock is added once, when you mark it as Received.'],
     Ordered:['info','ship',`Ordered${p.expectedDate?`, expected ${fmtDate(p.expectedDate)}`:''}. Stock is added once, when you mark it as Received.`],
     Received:['ok','package-check',`Received ${fmtDate(p.receivedDate)}. ${n0(t.units)} units were added to inventory. Items and quantities are now locked; to undo, use Reverse Purchase.`],
@@ -1299,6 +1760,7 @@ PAGES.purchase = id=>{
       <div class="table-wrap"><table><thead><tr><th>Product</th><th>Variant</th><th>SKU</th><th class="num">Quantity</th><th class="num">Unit Cost</th><th class="num">Line Total</th>${mv.length?'<th>Stock</th>':''}</tr></thead><tbody>
       ${p.lines.map(l=>{const L=purchaseLineLabel(l),ms=mvFor(l);return `<tr ${L.v?`class="click" data-variant="${L.v.id}"`:''}><td class="strong" style="white-space:nowrap">${esc(L.name)}</td><td style="white-space:nowrap">${L.v&&L.v.colour?sw(L.v.colour)+' ':''}${esc(L.variant)}</td><td class="mono">${esc(L.sku)}</td><td class="num strong">${n0(l.qty)}</td><td class="num">${cur(l.unitCost,c)}</td><td class="num strong">${cur(lineTotal(l),c)}</td>${mv.length?`<td style="white-space:nowrap">${ms.map(m=>`<span class="${m.change>0?'chg-in':'chg-out'} strong">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</span> <span class="muted">${m.prevQty} → ${m.newQty}</span>`).join('<br>')}</td>`:''}</tr>`}).join('')}
       </tbody></table></div></div>
+  ${returnsCard(DB.supplierReturns.filter(r=>r.purchaseId===p.id),'supplier')}
   <div class="grid g-3">
     <div class="card"><div class="card-head"><h3>Details</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:130px minmax(0,1fr)">
       <dt>Supplier</dt><dd>${s.id?`<a href="#supplier-${s.id}">${esc(s.name)}</a>`:esc(s.name)}</dd><dt>Country</dt><dd>${esc(s.country)||'—'}</dd>
@@ -1337,7 +1799,7 @@ PAGES.supplier = id=>{
   const actions=btn('Edit Supplier','editSupplier','pencil','',`data-id="${s.id}"`)+
     (s.status==='Active'?btn('Deactivate','toggleSupplier','circle-pause','ghost',`data-id="${s.id}"`):btn('Reactivate','toggleSupplier','circle-play','',`data-id="${s.id}"`))+
     (!ps.length?btn('Delete','deleteSupplier','trash-2','ghost danger-btn',`data-id="${s.id}"`):'')+
-    (s.status==='Active'?btn('Record Purchase','purchaseFor','package-plus','primary',`data-id="${s.id}"`):'');
+    btn('Supplier Return','pickSupplierReturn','package-minus','',`data-id="${s.id}"`)+(s.status==='Active'?btn('Record Purchase','purchaseFor','package-plus','primary',`data-id="${s.id}"`):'');
   return head(esc(s.name),`${esc(s.country)||'No country'} · default currency ${esc(s.currency)}`,actions,crumbs(['Purchases','purchases'],['Suppliers','suppliers'],[s.name]))+
   (s.status!=='Active'?`<div class="notice">${ic('circle-pause','i i-sm')}This supplier is inactive. Past purchases stay visible, but it won't be offered for new purchases.</div>`:'')+
   `<div class="grid kpis">
@@ -1381,16 +1843,14 @@ function invRows(){
 const filtersActive = ()=>{const f=S.inv;return !!(f.q||f.cat||f.prod||f.gauge||f.colour||f.pack||f.status||f.showInactive)};
 PAGES.inventory = ()=>{
   const f=S.inv, all=DB.variants, t=totals(all), inactive=all.filter(v=>!isLive(v)).length;
-  const viewSeg=`<div class="seg" role="group" aria-label="View">${[['levels','Stock levels'],['history','Movement history']].map(([k,l])=>`<button aria-pressed="${f.view===k}" data-invview="${k}">${l}</button>`).join('')}</div>`;
-  return head('Inventory',`${all.length} SKUs across ${DB.products.length} products${inactive?` · ${inactive} inactive`:''}`,btn('Adjust Stock','adjust','sliders-horizontal')+btn('Add Product','addProduct','package-plus','primary'))+
+  return head('Inventory',`${all.length} SKUs across ${DB.products.length} products${inactive?` · ${inactive} inactive`:''}`,btn('Stock Movements','gomovements','history')+btn('Stock Count','gostockcount','clipboard-list')+btn('Adjust Stock','adjust','sliders-horizontal')+btn('Add Product','addProduct','package-plus','primary'))+
   `<div class="grid kpis">
     ${kpi('Total Inventory Value',money(Math.round(t.value)),`At cost · ${sgd(Math.round(t.retail))} at selling price`,'wallet')}
     ${kpi('Total Units',n0(t.units),`Across ${all.length} SKUs`,'boxes')}
     ${kpi('Low Stock SKUs',t.low,'At or below reorder level · <button class="link-btn" data-setstatus="Low Stock">Show</button>','triangle-alert',true)}
     ${kpi('Out of Stock SKUs',t.out,'Zero on hand · <button class="link-btn" data-setstatus="Out of Stock">Show</button>','circle-off',t.out>0)}
   </div>
-  <div>${viewSeg}</div>
-  ${f.view==='history'?movementHistoryCard():`<div class="card" style="overflow:hidden">
+  <div class="card" style="overflow:hidden">
     <div class="toolbar">
       <div class="field-search">${ic('search')}<input class="input" id="invQ" placeholder="Search name, SKU, gauge, colour, packaging" value="${esc(f.q)}" aria-label="Search inventory"></div>
       <select class="select" data-filter="cat" aria-label="Category">${opt(DB.categories.map(c=>[c.id,c.name]),f.cat,'All categories')}</select>
@@ -1403,7 +1863,7 @@ PAGES.inventory = ()=>{
       <button class="btn sm ghost" data-action="resetInv" ${filtersActive()?'':'disabled'}>${ic('rotate-ccw','i i-sm')}Reset Filters</button>
     </div>
     <div id="invTable"></div>
-  </div>`}`;
+  </div>`;
 };
 function renderInvTable(){
   const box=$('#invTable'); if(!box) return;
@@ -1416,17 +1876,6 @@ function renderInvTable(){
     :`<div class="empty"><b>No SKUs match those filters</b>Try another search or <button class="link-btn" data-action="resetInv">reset the filters</button>.</div>`;
   refreshIcons();
 }
-function movementTable(list,{showVariant}){
-  if(!list.length) return `<div class="empty"><b>No stock movements yet</b>Opening stock, adjustments and received purchases appear here.</div>`;
-  return `<div class="table-wrap"><table><thead><tr><th>Date</th>${showVariant?'<th>Product</th>':''}<th>Movement Type</th><th class="num">Quantity</th><th class="num">Previous Stock</th><th class="num">New Stock</th><th>Reason</th><th>Reference</th></tr></thead><tbody>
-  ${list.map(m=>{const v=DB.variants.find(x=>x.id===m.variantId),p=v&&productOf(v),t=MOVEMENT_TYPES[m.type];return `<tr ${showVariant&&v?`class="click" data-variant="${v.id}"`:''}><td class="muted" style="white-space:nowrap">${fmtDate(m.date)}</td>${showVariant?`<td><span class="strong">${esc(p?p.name:'Deleted product')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')} · ${esc(m.sku)}</span></td>`:''}<td>${badge(t.label,t.tone)}</td><td class="num strong ${m.change>0?'chg-in':'chg-out'}">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</td><td class="num muted">${n0(m.prevQty)}</td><td class="num strong">${n0(m.newQty)}</td><td>${esc(m.reason)}${m.notes?`<span class="cell-sub">${esc(m.notes)}</span>`:''}</td><td class="mono">${m.purchaseId&&DB.purchases.some(x=>x.id===m.purchaseId)?`<a class="ref-link" href="#purchase-${m.purchaseId}">${esc(m.reference)}</a>`:m.saleId&&DB.sales.some(x=>x.id===m.saleId)?`<a class="ref-link" href="#sale-${m.saleId}">${esc(m.reference)}</a>`:esc(m.reference)}</td></tr>`}).join('')}
-  </tbody></table></div>`;
-}
-function movementHistoryCard(){
-  const list=DB.movements.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.seq-a.seq);
-  return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Movement history</h3><span class="sub">Every opening balance, adjustment, purchase, sale and reversal, newest first.</span></div></div>${movementTable(list,{showVariant:true})}</div>`;
-}
-
 /* ----- Products ----- */
 function productStatusBadge(p){
   if(p.status!=='Active') return badge('Inactive');
@@ -1484,6 +1933,7 @@ PAGES.variant = id=>{
   const actions=btn('Edit Variant','editVariant','pencil','',`data-id="${v.id}"`)+
     (v.status==='Active'?btn('Deactivate Variant','toggleVariant','circle-pause','ghost',`data-id="${v.id}"`):btn('Reactivate Variant','toggleVariant','circle-play','',`data-id="${v.id}"`))+
     (!mv.length&&!usedInPurchases(v.id)?btn('Delete','deleteVariant','trash-2','ghost danger-btn',`data-id="${v.id}"`):'')+
+    (DB.purchases.some(p=>p.status==='Received'&&p.lines.some(l=>l.variantId===v.id))?btn('Return to Supplier','returnVariantToSupplier','package-minus','',`data-id="${v.id}"`):'')+
     btn('Adjust Stock','adjust','sliders-horizontal','primary',`data-id="${v.id}"`);
   const tabs=['Overview','Stock Movement','Purchases','Sales'], nPur=DB.purchases.filter(p=>p.lines.some(l=>l.variantId===v.id)).length, nSal=DB.sales.filter(x=>x.lines.some(l=>l.variantId===v.id)).length;
   return head(`${esc(p.name)} ${esc(variantLabel(v).replace(/ \/ /g,' – '))}`,`<span class="mono">${esc(v.sku)}</span> · ${esc(c.name)}`,actions,crumbs(['Products','products'],[p.name,'product-'+p.id],[variantLabel(v)]))+
@@ -1509,7 +1959,7 @@ PAGES.variant = id=>{
         <dt>Last purchase cost</dt><dd>${v.lastPurchaseCost!=null?`${cur(v.lastPurchaseCost,v.lastPurchaseCurrency)} <span class="muted" style="font-weight:500">on ${fmtDate(v.lastPurchaseDate)}</span>`:'—'}</dd>
         <dt>Margin</dt><dd>${v.price?Math.round((v.price-v.cost)/v.price*100)+'%':'—'}</dd><dt>Inventory value</dt><dd>${sgd(v.qty*v.cost,2)} <span class="muted" style="font-weight:500">(${n0(v.qty)} × ${sgd(v.cost,2)})</span></dd>
         <dt>Last movement</dt><dd>${mv.length?fmtDate(mv[mv.length-1].date)+' · '+MOVEMENT_TYPES[mv[mv.length-1].type].label:'—'}</dd></dl></div></div>`
-    :S.vtab==='Stock Movement'?movementTable(mv,{showVariant:false})
+    :S.vtab==='Stock Movement'?variantLedger(v)
     :S.vtab==='Purchases'?variantPurchasesTab(v)
     :S.vtab==='Sales'?variantSalesTab(v)
     :`<div class="empty"><b>${S.vtab} arrive in a later phase</b>Once ${S.vtab.toLowerCase()} are recorded they will update this SKU's stock and show here.</div>`}
@@ -1537,7 +1987,7 @@ PAGES.settings = ()=>{
       ${sec('inventory','Inventory Preferences','How stock is tracked',`${pref('Allow negative stock','Off: stock can never go below zero',false)}${pref('Include landed costs in cost price','Arrives with Purchases',false)}`)}
       ${sec('notifications','Notifications','What you get alerted about',`${pref('Low stock alerts','When a variant reaches its reorder level',true)}${pref('Overdue invoices','When a customer passes their payment terms',true)}${pref('Weekly summary email','Every Monday at 8:00',false)}`)}
       ${sec('profile','User Profile','Your account',`<div style="display:flex;gap:16px;align-items:center;margin-bottom:18px"><span class="avatar" style="width:52px;height:52px;font-size:17px">JK</span><div><b>Jasmine Koh</b><div class="muted" style="font-size:13px">Owner · jasmine@msv-sea.com</div></div></div><div class="form-grid">${f('Full name','Jasmine Koh')}${f('Email','jasmine@msv-sea.com','email')}</div>`)}
-      ${sec('data','Data','Products, stock, suppliers, purchases, customers and sales are saved in this browser only',`<div class="pref"><div><b>Restore sample data</b><small>Replace everything with the MSV sample catalogue, suppliers, purchases, customers and sales</small></div><button class="btn sm" data-action="restoreSample">Restore</button></div><div class="pref"><div><b>Start with an empty catalogue</b><small>Remove all products, suppliers, purchases, customers, sales and stock history. Categories and currencies are kept.</small></div><button class="btn sm danger-btn" data-action="clearData">Clear data</button></div>`)}
+      ${sec('data','Data','Products, stock history, suppliers, purchases, customers, sales and returns are saved in this browser only',`<div class="pref"><div><b>Restore sample data</b><small>Replace everything with the MSV sample catalogue, suppliers, purchases, customers and sales</small></div><button class="btn sm" data-action="restoreSample">Restore</button></div><div class="pref"><div><b>Start with an empty catalogue</b><small>Remove all products, suppliers, purchases, customers, sales and stock history. Categories and currencies are kept.</small></div><button class="btn sm danger-btn" data-action="clearData">Clear data</button></div>`)}
     </div>
   </div>`;
 };
@@ -1657,6 +2107,7 @@ function openAddProduct(){
       const p={id:uid('p'),name,brand,code:productCode(name,brand),categoryId:F(form,'categoryId').value,description:F(form,'description').value.trim(),status:F(form,'status').value,createdAt:Date.now()};
       DB.products.push(p);
       vs.forEach(v=>createVariant(p,v));
+      audit(DB,{action:'Product created',entity:'Product',ref:name,link:'product-'+p.id,desc:`${vs.length} variant${vs.length===1?'':'s'}: ${vs.map(v=>v.sku).join(', ')}`});
       persist(); location.hash='product-'+p.id; render();
       toast('Product created successfully',`${name} with ${vs.length} variant${vs.length===1?'':'s'}.`);
       return true;
@@ -1677,6 +2128,7 @@ function openEditProduct(id){
       if(DB.products.some(x=>x.id!==id&&x.name.toLowerCase()===name.toLowerCase())){fieldError(F(form,'name'),'Another product already has this name.');return false}
       const was=p.status;
       Object.assign(p,{name,brand:F(form,'brand').value.trim()||'MSV',categoryId:F(form,'categoryId').value,description:F(form,'description').value.trim(),status:F(form,'status').value});
+      audit(DB,{action:was!==p.status?(p.status==='Active'?'Product reactivated':'Product deactivated'):'Product edited',entity:'Product',ref:name,link:'product-'+p.id,desc:`${p.brand} · ${categoryOf(p).name} · ${p.status}`});
       persist(); render();
       toast(was!==p.status?(p.status==='Active'?'Product reactivated':'Product deactivated'):'Product updated successfully',name);
       return true;
@@ -1692,9 +2144,10 @@ function openVariantForm(productId,variantId){
     onSave:form=>{
       const box=form.querySelector('[data-vbox]'), data=readVariant(box);
       if(!validateVariant(box,data,{exceptId:v?v.id:null,editing})){formAlert('Please fix the highlighted fields.');return false}
-      if(!editing){const nv=createVariant(p,data);persist();location.hash='variant-'+nv.id;render();toast('Variant added successfully',`${data.sku} · ${variantLabel(nv)}`);return true}
+      if(!editing){const nv=createVariant(p,data);audit(DB,{action:'Variant created',entity:'Variant',ref:nv.sku,link:'variant-'+nv.id,desc:`${p.name} ${variantLabel(nv)}${data.opening?` · opening stock ${data.opening}`:''}`});persist();location.hash='variant-'+nv.id;render();toast('Variant added successfully',`${data.sku} · ${variantLabel(nv)}`);return true}
       const was=v.status, oldSku=v.sku;
       Object.assign(v,{sku:data.sku,gauge:data.usesGauge?data.gauge:'',colour:data.colour,packaging:data.packaging,cost:data.cost,price:data.price,reorder:data.reorder,status:data.status});
+      audit(DB,{action:was!==v.status?(v.status==='Active'?'Variant reactivated':'Variant deactivated'):'Variant edited',entity:'Variant',ref:v.sku,link:'variant-'+v.id,desc:`${p.name} ${variantLabel(v)} · cost ${sgd(v.cost,2)} · price ${sgd(v.price,2)} · reorder ${v.reorder}${oldSku!==v.sku?` · SKU was ${oldSku}`:''}`});
       persist(); render();
       toast(was!==v.status?(v.status==='Active'?'Variant reactivated':'Variant deactivated'):'Variant updated successfully',oldSku!==v.sku?`SKU changed from ${oldSku} to ${v.sku}. Past movements keep the old SKU.`:v.sku);
       return true;
@@ -1702,19 +2155,20 @@ function openVariantForm(productId,variantId){
 }
 
 /* --- Adjust Stock --- */
+/* --- Adjust Stock (manual corrections) --- */
 function openAdjust(variantId){
   const pick=!variantId;
   const v0=variantId?DB.variants.find(x=>x.id===variantId):null;
   const options=DB.products.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>{const vs=variantsOf(p.id);return vs.length?`<optgroup label="${esc(p.name)}">${vs.map(v=>`<option value="${v.id}">${esc(p.name)} ${esc(variantLabel(v))} · ${esc(v.sku)} · ${v.qty} on hand</option>`).join('')}</optgroup>`:''}).join('');
-  showModal({title:'Adjust Stock',desc:'Correct stock when the physical count differs from the system. Every adjustment is recorded in the movement history.',narrow:true,save:'Save Adjustment',
+  showModal({title:'Adjust Stock',desc:'Record a manual correction. The change is added to the stock movement history as a new movement; past movements are never edited.',narrow:true,save:'Save Adjustment',
     body:`<div class="form-grid">
       ${pick?fld('Product Variant',`<select class="select" name="variantId"><option value="">Choose a SKU…</option>${options}</select>`,{req:1,span:1}):`<input type="hidden" name="variantId" value="${v0.id}"><div class="span-2"><b>${esc(productOf(v0).name)} ${esc(variantLabel(v0))}</b><div class="mono">${esc(v0.sku)}</div></div>`}
       <div class="field span-2"><span class="field-label">Adjustment Type</span><div class="seg" role="radiogroup" id="adjType">${[['increase','Increase Stock'],['decrease','Decrease Stock'],['set','Set Exact Quantity']].map(([k,l],i)=>`<button type="button" role="radio" aria-pressed="${i===1}" data-adjtype="${k}">${l}</button>`).join('')}</div><input type="hidden" name="type" value="decrease"></div>
       ${fld('<span id="qtyLabel">Quantity to remove</span>',`<input class="input" type="number" min="0" step="1" name="qty" inputmode="numeric" placeholder="e.g. 2">`,{req:1})}
       ${fld('Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}
-      ${fld('Reason',`<select class="select" name="reason"><option value="">Choose a reason…</option>${ADJ_REASONS.map(r=>`<option>${r}</option>`).join('')}</select>`,{req:1})}
+      ${fld('Reason',`<select class="select" name="reason"><option value="">Choose a reason…</option>${ADJ_REASONS.map(r=>`<option>${r}</option>`).join('')}</select>`,{req:1,hint:'Recorded as its own movement type, e.g. Damaged Stock'})}
       ${fld('Reference',`<input class="input" name="reference" placeholder="Optional · e.g. count sheet no.">`)}
-      ${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional · what happened"></textarea>`,{span:1})}
+      ${fld('Notes',`<textarea class="input" name="notes" placeholder="What happened, e.g. 2 reels crushed in storage"></textarea>`,{req:1,span:1})}
       <div class="span-2 adj-preview" id="adjPreview"></div>
     </div>`,
     onMount:form=>{
@@ -1722,9 +2176,8 @@ function openAdjust(variantId){
         const v=DB.variants.find(x=>x.id===F(form,'variantId').value), type=F(form,'type').value, q=parseInt0(F(form,'qty').value);
         $('#qtyLabel').textContent={increase:'Quantity to add',decrease:'Quantity to remove',set:'New quantity'}[type];
         if(!v){$('#adjPreview').innerHTML='<span class="muted">Choose a SKU to see the result.</span>';return}
-        const next=isNaN(q)?null:type==='increase'?v.qty+q:type==='decrease'?v.qty-q:q;
-        const ch=next===null?null:next-v.qty;
-        $('#adjPreview').innerHTML=`<div><span>Current</span><b>${n0(v.qty)}</b></div><div><span>Change</span><b class="${ch>0?'chg-in':ch<0?'chg-out':''}">${ch===null?'—':(ch>0?'+':ch<0?'−':'')+n0(Math.abs(ch))}</b></div><div><span>New quantity</span><b class="${next!==null&&next<0?'chg-out':''}">${next===null?'—':n0(next)}</b></div>`;
+        const next=isNaN(q)?null:type==='increase'?v.qty+q:type==='decrease'?v.qty-q:q, ch=next===null?null:next-v.qty, r=F(form,'reason').value;
+        $('#adjPreview').innerHTML=`<div><span>Current Stock</span><b>${n0(v.qty)}</b></div><div><span>Quantity Change</span><b class="${ch>0?'chg-in':ch<0?'chg-out':''}">${ch===null?'—':(ch>0?'+':ch<0?'−':'')+n0(Math.abs(ch))}</b></div><div><span>Expected New Stock</span><b class="${next!==null&&next<0?'chg-out':''}">${next===null?'—':n0(next)}</b></div><div><span>Recorded as</span><b style="font-size:14px">${r?MOVEMENT_TYPES[ADJ_TYPE[r]||'adjustment'].label:'—'}</b></div>`;
       };
       form.addEventListener('input',upd); form.addEventListener('change',upd);
       form.addEventListener('click',e=>{const b=e.target.closest('[data-adjtype]');if(!b)return;form.querySelectorAll('[data-adjtype]').forEach(x=>x.setAttribute('aria-pressed',x===b));F(form,'type').value=b.dataset.adjtype;upd()});
@@ -1732,22 +2185,176 @@ function openAdjust(variantId){
     },
     onSave:form=>{
       const f=n=>F(form,n);
-      const v=DB.variants.find(x=>x.id===f('variantId').value), type=f('type').value, q=parseInt0(f('qty').value), reason=f('reason').value, date=f('date').value;
+      const v=DB.variants.find(x=>x.id===f('variantId').value), type=f('type').value, q=parseInt0(f('qty').value), reason=f('reason').value, date=f('date').value, notes=f('notes').value.trim();
       let ok=true;
       if(!v){fieldError(f('variantId'),'Choose the SKU to adjust.');ok=false}
       if(isNaN(q)||q<0){fieldError(f('qty'),'Enter a whole number, 0 or more.');ok=false}
       else if(type!=='set'&&q===0){fieldError(f('qty'),'Enter a quantity greater than 0.');ok=false}
       if(!reason){fieldError(f('reason'),'Choose a reason for this adjustment.');ok=false}
+      if(!notes){fieldError(f('notes'),'Add a short note so the change can be explained later.');ok=false}
       if(!date){fieldError(f('date'),'Choose a date.');ok=false} else if(date>todayISO()){fieldError(f('date'),'The date cannot be in the future.');ok=false}
       if(!ok){formAlert('Please fix the highlighted fields.');return false}
       const change=type==='increase'?q:type==='decrease'?-q:q-v.qty;
       if(change===0){fieldError(f('qty'),`Stock is already ${v.qty}. Nothing to change.`);return false}
-      if(v.qty+change<0){fieldError(f('qty'),`Only ${v.qty} in stock. You can remove at most ${v.qty}.`);formAlert('Stock cannot go below zero.');return false}
-      const m=postMovement(DB,v.id,{type:'adjustment',change,date,reason,notes:f('notes').value.trim(),reference:f('reference').value.trim()});
+      if(v.qty+change<0){fieldError(f('qty'),`Only ${v.qty} in stock. You can remove at most ${v.qty}.`);formAlert('This stock adjustment would create negative inventory.');return false}
+      const m=postMovement(DB,v.id,{type:ADJ_TYPE[reason]||'adjustment',change,date,reason,notes,reference:f('reference').value.trim()});
+      audit(DB,{action:'Stock adjusted',entity:'Stock Movement',ref:m.ref,link:'movement-'+m.id,desc:`${v.sku}: ${m.prevQty} → ${m.newQty} (${change>0?'+':'−'}${Math.abs(change)}) · ${reason}`});
       persist(); render();
-      toast('Stock adjusted successfully',`${v.sku}: ${m.prevQty} → ${m.newQty} (${reason})`);
+      toast('Stock adjusted successfully',`${v.sku}: ${m.prevQty} → ${m.newQty} (${reason}) · ${m.ref}`);
       return true;
     }});
+}
+
+/* --- Customer returns --- */
+function openReturnPicker({customerId}={}){
+  const sales=DB.sales.filter(s=>s.status==='Completed'&&(!customerId||s.customerId===customerId)&&s.lines.some(l=>l.qty-returnedQty(DB,l.id)>0)).sort((a,b)=>b.completedDate.localeCompare(a.completedDate));
+  showModal({title:'Customer Return',desc:'Returns start from the original completed sale, so quantities and values match what was sold.',narrow:true,save:'Continue',saveIcon:'arrow-right',
+    body:sales.length?fld('Original Sale',`<select class="select" name="saleId"><option value="">Choose a completed sale…</option>${sales.map(s=>`<option value="${s.id}">${esc(s.no)} · ${esc(customerOf(s).name)} · ${fmtDate(s.completedDate)} · ${n0(saleTotals(s).units)} units</option>`).join('')}</select>`,{req:1,span:1}):'<div class="empty"><b>No completed sales with items left to return</b></div>',
+    onSave:form=>{const sel=F(form,'saleId');if(!sel)return true;if(!sel.value){fieldError(sel,'Choose the sale being returned.');return false}const id=sel.value;closeModal();openCustomerReturn(id);return false}});
+}
+function openCustomerReturn(saleId){
+  const s=DB.sales.find(x=>x.id===saleId);
+  if(!s||s.status!=='Completed'){toast('Return not possible','Returns can only be made against a completed sale.','error');return}
+  const rows=s.lines.map(l=>({l,v:variantById(l.variantId),max:l.qty-returnedQty(DB,l.id)}));
+  showModal({title:`Return from ${esc(s.no)}`,wide:true,save:'Save Return',saveIcon:'undo-2',desc:`${esc(customerOf(s).name)} · sold ${fmtDate(s.completedDate)}. Choose what came back and its condition. Resellable units go back into stock; damaged or unusable units are recorded but not restocked.`,
+    body:`<div class="form-grid cols-3">
+      ${fld('Return Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}
+      ${fld('Reason',`<select class="select" name="reason"><option value="">Choose a reason…</option>${RETURN_REASONS.map(r=>`<option>${r}</option>`).join('')}</select>`,{req:1})}
+      ${fld('Status',`<select class="select" name="status"><option>Completed</option><option>Draft</option></select>`,{hint:'Draft returns do not change stock'})}
+      ${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional · what the customer said, courier details"></textarea>`,{span:1})}</div>
+    <div class="table-wrap" style="border:1px solid var(--line);border-radius:12px"><table><thead><tr><th>Item</th><th class="num">Sold</th><th class="num">Already Returned</th><th class="num" style="width:110px">Return Qty</th><th style="width:150px">Condition</th><th>Stock</th><th class="num">Stock Now</th><th class="num">After</th></tr></thead><tbody>
+    ${rows.map(({l,v,max})=>`<tr data-rline="${l.id}"><td><span class="strong">${esc(v?productOf(v).name:'Deleted item')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')} · ${esc(v?v.sku:'')}</span></td><td class="num">${n0(l.qty)}</td><td class="num muted">${n0(l.qty-max)}</td>
+      <td class="num"><div class="field" style="gap:4px"><input class="input" type="number" min="0" max="${max}" step="1" inputmode="numeric" data-r="qty" placeholder="0" style="height:36px;text-align:right" ${max?'':'disabled'} aria-label="Return quantity"><span class="err"></span></div></td>
+      <td><select class="select" data-r="condition" style="height:36px" ${max?'':'disabled'} aria-label="Condition">${RETURN_CONDITIONS.map(c=>`<option>${c}</option>`).join('')}</select></td>
+      <td><label class="check" style="font-weight:500"><input type="checkbox" data-r="restock" checked ${max?'':'disabled'}>Restock</label></td>
+      <td class="num muted">${v?n0(v.qty):'—'}</td><td class="num strong" data-r="after">${v?n0(v.qty):'—'}</td></tr>`).join('')}
+    </tbody></table></div>
+    <div class="summary" id="rSum"></div>`,
+    onMount:form=>{
+      const upd=()=>{let units=0,restocked=0,value=0;
+        form.querySelectorAll('[data-rline]').forEach(tr=>{const l=s.lines.find(x=>x.id===tr.dataset.rline),v=variantById(l.variantId),q=parseInt0(tr.querySelector('[data-r=qty]').value)||0,cond=tr.querySelector('[data-r=condition]'),rs=tr.querySelector('[data-r=restock]');
+          const allowed=cond.value==='Resellable'||cond.value==='Other'; if(!allowed){rs.checked=false;rs.disabled=true}else if(rs.disabled&&!tr.querySelector('[data-r=qty]').disabled){rs.disabled=false;if(cond.value==='Resellable')rs.checked=true}
+          const back=rs.checked?q:0; units+=q; restocked+=back; value+=q*l.revenue/l.qty; tr.querySelector('[data-r=after]').innerHTML=v?(back?`<span class="chg-in">${n0(v.qty+back)}</span>`:n0(v.qty)):'—'});
+        $('#rSum').innerHTML=`<div><span>Units returned</span><span>${n0(units)}</span></div><div><span>Back into stock</span><span class="chg-in">+${n0(restocked)}</span></div><div><span>Recorded, not restocked</span><span>${n0(units-restocked)}</span></div><div class="total"><span>Return value</span><span>${cur(value,s.currency)}</span></div>`;};
+      form.addEventListener('input',upd); form.addEventListener('change',upd); upd();
+    },
+    onSave:form=>{
+      const date=F(form,'date').value, reason=F(form,'reason').value, status=F(form,'status').value; let ok=true;
+      if(!date){fieldError(F(form,'date'),'Choose the return date.');ok=false} else if(date>todayISO()){fieldError(F(form,'date'),'The date cannot be in the future.');ok=false} else if(date<s.completedDate){fieldError(F(form,'date'),`A return can't be before the sale (${fmtDate(s.completedDate)}).`);ok=false}
+      if(!reason){fieldError(F(form,'reason'),'Choose a reason for the return.');ok=false}
+      const lines=[];
+      form.querySelectorAll('[data-rline]').forEach(tr=>{const l=s.lines.find(x=>x.id===tr.dataset.rline),el=tr.querySelector('[data-r=qty]');if(el.disabled||!el.value.trim())return;const q=parseInt0(el.value),max=l.qty-returnedQty(DB,l.id);
+        if(isNaN(q)||q<0){fieldError(el,'Whole number');ok=false;return} if(q>max){fieldError(el,`Max ${max}`);ok=false;formAlert(`Cannot return more than quantity sold. ${variantById(l.variantId).sku}: sold ${l.qty}, already returned ${l.qty-max}, so at most ${max} more.`);return}
+        if(q>0) lines.push({saleLineId:l.id,qty:q,condition:tr.querySelector('[data-r=condition]').value,restock:tr.querySelector('[data-r=restock]').checked})});
+      if(ok&&!lines.length){formAlert('Enter a return quantity for at least one item.');return false}
+      if(!ok){if(!$('#mAlert').textContent)formAlert('Please fix the highlighted fields.');return false}
+      let r,t;
+      try{transact(()=>{r=createCustomerReturn(DB,{saleId:s.id,date,reason,notes:F(form,'notes').value.trim(),lines});if(status==='Completed')t=completeCustomerReturn(DB,r,{date})})}catch(err){formAlert(err.message);return false}
+      persist(); location.hash='return-'+r.id; render();
+      toast(status==='Completed'?'Return completed successfully':'Return saved as draft',status==='Completed'?`${r.no} · ${t.restocked} unit${t.restocked===1?'':'s'} back in stock${t.notRestocked?`, ${t.notRestocked} not restocked`:''}.`:`${r.no} · stock unchanged until it is completed.`);
+      return true;
+    }});
+}
+function returnLinesTable(lines,dir){return `<div class="table-wrap" style="border:1px solid var(--line);border-radius:12px"><table><thead><tr><th>Item</th><th class="num">Quantity Change</th><th class="num">Current Stock</th><th class="num">Expected New Stock</th></tr></thead><tbody>
+  ${lines.map(({v,ch,note})=>`<tr><td><span class="strong">${esc(v?productOf(v).name:'Deleted item')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')} · ${esc(v?v.sku:'')}</span></td><td class="num strong ${ch>0?'chg-in':ch<0?'chg-out':'muted'}">${ch>0?'+':ch<0?'−':''}${n0(Math.abs(ch))}${note?`<span class="cell-sub">${note}</span>`:''}</td><td class="num muted">${v?n0(v.qty):'—'}</td><td class="num strong ${v&&v.qty+ch<0?'chg-out':''}">${v?(v.qty+ch<0?`${n0(v.qty+ch)} · not allowed`:n0(v.qty+ch)):'—'}</td></tr>`).join('')}</tbody></table></div>`}
+function openCompleteReturn(id){
+  const r=DB.returns.find(x=>x.id===id);
+  if(r.status!=='Draft'){toast('Return not completed','This return has already been completed.','error');return}
+  showModal({title:`Complete ${esc(r.no)}`,desc:'Resellable units go back into stock once. Damaged or unusable units are recorded without changing saleable stock.',save:'Complete Return',saveIcon:'package-check',
+    body:`${fld('Completion Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}${returnLinesTable(r.lines.map(l=>({v:variantById(l.variantId),ch:l.restock?l.qty:0,note:l.restock?'':`${l.qty} ${l.condition.toLowerCase()}, not restocked`})))}<p class="note">${ic('hash','i i-sm')}Reference ${esc(r.no)}</p>`,
+    onSave:form=>{const date=F(form,'date').value;if(!date||date>todayISO()){fieldError(F(form,'date'),'Choose a date that is not in the future.');return false}
+      try{const t=transact(()=>completeCustomerReturn(DB,DB.returns.find(x=>x.id===id),{date}));persist();render();toast('Return completed successfully',`${r.no} · ${t.restocked} unit${t.restocked===1?'':'s'} back in stock.`);return true}catch(err){formAlert(err.message);return false}}});
+}
+function openReverseReturn(id){
+  const r=DB.returns.find(x=>x.id===id), short=r.lines.filter(l=>l.restock&&(variantById(l.variantId)||{qty:0}).qty<l.qty);
+  showModal({title:`Reverse ${esc(r.no)}`,desc:'Use this if the return was recorded by mistake. Units that went back into stock are removed again; the original return stays visible.',save:'Reverse Return',saveIcon:'undo-2',danger:true,
+    body:`${short.length?`<div class="notice" style="background:var(--bad-bg);color:var(--bad-fg)">${ic('circle-alert','i i-sm')}Insufficient inventory to reverse: some of these units have already been sold again.</div>`:''}${returnLinesTable(r.lines.map(l=>({v:variantById(l.variantId),ch:l.restock?-l.qty:0,note:l.restock?'':'record only'})))}
+      <div class="form-grid">${fld('Reason',`<input class="input" name="reason" placeholder="e.g. Entered against the wrong sale">`,{req:1})}${fld('Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional"></textarea>`,{span:1})}</div>`,
+    onSave:form=>{const reason=F(form,'reason').value.trim(),date=F(form,'date').value;let ok=true;
+      if(!reason){fieldError(F(form,'reason'),'Give a reason for the reversal.');ok=false} if(!date||date>todayISO()){fieldError(F(form,'date'),'Choose a date that is not in the future.');ok=false}
+      if(!ok){formAlert('Please fix the highlighted fields.');return false}
+      try{transact(()=>reverseCustomerReturn(DB,DB.returns.find(x=>x.id===id),{date,reason,notes:F(form,'notes').value.trim()}));persist();render();toast('Return reversed',`${r.no} · reversal movements recorded.`);return true}catch(err){formAlert(err.message);return false}}});
+  if(short.length){const b=$('.modal-foot [data-action=save]');if(b)b.disabled=true}
+}
+
+/* --- Supplier returns --- */
+function openSReturnPicker({supplierId,variantId}={}){
+  const ps=DB.purchases.filter(p=>p.status==='Received'&&(!supplierId||p.supplierId===supplierId)&&(!variantId||p.lines.some(l=>l.variantId===variantId))&&p.lines.some(l=>l.qty-supplierReturnedQty(DB,l.id)>0)).sort((a,b)=>b.receivedDate.localeCompare(a.receivedDate));
+  showModal({title:'Supplier Return',desc:'Supplier returns start from the original received purchase, so you can only send back what you received.',narrow:true,save:'Continue',saveIcon:'arrow-right',
+    body:ps.length?fld('Original Purchase',`<select class="select" name="purchaseId"><option value="">Choose a received purchase…</option>${ps.map(p=>`<option value="${p.id}">${esc(p.no)} · ${esc(supplierOf(p).name)} · received ${fmtDate(p.receivedDate)}</option>`).join('')}</select>`,{req:1,span:1}):'<div class="empty"><b>No received purchases with items left to return</b></div>',
+    onSave:form=>{const sel=F(form,'purchaseId');if(!sel)return true;if(!sel.value){fieldError(sel,'Choose the purchase.');return false}const id=sel.value;closeModal();openSupplierReturn(id,{variantId});return false}});
+}
+function openSupplierReturn(purchaseId,{variantId}={}){
+  const p=DB.purchases.find(x=>x.id===purchaseId);
+  if(!p||p.status!=='Received'){toast('Return not possible','Supplier returns can only be made against a received purchase.','error');return}
+  const rows=p.lines.map(l=>{const v=variantById(l.variantId),left=l.qty-supplierReturnedQty(DB,l.id);return {l,v,left,max:Math.max(0,Math.min(left,v?v.qty:0))}});
+  showModal({title:`Return to ${esc(supplierOf(p).name)}`,wide:true,save:'Save Return',saveIcon:'package-minus',desc:`From ${esc(p.no)}, received ${fmtDate(p.receivedDate)}. Completing removes the units from stock.`,
+    body:`<div class="form-grid cols-3">
+      ${fld('Return Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}
+      ${fld('Reason',`<select class="select" name="reason"><option value="">Choose a reason…</option>${SUPPLIER_RETURN_REASONS.map(r=>`<option>${r}</option>`).join('')}</select>`,{req:1})}
+      ${fld('Status',`<select class="select" name="status"><option>Completed</option><option>Draft</option></select>`,{hint:'Draft returns do not change stock'})}
+      ${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional · RMA number, courier"></textarea>`,{span:1})}</div>
+    <div class="table-wrap" style="border:1px solid var(--line);border-radius:12px"><table><thead><tr><th>Item</th><th class="num">Received</th><th class="num">Already Returned</th><th class="num">In Stock</th><th class="num" style="width:120px">Return Qty</th><th class="num">After</th></tr></thead><tbody>
+    ${rows.map(({l,v,left,max})=>`<tr data-sline2="${l.id}"><td><span class="strong">${esc(v?productOf(v).name:'Deleted item')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')} · ${esc(v?v.sku:'')}</span></td><td class="num">${n0(l.qty)}</td><td class="num muted">${n0(l.qty-left)}</td><td class="num">${v?n0(v.qty):'—'}</td>
+      <td class="num"><div class="field" style="gap:4px"><input class="input" type="number" min="0" max="${max}" step="1" inputmode="numeric" data-r="qty" placeholder="0" value="${variantId&&l.variantId===variantId&&max?1:''}" style="height:36px;text-align:right" ${max?'':'disabled'} aria-label="Return quantity"><span class="err"></span></div></td><td class="num strong" data-r="after">${v?n0(v.qty):'—'}</td></tr>`).join('')}
+    </tbody></table></div><div class="summary" id="srSum"></div>`,
+    onMount:form=>{const upd=()=>{let u=0,val=0;form.querySelectorAll('[data-sline2]').forEach(tr=>{const l=p.lines.find(x=>x.id===tr.dataset.sline2),v=variantById(l.variantId),q=parseInt0(tr.querySelector('[data-r=qty]').value)||0;u+=q;val+=q*l.unitCost;tr.querySelector('[data-r=after]').innerHTML=v?(q?`<span class="chg-out">${n0(v.qty-q)}</span>`:n0(v.qty)):'—'});
+      $('#srSum').innerHTML=`<div><span>Units leaving stock</span><span class="chg-out">−${n0(u)}</span></div><div class="total"><span>Return value</span><span>${cur(val,p.currency)}</span></div>`};form.addEventListener('input',upd);upd()},
+    onSave:form=>{
+      const date=F(form,'date').value, reason=F(form,'reason').value, status=F(form,'status').value; let ok=true;
+      if(!date){fieldError(F(form,'date'),'Choose the return date.');ok=false} else if(date>todayISO()){fieldError(F(form,'date'),'The date cannot be in the future.');ok=false} else if(date<p.receivedDate){fieldError(F(form,'date'),`A return can't be before the stock arrived (${fmtDate(p.receivedDate)}).`);ok=false}
+      if(!reason){fieldError(F(form,'reason'),'Choose a reason for the return.');ok=false}
+      const lines=[];
+      form.querySelectorAll('[data-sline2]').forEach(tr=>{const l=p.lines.find(x=>x.id===tr.dataset.sline2),v=variantById(l.variantId),el=tr.querySelector('[data-r=qty]');if(el.disabled||!el.value.trim())return;const q=parseInt0(el.value),left=l.qty-supplierReturnedQty(DB,l.id);
+        if(isNaN(q)||q<0){fieldError(el,'Whole number');ok=false;return}
+        if(q>left){fieldError(el,`Max ${left}`);ok=false;formAlert(`Cannot return more than quantity purchased. ${v.sku}: received ${l.qty}, already returned ${l.qty-left}.`);return}
+        if(q>v.qty){fieldError(el,`Only ${v.qty}`);ok=false;formAlert(`Insufficient inventory for supplier return: ${v.sku} has ${v.qty} in stock.`);return}
+        if(q>0) lines.push({purchaseLineId:l.id,qty:q})});
+      if(ok&&!lines.length){formAlert('Enter a return quantity for at least one item.');return false}
+      if(!ok){if(!$('#mAlert').textContent)formAlert('Please fix the highlighted fields.');return false}
+      let r,t;
+      try{transact(()=>{r=createSupplierReturn(DB,{purchaseId:p.id,date,reason,notes:F(form,'notes').value.trim(),lines});if(status==='Completed')t=completeSupplierReturn(DB,r,{date})})}catch(err){formAlert(err.message);return false}
+      persist(); location.hash='sreturn-'+r.id; render();
+      toast(status==='Completed'?'Supplier return completed':'Supplier return saved as draft',status==='Completed'?`${r.no} · ${t.units} unit${t.units===1?'':'s'} removed from inventory.`:`${r.no} · stock unchanged until it is completed.`);
+      return true;
+    }});
+}
+function openCompleteSReturn(id){
+  const r=DB.supplierReturns.find(x=>x.id===id);
+  if(r.status!=='Draft'){toast('Return not completed','This return has already been completed.','error');return}
+  showModal({title:`Complete ${esc(r.no)}`,desc:'Removes these units from stock once.',save:'Complete Return',saveIcon:'package-check',
+    body:`${fld('Completion Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}${returnLinesTable(r.lines.map(l=>({v:variantById(l.variantId),ch:-l.qty})))}<p class="note">${ic('hash','i i-sm')}Reference ${esc(r.no)}</p>`,
+    onSave:form=>{const date=F(form,'date').value;if(!date||date>todayISO()){fieldError(F(form,'date'),'Choose a date that is not in the future.');return false}
+      try{const t=transact(()=>completeSupplierReturn(DB,DB.supplierReturns.find(x=>x.id===id),{date}));persist();render();toast('Supplier return completed',`${r.no} · ${t.units} units removed from inventory.`);return true}catch(err){formAlert(err.message);return false}}});
+}
+function openReverseSReturn(id){
+  const r=DB.supplierReturns.find(x=>x.id===id);
+  showModal({title:`Reverse ${esc(r.no)}`,desc:'Use this if the supplier return was recorded by mistake. The units come back into stock; both records stay visible.',save:'Reverse Return',saveIcon:'undo-2',danger:true,
+    body:`${returnLinesTable(r.lines.map(l=>({v:variantById(l.variantId),ch:l.qty})))}<div class="form-grid">${fld('Reason',`<input class="input" name="reason" placeholder="e.g. Supplier refused the return">`,{req:1})}${fld('Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}</div>`,
+    onSave:form=>{const reason=F(form,'reason').value.trim(),date=F(form,'date').value;if(!reason){fieldError(F(form,'reason'),'Give a reason for the reversal.');return false}if(!date||date>todayISO()){fieldError(F(form,'date'),'Choose a date that is not in the future.');return false}
+      try{transact(()=>reverseSupplierReturn(DB,DB.supplierReturns.find(x=>x.id===id),{date,reason}));persist();render();toast('Supplier return reversed',`${r.no} · units back in stock.`);return true}catch(err){formAlert(err.message);return false}}});
+}
+function openRecordNote(list,id,entity){
+  const r=list.find(x=>x.id===id);
+  showModal({title:'Add Note',desc:`Added to the activity log of ${esc(r.no)}. Notes don't change stock.`,narrow:true,save:'Add Note',body:fld('Note',`<textarea class="input" name="note"></textarea>`,{req:1,span:1}),
+    onSave:form=>{const n=F(form,'note').value.trim();if(!n){fieldError(F(form,'note'),'Write a note first.');return false}addHistory(r,`Note: ${n}`,'note');audit(DB,{action:'Note added',entity,ref:r.no,link:(entity==='Supplier Return'?'sreturn-':'return-')+r.id,desc:n});persist();render();toast('Note added',r.no);return true}});
+}
+
+/* --- Stock count: confirm and apply --- */
+function openApplyCounts(ids){
+  const lines=ids.map(id=>({v:variantById(id),physical:parseInt0(S.cnt.counts[id])})).filter(x=>x.v&&!isNaN(x.physical)&&x.physical>=0);
+  if(!lines.length){toast('Nothing to apply','Enter a physical count first.','error');return}
+  const changes=lines.filter(x=>x.physical!==x.v.qty);
+  showModal({title:'Apply Stock Count',desc:`${lines.length} SKU${lines.length===1?'':'s'} counted · ${changes.length} need${changes.length===1?'s':''} a correction. Each correction is recorded as a Stock Count Correction movement; matches are kept on the count record.`,save:`Apply ${changes.length} Correction${changes.length===1?'':'s'}`,saveIcon:'clipboard-check',
+    body:`<div class="table-wrap" style="border:1px solid var(--line);border-radius:12px"><table><thead><tr><th>Item</th><th class="num">System Qty</th><th class="num">Physical Qty</th><th class="num">Variance</th><th class="num">New Stock</th></tr></thead><tbody>
+      ${lines.map(({v,physical})=>{const d=physical-v.qty;return `<tr><td><span class="strong">${esc(productOf(v).name)}</span><span class="cell-sub">${esc(variantLabel(v))} · ${esc(v.sku)}</span></td><td class="num">${n0(v.qty)}</td><td class="num strong">${n0(physical)}</td><td class="num strong ${d>0?'chg-in':d<0?'chg-out':''}">${d>0?'+':d<0?'−':''}${n0(Math.abs(d))}${d?'':' <span class="muted">matches</span>'}</td><td class="num strong">${n0(physical)}</td></tr>`}).join('')}
+    </tbody></table></div>
+    <div class="form-grid">${fld('Count Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}${fld('Notes',`<input class="input" name="notes" placeholder="e.g. Monthly shelf count, warehouse B">`,{req:1})}</div>`,
+    onSave:form=>{const date=F(form,'date').value,notes=F(form,'notes').value.trim();let ok=true;
+      if(!date||date>todayISO()){fieldError(F(form,'date'),'Choose a date that is not in the future.');ok=false} if(!notes){fieldError(F(form,'notes'),'Add a note, e.g. who counted and where.');ok=false}
+      if(!ok){formAlert('Please fix the highlighted fields.');return false}
+      try{const c=transact(()=>applyStockCount(DB,{date,notes,lines:lines.map(x=>({variantId:x.v.id,physical:x.physical}))}));ids.forEach(id=>delete S.cnt.counts[id]);persist();render();
+        toast('Stock count applied',`${c.no} · ${c.lines.filter(l=>l.variance).length} correction${c.lines.filter(l=>l.variance).length===1?'':'s'} recorded, ${c.lines.filter(l=>!l.variance).length} matched.`);return true}catch(err){formAlert(err.message);return false}}});
 }
 
 /* --- Currency picker (shared by supplier and purchase forms) --- */
@@ -1783,7 +2390,7 @@ function openSupplierForm(id){
       const currency=checkCurrency(form,'currency'); if(!currency) ok=false;
       if(!ok){formAlert('Please fix the highlighted fields.');return false}
       const data={name,contact:g('contact'),country:g('country'),email:g('email'),phone:g('phone'),address:g('address'),notes:g('notes'),currency,status:F(form,'status').value};
-      if(s){const was=s.status;Object.assign(s,data);persist();render();toast(was!==s.status?(s.status==='Active'?'Supplier reactivated':'Supplier deactivated'):'Supplier updated successfully',name);return true}
+      if(s){const was=s.status;Object.assign(s,data);audit(DB,{action:'Supplier edited',entity:'Supplier',ref:name,link:'supplier-'+s.id,desc:[data.country,data.currency,data.status].filter(Boolean).join(' · ')});persist();render();toast(was!==s.status?(s.status==='Active'?'Supplier reactivated':'Supplier deactivated'):'Supplier updated successfully',name);return true}
       const ns={id:uid('s'),...data,createdAt:Date.now()}; DB.suppliers.push(ns);
       logActivity(DB,{tone:'mute',icon:'factory',title:`Supplier ${name} added`,sub:[data.country,data.currency].filter(Boolean).join(' · '),link:'supplier-'+ns.id});
       persist(); if(modal&&modal.returnTo){const r=modal.returnTo;closeModal();r(ns.id);toast('Supplier created successfully',`${name} is selected on the purchase.`);return false}
@@ -1901,7 +2508,7 @@ function openPurchaseForm(id,{supplierId,copyFrom}={}){
       if(editing){
         Object.assign(p,{supplierId:locked?p.supplierId:d.supplierId,currency:locked?p.currency:d.currency,date:d.date,expectedDate:d.expectedDate,invoiceNo:d.invoiceNo,notes:d.notes,costs:d.costs,
           lines:d.lines.map(l=>({id:uid('pl'),variantId:l.variantId,qty:l.qty,unitCost:l.unitCost}))});
-        addHistory(p,'Edited','edited'); persist(); render();
+        addHistory(p,'Edited','edited'); audit(DB,{action:'Purchase edited',entity:'Purchase',ref:p.no,link:'purchase-'+p.id,desc:`${p.lines.length} items · ${p.status}`}); persist(); render();
         toast('Purchase updated',`${p.no}${d.combined?` · ${d.combined} duplicate line${d.combined>1?'s':''} combined`:''}`); return true;
       }
       let np, msg;
@@ -2009,7 +2616,7 @@ function openPurchaseNote(id){
   const p=DB.purchases.find(x=>x.id===id);
   showModal({title:'Add Note',desc:`Added to the activity log of ${esc(p.no)}. Notes don't change items or stock.`,narrow:true,save:'Add Note',
     body:fld('Note',`<textarea class="input" name="note" placeholder="e.g. 2 reels had dented spools, supplier crediting next order"></textarea>`,{req:1,span:1}),
-    onSave:form=>{const n=F(form,'note').value.trim();if(!n){fieldError(F(form,'note'),'Write a note first.');return false}addHistory(p,`Note: ${n}`,'note');persist();render();toast('Note added',p.no);return true}});
+    onSave:form=>{const n=F(form,'note').value.trim();if(!n){fieldError(F(form,'note'),'Write a note first.');return false}addHistory(p,`Note: ${n}`,'note');audit(DB,{action:'Note added',entity:'Purchase',ref:p.no,link:'purchase-'+p.id,desc:n});persist();render();toast('Note added',p.no);return true}});
 }
 
 /* --- Customer form --- */
@@ -2037,7 +2644,7 @@ function openCustomerForm(id){
       const currency=checkCurrency(form,'currency'); if(!currency) ok=false;
       if(!ok){formAlert('Please fix the highlighted fields.');return false}
       const data={name,type:F(form,'type').value,country:g('country'),contact:g('contact'),email:g('email'),phone:g('phone'),address:g('address'),notes:g('notes'),currency,status:F(form,'status').value};
-      if(c){const was=c.status;Object.assign(c,data);persist();render();toast(was!==c.status?(c.status==='Active'?'Customer reactivated':'Customer deactivated'):'Customer updated successfully',name);return true}
+      if(c){const was=c.status;Object.assign(c,data);audit(DB,{action:'Customer edited',entity:'Customer',ref:name,link:'customer-'+c.id,desc:[data.type,data.country,data.currency,data.status].filter(Boolean).join(' · ')});persist();render();toast(was!==c.status?(c.status==='Active'?'Customer reactivated':'Customer deactivated'):'Customer updated successfully',name);return true}
       const nc={id:uid('c'),...data,createdAt:Date.now()}; DB.customers.push(nc);
       logActivity(DB,{tone:'mute',icon:'user-plus',title:`Customer ${name} added`,sub:[data.type,data.country].filter(Boolean).join(' · '),link:'customer-'+nc.id});
       persist(); if(modal&&modal.returnTo){const r=modal.returnTo;closeModal();r(nc.id);toast('Customer created successfully',`${name} is selected on the sale.`);return false}
@@ -2168,7 +2775,7 @@ function openSaleForm(id,{customerId,copyFrom}={}){
       if(editing){
         Object.assign(s,{customerId:locked?s.customerId:d.customerId,currency:locked?s.currency:d.currency,fxRate:d.fxRate,date:d.date,country:d.country,reference:d.reference,notes:d.notes,charges:d.charges,payment:d.payment,
           lines:d.lines.map(l=>({id:uid('sl'),variantId:l.variantId,qty:l.qty,unitPrice:l.unitPrice,discount:l.discount}))});
-        addHistory(s,'Edited','edited'); persist(); render();
+        addHistory(s,'Edited','edited'); audit(DB,{action:'Sale edited',entity:'Sale',ref:s.no,link:'sale-'+s.id,desc:`${s.lines.length} items · ${s.status}`}); persist(); render();
         toast('Sale updated',`${s.no}${d.combined?` · ${d.combined} duplicate line${d.combined>1?'s':''} combined`:''}`); return true;
       }
       let ns, msg;
@@ -2304,7 +2911,7 @@ function openSaleNote(id){
   const s=DB.sales.find(x=>x.id===id);
   showModal({title:'Add Note',desc:`Added to the activity log of ${esc(s.no)}. Notes don't change items, stock or revenue.`,narrow:true,save:'Add Note',
     body:fld('Note',`<textarea class="input" name="note" placeholder="e.g. Courier tracking number"></textarea>`,{req:1,span:1}),
-    onSave:form=>{const n=F(form,'note').value.trim();if(!n){fieldError(F(form,'note'),'Write a note first.');return false}addHistory(s,`Note: ${n}`,'note');persist();render();toast('Note added',s.no);return true}});
+    onSave:form=>{const n=F(form,'note').value.trim();if(!n){fieldError(F(form,'note'),'Write a note first.');return false}addHistory(s,`Note: ${n}`,'note');audit(DB,{action:'Note added',entity:'Sale',ref:s.no,link:'sale-'+s.id,desc:n});persist();render();toast('Note added',s.no);return true}});
 }
 
 /* --- Confirm --- */
@@ -2326,26 +2933,49 @@ function toast(title,msg,tone){
 }
 
 /* ---------- Router & render ---------- */
-const NAV=[['dashboard','Dashboard','layout-dashboard'],['inventory','Inventory','boxes'],['products','Products','package'],['purchases','Purchases','truck'],['suppliers','Suppliers','factory'],['sales','Sales','receipt'],['customers','Customers','users'],['reports','Reports','chart-column'],['settings','Settings','settings']];
-const PARENT={product:'products',variant:'products',customer:'customers',purchase:'purchases',supplier:'suppliers',sale:'sales'};
-function route(){ const h=location.hash.slice(1); const m=h.match(/^(product|variant|purchase|supplier|sale|customer)-(.+)$/); if(m) return [m[1],m[2]]; return [PAGES[h]?h:'dashboard',null]; }
+const NAV=[['dashboard','Dashboard','layout-dashboard'],['inventory','Inventory','boxes'],['movements','Stock Movements','history'],['products','Products','package'],['purchases','Purchases','truck'],['suppliers','Suppliers','factory'],['sales','Sales','receipt'],['customers','Customers','users'],['returns','Returns','undo-2'],['reports','Reports','chart-column'],['audit','Audit Trail','scroll-text'],['settings','Settings','settings']];
+const PARENT={product:'products',variant:'products',customer:'customers',purchase:'purchases',supplier:'suppliers',sale:'sales',movement:'movements',stockcount:'movements',return:'returns',sreturn:'returns'};
+function route(){ const h=location.hash.slice(1); const m=h.match(/^(product|variant|purchase|supplier|sale|customer|movement|return|sreturn)-(.+)$/); if(m) return [m[1],m[2]]; return [PAGES[h]?h:'dashboard',null]; }
 function render(){
-  const [r,id]=route(), active=PARENT[r]||r, att=attention().length;
-  $('#nav').innerHTML=NAV.map(([k,label,icon])=>`<a href="#${k}" ${k===active?'aria-current="page"':''}>${ic(icon)}<span>${label}</span>${k==='inventory'&&att?`<span class="count" title="Low or out of stock">${att}</span>`:''}</a>`).join('');
+  const [r,id]=route(), active=PARENT[r]||r, att=attention().length, ledgerIssues=ledgerCheck().length;
+  $('#nav').innerHTML=NAV.map(([k,label,icon])=>`<a href="#${k}" ${k===active?'aria-current="page"':''}>${ic(icon)}<span>${label}</span>${k==='inventory'&&att?`<span class="count" title="Low or out of stock">${att}</span>`:''}${k==='movements'&&ledgerIssues?`<span class="count" style="background:var(--bad-fg);color:#FFFFFF" title="Inventory discrepancies">${ledgerIssues}</span>`:''}</a>`).join('');
   $('#app').innerHTML=(Store.available?'':`<div class="notice">${ic('triangle-alert','i i-sm')}This browser is blocking storage. You can try things out, but changes will be lost when you close the page.</div>`)+PAGES[r](id);
   if(r==='inventory') renderInvTable();
   if(r==='purchases') renderPurTable();
   if(r==='sales') renderSalTable();
+  if(r==='movements') renderMovTable();
   renderNotifications();
   refreshIcons(); $('#shell').classList.remove('open');
 }
 function refreshIcons(){ if(window.lucide) lucide.createIcons({attrs:{'stroke-width':1.75}}); }
 function go(h){ if(location.hash==='#'+h) render(); else location.hash=h; window.scrollTo(0,0); }
 let lastRoute='';
-window.addEventListener('hashchange',()=>{const r=route()[0];if(r==='variant'&&lastRoute!=='variant')S.vtab='Overview';lastRoute=r;render();window.scrollTo(0,0)});
+window.addEventListener('hashchange',()=>{const [r,id]=route();if(r==='variant'&&lastRoute!=='variant')S.vtab='Overview';if(r==='variant'&&id!==S.vmovFor){S.vmov=blankVmovFilters();S.vmovFor=id}lastRoute=r;render();window.scrollTo(0,0)});
 
 /* ---------- Events ---------- */
 const ACTIONS={
+  gomovements:()=>go('movements'), gostockcount:()=>go('stockcount'), govariant:d=>go('variant-'+d.id),
+  exportMovements:()=>exportMovementsCSV(),
+  resetMov:()=>{S.mov=blankMovFilters();S.movLimit=150;render()},
+  moreMov:()=>{S.movLimit+=150;renderMovTable()},
+  resetVmov:()=>{S.vmov=blankVmovFilters();render()},
+  moreAud:()=>{S.audLimit+=200;render()},
+  clearCounts:()=>{S.cnt.counts={};render()},
+  applyCounts:()=>openApplyCounts(Object.keys(S.cnt.counts).filter(id=>S.cnt.counts[id]!=='')),
+  applyOneCount:d=>openApplyCounts([d.id]),
+  pickCustomerReturn:d=>openReturnPicker({customerId:d.id}),
+  createReturn:d=>openCustomerReturn(d.id),
+  completeReturn:d=>openCompleteReturn(d.id),
+  reverseReturn:d=>openReverseReturn(d.id),
+  noteReturn:d=>openRecordNote(DB.returns,d.id,'Customer Return'),
+  deleteReturn:d=>{const r=DB.returns.find(x=>x.id===d.id);confirmDialog({title:`Delete ${esc(r.no)}?`,body:'Only draft returns can be deleted, because they never changed stock. The number will not be reused.',confirm:'Delete Draft',onConfirm:()=>{if(r.status!=='Draft'){toast('Return not deleted','This return has already been completed.','error');return}DB.returns=DB.returns.filter(x=>x!==r);audit(DB,{action:'Draft return deleted',entity:'Customer Return',ref:r.no});persist();go('returns');toast('Draft return deleted',r.no)}})},
+  pickSupplierReturn:d=>openSReturnPicker({supplierId:d.id}),
+  returnToSupplier:d=>openSupplierReturn(d.id),
+  returnVariantToSupplier:d=>openSReturnPicker({variantId:d.id}),
+  completeSReturn:d=>openCompleteSReturn(d.id),
+  reverseSReturn:d=>openReverseSReturn(d.id),
+  noteSReturn:d=>openRecordNote(DB.supplierReturns,d.id,'Supplier Return'),
+  deleteSReturn:d=>{const r=DB.supplierReturns.find(x=>x.id===d.id);confirmDialog({title:`Delete ${esc(r.no)}?`,body:'Only draft returns can be deleted, because they never changed stock. The number will not be reused.',confirm:'Delete Draft',onConfirm:()=>{if(r.status!=='Draft'){toast('Return not deleted','This return has already been completed.','error');return}DB.supplierReturns=DB.supplierReturns.filter(x=>x!==r);audit(DB,{action:'Draft supplier return deleted',entity:'Supplier Return',ref:r.no});persist();go('returns');toast('Draft return deleted',r.no)}})},
   sale:()=>openSaleForm(),
   saleFor:d=>openSaleForm(null,{customerId:d.id}),
   editSale:d=>openSaleForm(d.id),
@@ -2359,7 +2989,7 @@ const ACTIONS={
   deleteSale:d=>{const s=DB.sales.find(x=>x.id===d.id);confirmDialog({title:`Delete ${esc(s.no)}?`,body:'Only drafts can be deleted, because they never affected stock. The sale number will not be reused.',confirm:'Delete Draft',onConfirm:()=>{if(s.status!=='Draft'){toast('Sale not deleted','Only draft sales can be deleted.','error');return}DB.sales=DB.sales.filter(x=>x!==s);logActivity(DB,{tone:'mute',icon:'trash-2',title:`Draft ${s.no} deleted`,sub:customerOf(s).name});persist();go('sales');toast('Draft sale deleted',s.no)}})},
   addCustomer:()=>openCustomerForm(),
   editCustomer:d=>openCustomerForm(d.id),
-  toggleCustomer:d=>{const c=DB.customers.find(x=>x.id===d.id);c.status=c.status==='Active'?'Inactive':'Active';persist();render();toast(c.status==='Active'?'Customer reactivated':'Customer deactivated',c.status==='Active'?`${c.name} can be used on new sales.`:`${c.name} is hidden from new sales. Their history is kept.`)},
+  toggleCustomer:d=>{const c=DB.customers.find(x=>x.id===d.id);c.status=c.status==='Active'?'Inactive':'Active';audit(DB,{action:c.status==='Active'?'Customer reactivated':'Customer deactivated',entity:'Customer',ref:c.name,link:'customer-'+c.id});persist();render();toast(c.status==='Active'?'Customer reactivated':'Customer deactivated',c.status==='Active'?`${c.name} can be used on new sales.`:`${c.name} is hidden from new sales. Their history is kept.`)},
   deleteCustomer:d=>{const c=DB.customers.find(x=>x.id===d.id);confirmDialog({title:'Delete customer?',body:`${esc(c.name)} has no sales, so they can be deleted. This can't be undone.`,confirm:'Delete Customer',onConfirm:()=>{if(DB.sales.some(x=>x.customerId===c.id)){toast('Customer not deleted','They have sales. Deactivate them instead.','error');return}DB.customers=DB.customers.filter(x=>x!==c);persist();go('customers');toast('Customer deleted',c.name)}})},
   gocustomers:()=>go('customers'),
   resetSal:()=>{Object.assign(S.sal,blankSalFilters());render()},
@@ -2375,7 +3005,7 @@ const ACTIONS={
   deletePurchase:d=>{const p=DB.purchases.find(x=>x.id===d.id);confirmDialog({title:`Delete ${esc(p.no)}?`,body:'Only drafts can be deleted, because they never affected stock. The purchase number will not be reused.',confirm:'Delete Draft',onConfirm:()=>{if(p.status!=='Draft'){toast('Purchase not deleted','Only draft purchases can be deleted.','error');return}DB.purchases=DB.purchases.filter(x=>x!==p);logActivity(DB,{tone:'mute',icon:'trash-2',title:`Draft ${p.no} deleted`,sub:supplierOf(p).name});persist();go('purchases');toast('Draft purchase deleted',p.no)}})},
   addSupplier:()=>openSupplierForm(),
   editSupplier:d=>openSupplierForm(d.id),
-  toggleSupplier:d=>{const s=DB.suppliers.find(x=>x.id===d.id);s.status=s.status==='Active'?'Inactive':'Active';persist();render();toast(s.status==='Active'?'Supplier reactivated':'Supplier deactivated',s.status==='Active'?`${s.name} can be used on new purchases.`:`${s.name} is hidden from new purchases. Its history is kept.`)},
+  toggleSupplier:d=>{const s=DB.suppliers.find(x=>x.id===d.id);s.status=s.status==='Active'?'Inactive':'Active';audit(DB,{action:s.status==='Active'?'Supplier reactivated':'Supplier deactivated',entity:'Supplier',ref:s.name,link:'supplier-'+s.id});persist();render();toast(s.status==='Active'?'Supplier reactivated':'Supplier deactivated',s.status==='Active'?`${s.name} can be used on new purchases.`:`${s.name} is hidden from new purchases. Its history is kept.`)},
   deleteSupplier:d=>{const s=DB.suppliers.find(x=>x.id===d.id);confirmDialog({title:'Delete supplier?',body:`${esc(s.name)} has no purchases, so it can be deleted. This can't be undone.`,confirm:'Delete Supplier',onConfirm:()=>{if(DB.purchases.some(p=>p.supplierId===s.id)){toast('Supplier not deleted','It has purchases. Deactivate it instead.','error');return}DB.suppliers=DB.suppliers.filter(x=>x!==s);persist();go('suppliers');toast('Supplier deleted',s.name)}})},
   gosuppliers:()=>go('suppliers'),
   resetPur:()=>{Object.assign(S.pur,blankPurFilters());render()},
@@ -2386,8 +3016,8 @@ const ACTIONS={
   addVariant:d=>openVariantForm(d.id),
   editVariant:d=>{const v=DB.variants.find(x=>x.id===d.id);openVariantForm(v.productId,v.id)},
   adjust:d=>openAdjust(d.id),
-  toggleProduct:d=>{const p=DB.products.find(x=>x.id===d.id);p.status=p.status==='Active'?'Inactive':'Active';persist();render();toast(p.status==='Active'?'Product reactivated':'Product deactivated',p.status==='Active'?`${p.name} is available again.`:`${p.name} is hidden from new transactions. Its history is kept.`)},
-  toggleVariant:d=>{const v=DB.variants.find(x=>x.id===d.id);v.status=v.status==='Active'?'Inactive':'Active';persist();render();toast(v.status==='Active'?'Variant reactivated':'Variant deactivated',`${v.sku} · ${variantLabel(v)}`)},
+  toggleProduct:d=>{const p=DB.products.find(x=>x.id===d.id);p.status=p.status==='Active'?'Inactive':'Active';audit(DB,{action:p.status==='Active'?'Product reactivated':'Product deactivated',entity:'Product',ref:p.name,link:'product-'+p.id});persist();render();toast(p.status==='Active'?'Product reactivated':'Product deactivated',p.status==='Active'?`${p.name} is available again.`:`${p.name} is hidden from new transactions. Its history is kept.`)},
+  toggleVariant:d=>{const v=DB.variants.find(x=>x.id===d.id);v.status=v.status==='Active'?'Inactive':'Active';audit(DB,{action:v.status==='Active'?'Variant reactivated':'Variant deactivated',entity:'Variant',ref:v.sku,link:'variant-'+v.id});persist();render();toast(v.status==='Active'?'Variant reactivated':'Variant deactivated',`${v.sku} · ${variantLabel(v)}`)},
   deleteProduct:d=>{const p=DB.products.find(x=>x.id===d.id);confirmDialog({title:'Delete product?',body:`${esc(p.name)} and its ${variantsOf(p.id).length} variant(s) have no stock, purchase or sales history, so they can be deleted. This can't be undone.`,confirm:'Delete Product',onConfirm:()=>{if(variantsOf(p.id).some(v=>movementsOf(v.id).length||usedInPurchases(v.id))){toast('Product not deleted','It has stock, purchase or sales history. Deactivate it instead.','error');return}DB.variants=DB.variants.filter(v=>v.productId!==p.id);DB.products=DB.products.filter(x=>x.id!==p.id);persist();go('products');toast('Product deleted',p.name)}})},
   deleteVariant:d=>{const v=DB.variants.find(x=>x.id===d.id);confirmDialog({title:'Delete variant?',body:`${esc(v.sku)} has no stock, purchase or sales history, so it can be deleted. This can't be undone.`,confirm:'Delete Variant',onConfirm:()=>{if(movementsOf(v.id).length||usedInPurchases(v.id)){toast('Variant not deleted','It has stock, purchase or sales history. Deactivate it instead.','error');return}DB.variants=DB.variants.filter(x=>x.id!==v.id);persist();go('product-'+v.productId);toast('Variant deleted',v.sku)}})},
   resetInv:()=>{Object.assign(S.inv,blankInvFilters());render()},
@@ -2399,7 +3029,7 @@ const ACTIONS={
 };
 document.addEventListener('click',e=>{
   if(e.target.closest('a[href^="#"]:not([data-action])')&&!e.target.closest('#mForm')) return;
-  const el=e.target.closest('[data-action],[data-go],[data-variant],[data-product],[data-vtab],[data-rtab],[data-range],[data-sort],[data-scroll],[data-pstatus],[data-invview],[data-setstatus],[data-psort],[data-sstatus],[data-ssort],[data-drange],[data-dtop],[data-ctype],[data-cstatus],[data-rtabgo]');
+  const el=e.target.closest('[data-action],[data-go],[data-variant],[data-product],[data-vtab],[data-rtab],[data-range],[data-sort],[data-scroll],[data-pstatus],[data-setstatus],[data-psort],[data-sstatus],[data-ssort],[data-drange],[data-dtop],[data-ctype],[data-cstatus],[data-rtabgo],[data-rettab],[data-retstatus]');
   if(!el) return;
   const d=el.dataset;
   if(d.action){ if(['suggestSku','addVariantCard','removeVariantCard','addPLine','removePLine','newSupplierInline','addSLine','removeSLine','newCustomerInline'].includes(d.action)) return; const fn=ACTIONS[d.action]; if(fn){ if(el.tagName==='A'&&d.action==='close'){closeModal();return} e.preventDefault(); fn(d,el);} return; }
@@ -2412,6 +3042,8 @@ document.addEventListener('click',e=>{
   if(d.pstatus){S.prod.status=d.pstatus;return render();}
   if(d.invview){S.inv.view=d.invview;return render();}
   if(d.setstatus){Object.assign(S.inv,{status:d.setstatus,view:'levels'});return render();}
+  if(d.rettab){S.ret.tab=d.rettab;return render();}
+  if(d.retstatus!==undefined){S.ret.status=d.retstatus;return render();}
   if(d.ssort){const f=S.sal;f.dir=f.sort===d.ssort?-f.dir:1;f.sort=d.ssort;return renderSalTable();}
   if(d.drange){S.dash.range=d.drange;return render();}
   if(d.dtop){S.dash.top=d.dtop;return render();}
@@ -2427,6 +3059,10 @@ function rerenderKeepFocus(id){const el=$('#'+id),pos=el?el.selectionStart:0;ren
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.dataset.filter){S.inv[t.dataset.filter]=t.value;rerenderKeepFocus('invQ');return}
+  if(t.dataset.mfilter){S.mov[t.dataset.mfilter]=t.value;S.movLimit=150;rerenderKeepFocus('movQ');return}
+  if(t.dataset.vmfilter){S.vmov[t.dataset.vmfilter]=t.value;rerenderKeepFocus('vmovQ');return}
+  if(t.id==='cntProd'){S.cnt.prod=t.value;rerenderKeepFocus('cntQ');return}
+  if(t.id==='audEnt'){S.aud.entity=t.value;S.audLimit=200;rerenderKeepFocus('audQ');return}
   if(t.dataset.sfilter){S.sal[t.dataset.sfilter]=t.value;rerenderKeepFocus('salQ');return}
   if(t.id==='rFrom'||t.id==='rTo'){S[t.id==='rFrom'?'rfrom':'rto']=t.value;render();return}
   if(t.dataset.fx){const r=parseFloat(t.value);if(r>0){DB.fxRates[t.dataset.fx]=r;persist();toast('Exchange rate updated',`1 ${t.dataset.fx} = ${r} SGD. Completed sales keep their own rate.`)}else toast('Rate not saved','Enter a number greater than 0.','error');return}
@@ -2438,6 +3074,13 @@ document.addEventListener('change',e=>{
 document.addEventListener('input',e=>{
   const t=e.target;
   if(t.id==='invQ'){S.inv.q=t.value;renderInvTable();const rb=document.querySelector('[data-action=resetInv]');if(rb)rb.disabled=!filtersActive();return}
+  if(t.id==='movQ'){S.mov.q=t.value;S.movLimit=150;renderMovTable();const rb=document.querySelector('[data-action=resetMov]');if(rb)rb.disabled=!movFiltersActive();return}
+  if(t.id==='vmovQ'){S.vmov.q=t.value;rerenderKeepFocus('vmovQ');return}
+  if(t.id==='cntQ'){S.cnt.q=t.value;rerenderKeepFocus('cntQ');return}
+  if(t.id==='retQ'){S.ret.q=t.value;rerenderKeepFocus('retQ');return}
+  if(t.id==='audQ'){S.aud.q=t.value;S.audLimit=200;rerenderKeepFocus('audQ');return}
+  if(t.dataset.count){const id=t.dataset.count,v=variantById(id);S.cnt.counts[id]=t.value.trim();const cell=document.querySelector(`[data-var="${id}"]`);if(cell)cell.innerHTML=varianceHtml(v,S.cnt.counts[id]);const one=document.querySelector(`[data-action=applyOneCount][data-id="${id}"]`);if(one)one.disabled=S.cnt.counts[id]==='';
+    const n=Object.keys(S.cnt.counts).filter(k=>S.cnt.counts[k]!=='').length,ab=document.querySelector('[data-action=applyCounts]');if(ab){ab.disabled=!n;ab.lastChild.textContent=`Review and Apply${n?` (${n})`:''}`}const cb=document.querySelector('[data-action=clearCounts]');if(cb)cb.disabled=!n;return}
   if(t.id==='salQ'){S.sal.q=t.value;renderSalTable();const rb=document.querySelector('[data-action=resetSal]');if(rb)rb.disabled=!salFiltersActive();return}
   if(t.id==='cusQ'){S.cus.q=t.value;rerenderKeepFocus('cusQ');return}
   if(t.id==='purQ'){S.pur.q=t.value;renderPurTable();const rb=document.querySelector('[data-action=resetPur]');if(rb)rb.disabled=!purFiltersActive();return}
@@ -2465,9 +3108,11 @@ $('#backdrop').onclick=()=>$('#shell').classList.remove('open');
 function hidePops(){ $('#notifPop').hidden=true; $('#profilePop').hidden=true; }
 function renderNotifications(){
   const att=attention(), out=att.filter(v=>v.qty<=0).length;
-  $('#notifDot').hidden=!att.length;
+  $('#notifDot').hidden=!att.length&&!ledgerCheck().length;
   $('#notifPop').innerHTML=`<div class="pop-head">Notifications</div>
   ${att.length?`<button class="pop-item" data-go="inventory" data-status="attention"><span class="act-icon" style="background:var(--warn-bg);color:var(--warn-fg)">${ic('triangle-alert','i i-sm')}</span><span><b style="font-size:13.5px">${att.length} SKU${att.length===1?' needs':'s need'} reordering</b><small>${out} out of stock</small></span></button>`:`<div class="pop-item" style="cursor:default"><span class="act-icon" style="background:var(--ok-bg);color:var(--ok-fg)">${ic('circle-check','i i-sm')}</span><span><b style="font-size:13.5px">Stock levels look good</b><small>No SKU is at its reorder level</small></span></div>`}
+  ${(()=>{const iss=ledgerCheck();return iss.length?`<button class="pop-item" data-go="movements"><span class="act-icon" style="background:var(--bad-bg);color:var(--bad-fg)">${ic('triangle-alert','i i-sm')}</span><span><b style="font-size:13.5px">Inventory discrepancy on ${iss.length} SKU${iss.length===1?'':'s'}</b><small>Stock and movement history don't match</small></span></button>`:''})()}
+  ${DB.returns.some(r=>r.status==='Draft')||DB.supplierReturns.some(r=>r.status==='Draft')?`<button class="pop-item" data-go="returns"><span class="act-icon" style="background:var(--info-bg);color:var(--info-fg)">${ic('undo-2','i i-sm')}</span><span><b style="font-size:13.5px">Draft returns waiting</b><small>Complete them to update stock</small></span></button>`:''}
   ${DB.purchases.some(p=>p.status==='Ordered')?`<button class="pop-item" data-go="purchases"><span class="act-icon" style="background:var(--info-bg);color:var(--info-fg)">${ic('ship','i i-sm')}</span><span><b style="font-size:13.5px">${DB.purchases.filter(p=>p.status==='Ordered').length} purchase${DB.purchases.filter(p=>p.status==='Ordered').length===1?'':'s'} on order</b><small>Mark as Received when the stock arrives</small></span></button>`:''}
   ${(()=>{const u=DB.sales.filter(x=>x.status==='Completed'&&(x.payment==='Unpaid'||x.payment==='Partially Paid'));return u.length?`<button class="pop-item" data-go="sales"><span class="act-icon" style="background:var(--bad-bg);color:var(--bad-fg)">${ic('clock','i i-sm')}</span><span><b style="font-size:13.5px">${u.length} completed sale${u.length===1?'':'s'} awaiting payment</b><small>${sgd(Math.round(u.reduce((a,x)=>a+saleTotals(x).totalBase,0)))} outstanding</small></span></button>`:''})()}
   ${DB.sales.some(x=>x.status==='Confirmed')?`<button class="pop-item" data-go="sales"><span class="act-icon" style="background:var(--info-bg);color:var(--info-fg)">${ic('clipboard-check','i i-sm')}</span><span><b style="font-size:13.5px">${DB.sales.filter(x=>x.status==='Confirmed').length} confirmed sale${DB.sales.filter(x=>x.status==='Confirmed').length===1?'':'s'} to ship</b><small>Complete them when the goods leave</small></span></button>`:''}`;

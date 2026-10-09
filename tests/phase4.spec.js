@@ -286,7 +286,7 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
   console.log('Dashboard');
   await check('dashboard sales figures use completed sales', async () => {
     await page.goto(FILE + '#dashboard');
-    const live = await page.evaluate(() => { const t = todayISO(); const m = salesStats(completedBetween(monthStart(t), t)); return { total: Math.round(m.total) }; });
+    const live = await page.evaluate(() => { const t = todayISO(); const m = salesStats(completedBetween(monthStart(t), t), returnsBetween(monthStart(t), t)); return { total: Math.round(m.total) }; });
     const k = await page.$$eval('.kpi .kpi-value', e => e.map(x => x.innerText.replace(/\s+/g, '')));
     eq(k[1], 'SGD' + live.total.toLocaleString('en-SG'));
     const txt = await page.textContent('#app');
@@ -297,7 +297,7 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
   await check('sales overview chart totals the completed sales in range', async () => {
     for (const r of ['Last 30 Days', '3 Months', '6 Months', '12 Months']) {
       await page.click(`[data-drange="${r}"]`);
-      const exp = await page.evaluate(r => { const t = todayISO(); const f = DASH_RANGES[r](t); return Math.round(salesStats(completedBetween(f, t)).total); }, r);
+      const exp = await page.evaluate(r => { const t = todayISO(); const f = DASH_RANGES[r](t); return Math.round(salesStats(completedBetween(f, t), returnsBetween(f, t)).total); }, r);
       ok((await page.textContent('.card-head .sub')).includes('SGD ' + exp.toLocaleString('en-SG')), r);
     }
   });
@@ -338,7 +338,7 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
     await page.goto(FILE + '#purchase-' + p.id); await page.click(`.page-head [data-action=receivePurchase][data-id="${p.id}"]`); await save();
     eq(await page.evaluate(i => DB.variants.find(x => x.id === i).qty, v), b + p.lines[0].qty);
     const types = await page.evaluate(() => [...new Set(DB.movements.map(m => m.type))].sort().join());
-    eq(types, 'adjustment,opening,purchase,sale,sale_reversal');
+    eq(types, 'count,customer_return,damaged,damaged_return,opening,purchase,sale,sale_reversal,supplier_return');
   });
   await check('every stock quantity equals the sum of its movements', async () => {
     const bad = await page.evaluate(() => DB.variants.filter(v => DB.movements.filter(m => m.variantId === v.id).reduce((a, m) => a + m.change, 0) !== v.qty).map(v => v.sku));
