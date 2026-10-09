@@ -309,6 +309,20 @@ label.field{display:flex;flex-direction:column;gap:7px;min-width:0}
 .summary div{display:flex;justify-content:space-between;gap:12px}
 .summary .total{border-top:1px solid var(--line);padding-top:10px;margin-top:2px;font-weight:700;font-size:16px}
 .note{font-size:12.5px;color:var(--fg-3);display:flex;gap:6px;align-items:center}
+.period-bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.period-bar .select{width:auto;min-width:170px;height:38px}
+.period-bar .input{width:auto;height:38px}
+.period-note{font-size:13px;font-weight:600;color:var(--fg-2)}
+.delta{display:inline-flex;align-items:center;gap:2px;font-weight:700;color:var(--fg-2);font-variant-numeric:tabular-nums}
+.info-i{display:inline-flex;vertical-align:-2px;margin-left:4px;color:var(--fg-3);cursor:help;text-transform:none;letter-spacing:0}
+.info-i .i{width:13px;height:13px}
+.info-i:hover,.info-i:focus{color:var(--fg-2);outline:none}
+.nowrap{white-space:nowrap}
+.summary div>span:last-child{white-space:nowrap;text-align:right}
+.kpi-btn{font:inherit;text-align:left;cursor:pointer;color:inherit;width:100%}
+.kpi-btn[aria-pressed="true"]{box-shadow:0 0 0 2px var(--accent-ring,var(--c-in))}
+.stat-strip .click{cursor:pointer}
+.stat-strip .click:hover{background:var(--surface-2)}
 
 .toast{position:fixed;right:24px;bottom:calc(24px + env(safe-area-inset-bottom,0px));z-index:90;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--c-in);border-radius:12px;box-shadow:var(--shadow-2);padding:14px 16px;display:flex;gap:12px;align-items:flex-start;max-width:380px}
 .toast b{display:block;font-size:14px}
@@ -446,7 +460,7 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
       <div><b>MSV Southeast Asia</b><span>Inventory Management</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
-    <div class="side-foot"><strong>Phase 5</strong>Stock ledger, returns and audit trail are live</div>
+    <div class="side-foot"><strong>Phase 6</strong>Dashboard and business reports are live</div>
   </aside>
   <div class="backdrop" id="backdrop"></div>
   <div class="main">
@@ -458,7 +472,7 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
         <span class="kbd">/</span>
       </form>
       <div class="top-right">
-        <span class="proto-tag">Phase 5 · saved in this browser</span>
+        <span class="proto-tag">Phase 6 · saved in this browser</span>
         <div style="position:relative">
           <button class="icon-btn" id="notifBtn" aria-label="Notifications" aria-haspopup="true"><i data-lucide="bell" class="i"></i><span class="dot" id="notifDot"></span></button>
           <div class="pop" id="notifPop" hidden></div>
@@ -580,7 +594,7 @@ function seedCustomers(t0){
 
 function seedDb(){
   const t0=Date.UTC(2026,3,1), day=86400000;
-  const db={version:5,user:'Jasmine Koh',categories:[],products:[],variants:[],movements:[],seq:0,suppliers:seedSuppliers(t0),purchases:[],customers:seedCustomers(t0),sales:[],returns:[],supplierReturns:[],counts:[],activity:[],audit:[],counters:{},currencies:DEFAULT_CURRENCIES.slice(),fxRates:{...DEFAULT_FX}};
+  const db={version:6,reportSettings:slowDefaults(),user:'Jasmine Koh',categories:[],products:[],variants:[],movements:[],seq:0,suppliers:seedSuppliers(t0),purchases:[],customers:seedCustomers(t0),sales:[],returns:[],supplierReturns:[],counts:[],activity:[],audit:[],counters:{},currencies:DEFAULT_CURRENCIES.slice(),fxRates:{...DEFAULT_FX}};
   const cat=(id,name,usesGauge)=>db.categories.push({id,name,usesGauge});
   cat('cat-strings','Tennis Strings',true);cat('cat-grips','Grips',false);cat('cat-acc','Accessories',false);cat('cat-equip','Equipment',false);cat('cat-other','Other',false);
   const P=[
@@ -692,7 +706,8 @@ function seedDb(){
   ev.sort((a,b)=>a.date.localeCompare(b.date)||a.o-b.o).forEach(e=>e.fn());
   return db;
 }
-function emptyDb(){const s=seedDb();return {version:5,user:DB&&DB.user||'Jasmine Koh',categories:s.categories,products:[],variants:[],movements:[],seq:0,suppliers:[],purchases:[],customers:[],sales:[],returns:[],supplierReturns:[],counts:[],activity:[],audit:[],counters:DB&&DB.counters?{...DB.counters}:{},currencies:DB&&DB.currencies?DB.currencies.slice():DEFAULT_CURRENCIES.slice(),fxRates:DB&&DB.fxRates?{...DB.fxRates}:{...DEFAULT_FX}}}
+function emptyDb(){const s=seedDb();return {version:6,reportSettings:DB&&DB.reportSettings?{...DB.reportSettings}:slowDefaults(),user:DB&&DB.user||'Jasmine Koh',categories:s.categories,products:[],variants:[],movements:[],seq:0,suppliers:[],purchases:[],customers:[],sales:[],returns:[],supplierReturns:[],counts:[],activity:[],audit:[],counters:DB&&DB.counters?{...DB.counters}:{},currencies:DB&&DB.currencies?DB.currencies.slice():DEFAULT_CURRENCIES.slice(),fxRates:DB&&DB.fxRates?{...DB.fxRates}:{...DEFAULT_FX}}}
+function slowDefaults(){return {slowDays:60,staleDays:120}}
 function migrate(db){
   if(!db) return seedDb();
   if(db.version===2) Object.assign(db,{version:3,suppliers:seedSuppliers(Date.now()),purchases:[],activity:[],counters:{},currencies:DEFAULT_CURRENCIES.slice()});
@@ -708,11 +723,15 @@ function migrate(db){
     Object.assign(db,{version:5,user:'Jasmine Koh',returns:[],supplierReturns:[],counts:[]});
     db.audit=db.activity.map(a=>auditFromActivity(a,db.user));
   }
-  return db.version===5?db:seedDb();
+  if(db.version===5){ // Phase 6: received purchases keep the exchange rate they were received at, so reports never shift when rates are edited.
+    db.purchases.forEach(p=>{if((p.status==='Received'||p.status==='Reversed')&&!p.fxRate)p.fxRate=fxOf(db,p.currency)});
+    Object.assign(db,{version:6,reportSettings:slowDefaults()});
+  }
+  return db.version===6?db:seedDb();
 }
 let DB=freezeLedger(migrate(Store.load()));
 let storageWarned=false;
-function persist(){ const ok=Store.save(DB); if(!ok&&!storageWarned){storageWarned=true;toast('Changes not saved','This browser is blocking storage, so changes will be lost when you close the page.','error');} }
+function persist(){ clearMemo(); const ok=Store.save(DB); if(!ok&&!storageWarned){storageWarned=true;toast('Changes not saved','This browser is blocking storage, so changes will be lost when you close the page.','error');} }
 
 /* ---------- Inventory engine ---------- */
 /* The one place stock quantities change. Purchases, sales and returns
@@ -930,7 +949,7 @@ function receivePurchase(db,p,{date,updateCost=false,at=Date.now()}){
     if(updateCost&&p.currency===BASE_CURRENCY) v.cost=l.unitCost;
     units+=l.qty;
   });
-  Object.assign(p,{status:'Received',receivedDate:date,receivedAt:at});
+  Object.assign(p,{status:'Received',receivedDate:date,receivedAt:at,fxRate:fxOf(db,p.currency)});
   addHistory(p,`Received · ${n0(units)} units added to inventory${updateCost&&p.currency===BASE_CURRENCY?' · cost prices updated':''}`,'received',at);
   logActivity(db,{at,tone:'ok',icon:'package-check',title:`Received ${p.no} from ${s?s.name:'supplier'}`,sub:`+${n0(units)} units added to inventory`,link:'purchase-'+p.id});
   return units;
@@ -1067,7 +1086,7 @@ function totals(list=DB.variants){
 const attention = ()=>DB.variants.filter(v=>isLive(v)&&stockStatus(v)!=='In Stock');
 
 /* ---------- UI helpers ---------- */
-const TONE = {'In Stock':'ok','Paid':'ok','Completed':'ok','Received':'ok','Active':'ok',
+const TONE = {'Healthy':'ok','Slow Moving':'warn','No Recent Sales':'bad','Never Sold':'mute','In Stock':'ok','Paid':'ok','Completed':'ok','Received':'ok','Active':'ok',
   'Low Stock':'warn','Pending':'warn','Partially Paid':'warn',
   'Out of Stock':'bad','Cancelled':'bad','Overdue':'bad',
   'Processing':'info','In Transit':'info','Ordered':'info',
@@ -1116,9 +1135,133 @@ const btn = (label,action,icon,kind='',extra='')=>`<button type="button" class="
 const sortIcon = ()=>`<span class="sort">${ic('chevrons-up-down','i i-sm')}</span>`;
 const crumbs = (...parts)=>`<div class="crumb">${parts.map((p,i)=>i<parts.length-1?`<a href="#${p[1]}">${esc(p[0])}</a>${ic('chevron-right','i i-sm')}`:`<span>${esc(p[0])}</span>`).join('')}</div>`;
 
+/* ===== Phase 6 · Reporting =====
+   Rules every figure follows:
+   - Sales: completed sales only, dated by completion. Draft, confirmed, cancelled and reversed sales never count.
+   - Customer returns: completed returns only, dated by completion, valued at the original sale line (snapshot).
+   - Cost of goods sold: the unit cost stored on each sale line when it was completed. Restocked returns add it back.
+   - Purchases: received purchases only (reversed ones drop out), in SGD at the rate stored when received.
+   - Inventory: current stock × current cost price.
+   Figures are worked out in single passes over the records and cached until the data changes. */
+
+/* ----- Reporting period (shared by Dashboard and Reports; remembered for this browser session) ----- */
+const PERIODS=['Today','Last 7 Days','Last 30 Days','This Month','Last Month','Last 3 Months','Last 6 Months','This Year','Last Year','Custom Range'];
+function loadPeriod(){try{const p=JSON.parse(sessionStorage.getItem('msv-period')||'null');if(p&&PERIODS.includes(p.range))return {range:p.range,from:p.from||'',to:p.to||''}}catch(e){}return {range:'This Month',from:'',to:''}}
+function savePeriod(){try{sessionStorage.setItem('msv-period',JSON.stringify(S.period))}catch(e){}}
+function addMonthsClamp(iso,n){const y=+iso.slice(0,4),m=+iso.slice(5,7)-1+n,d=+iso.slice(8),last=new Date(Date.UTC(y,m+1,0)).getUTCDate();return new Date(Date.UTC(y,m,Math.min(d,last))).toISOString().slice(0,10)}
+const daysBetween = (a,b)=>Math.round((Date.parse(b)-Date.parse(a))/864e5);
+function periodRange(p=S.period,t=todayISO()){
+  const Y=+t.slice(0,4), ms=monthStart; let from,to=t,pf,pt,vs;
+  switch(p.range){
+    case 'Today': from=t; pf=pt=isoAddDays(t,-1); vs='yesterday'; break;
+    case 'Last 7 Days': from=isoAddDays(t,-6); pf=isoAddDays(t,-13); pt=isoAddDays(t,-7); vs='previous 7 days'; break;
+    case 'Last 30 Days': from=isoAddDays(t,-29); pf=isoAddDays(t,-59); pt=isoAddDays(t,-30); vs='previous 30 days'; break;
+    case 'This Month': from=ms(t); pf=ms(t,1); pt=addMonthsClamp(t,-1); vs='same days last month'; break;
+    case 'Last Month': from=ms(t,1); to=isoAddDays(ms(t),-1); pf=ms(t,2); pt=isoAddDays(ms(t,1),-1); vs='the month before'; break;
+    case 'Last 3 Months': from=ms(t,2); pf=ms(t,5); pt=addMonthsClamp(t,-3); vs='previous 3 months'; break;
+    case 'Last 6 Months': from=ms(t,5); pf=ms(t,11); pt=addMonthsClamp(t,-6); vs='previous 6 months'; break;
+    case 'This Year': from=Y+'-01-01'; pf=(Y-1)+'-01-01'; pt=addMonthsClamp(t,-12); vs='same period last year'; break;
+    case 'Last Year': from=(Y-1)+'-01-01'; to=(Y-1)+'-12-31'; pf=(Y-2)+'-01-01'; pt=(Y-2)+'-12-31'; vs='the year before'; break;
+    default: {let f=p.from||ms(t),e=p.to||t; if(f>e)[f,e]=[e,f]; from=f; to=e; const n=daysBetween(f,e)+1; pf=isoAddDays(f,-n); pt=isoAddDays(f,-1); vs=`previous ${n} day${n===1?'':'s'}`}
+  }
+  return {from,to,prevFrom:pf,prevTo:pt,vs};
+}
+const grouping = (from,to)=>{const d=daysBetween(from,to)+1;return d<=45?'daily':d<=120?'weekly':'monthly'};
+function periodBar(){
+  const r=periodRange();
+  return `<div class="period-bar"><select class="select" id="period" aria-label="Reporting period">${PERIODS.map(x=>`<option ${x===S.period.range?'selected':''}>${x}</option>`).join('')}</select>
+    ${S.period.range==='Custom Range'?`<input type="date" class="input" id="pFrom" value="${r.from}" aria-label="From date"><span class="muted">to</span><input type="date" class="input" id="pTo" value="${r.to}" aria-label="To date">`:''}
+    <span class="period-note">${fmtDate(r.from)} – ${fmtDate(r.to)} <span class="muted">· compared with ${r.vs}</span></span></div>`;
+}
+/* Change against the previous equivalent period. Neutral colour: it reports the change, it doesn't judge it. */
+function delta(cur,prev,vs){
+  cur=round2(cur); prev=round2(prev);
+  if(!prev) return cur?`<span class="muted">Nothing in ${vs}</span>`:`<span class="muted">Same as ${vs}</span>`;
+  const ch=(cur-prev)/Math.abs(prev)*100, up=ch>=0;
+  return `<span><span class="delta">${ic(up?'arrow-up-right':'arrow-down-right','i i-sm')}${up?'+':'−'}${Math.abs(ch).toFixed(1)}%</span> vs ${vs}</span>`;
+}
+const tipI = text=>`<span class="info-i" tabindex="0" role="img" aria-label="${esc(text)}" data-tip="${esc(esc(text))}">${ic('info','i')}</span>`;
+const DEF={
+  gross:'Gross sales: completed sales in the period, including shipping and other charges, in SGD at each sale\'s own exchange rate.',
+  returns:'Customer returns: completed customer returns in the period, valued at the price on the original sale.',
+  net:'Net sales: gross sales minus customer returns.',
+  rev:'Product revenue: net sales without shipping and other charges. Gross profit is worked out on this.',
+  cogs:'Cost of goods sold: the unit cost stored on each sale line when the sale was completed, less the cost of restocked returns. Editing today\'s cost never changes it.',
+  gp:'Gross profit: product revenue (net sales excluding shipping and other charges) minus cost of goods sold.',
+  margin:'Gross margin: gross profit ÷ product revenue × 100.',
+  inv:'Inventory value: current stock × current cost price (cost basis), across every SKU.',
+  units:'Units in stock: current quantity on hand across every SKU.',
+  spend:'Purchase spend: received purchases in the period, including additional costs, in SGD at the rate stored when each purchase was received. Reversed purchases are excluded.',
+  rate:'Return rate (units): units returned by customers ÷ units sold, in the selected period.',
+  rateV:'Return rate (value): customer return value ÷ gross sales, in the selected period.',
+  cover:'Historical coverage: current stock ÷ average monthly units sold over the last 90 days. Based on past sales only, not a forecast.',
+  reorder:'Suggested minimum reorder: units needed to bring stock back up to its reorder level. Not a forecast.',
+  slow:'Based on days since the last completed sale. Thresholds are set in the toolbar.',
+  lowv:'Low stock value: value of active SKUs at or below their reorder level.'
+};
+
+/* ----- Cache: cleared whenever data is saved or a page renders ----- */
+let MEMO=new Map();
+const memo = (k,fn)=>{if(!MEMO.has(k))MEMO.set(k,fn());return MEMO.get(k)};
+const clearMemo = ()=>{MEMO=new Map()};
+
+/* ----- Period figures ----- */
+function periodSales(from,to){return memo('ps|'+from+'|'+to,()=>{const sales=completedBetween(from,to),rets=returnsBetween(from,to);return {sales,rets,st:salesStats(sales,rets)}})}
+const purFx = p=>+p.fxRate||fxOf(DB,p.currency);
+function purchaseBase(p){const t=purchaseTotals(p),fx=purFx(p);return {...t,fx,subBase:round2(t.sub*fx),addBase:round2(t.add*fx),totalBase:round2(t.total*fx)}}
+const receivedBetween = (from,to)=>DB.purchases.filter(p=>p.status==='Received'&&p.receivedDate>=from&&p.receivedDate<=to);
+const sreturnsBetween = (from,to)=>DB.supplierReturns.filter(r=>r.status==='Completed'&&r.completedDate>=from&&r.completedDate<=to);
+function sreturnBase(r){const p=DB.purchases.find(x=>x.id===r.purchaseId);return round2(sreturnTotals(r).value*(p?purFx(p):fxOf(DB,r.currency)))}
+function purchaseStats(from,to){return memo('pst|'+from+'|'+to,()=>{const list=receivedBetween(from,to);let units=0,sub=0,add=0;list.forEach(p=>{const t=purchaseBase(p);units+=t.units;sub+=t.subBase;add+=t.addBase});return {list,count:list.length,units,sub:round2(sub),add:round2(add),spend:round2(sub+add)}})}
+/* Per SKU, for the period: units sold, units returned, and revenue, COGS and gross profit net of returns. */
+function variantPerf(from,to){return memo('vp|'+from+'|'+to,()=>{
+  const m={}, get=id=>m[id]||(m[id]={id,sold:0,returned:0,rev:0,cogs:0,orders:0});
+  completedBetween(from,to).forEach(s=>saleTotals(s).lines.forEach(x=>{const r=get(x.l.variantId);r.sold+=x.l.qty;r.rev+=x.revBase;r.cogs+=x.cogs;r.orders++}));
+  returnsBetween(from,to).forEach(rt=>rt.lines.forEach(l=>{const r=get(l.variantId);r.returned+=l.qty;r.rev-=l.qty*l.unitRevenueBase;if(l.restock)r.cogs-=l.qty*l.unitCost}));
+  Object.values(m).forEach(r=>{r.rev=round2(r.rev);r.cogs=round2(r.cogs);r.gp=round2(r.rev-r.cogs);r.net=r.sold-r.returned;r.margin=r.rev?r.gp/r.rev:NaN});
+  return m;
+})}
+const NOPERF={sold:0,returned:0,rev:0,cogs:0,gp:0,net:0,margin:NaN,orders:0};
+function lastSales(){return memo('ls',()=>{const m={};DB.sales.forEach(s=>{if(s.status!=='Completed')return;s.lines.forEach(l=>{if(!m[l.variantId]||s.completedDate>m[l.variantId])m[l.variantId]=s.completedDate})});return m})}
+function lastPurchases(){return memo('lp',()=>{const m={};DB.purchases.forEach(p=>{if(p.status!=='Received')return;p.lines.forEach(l=>{const c=m[l.variantId];if(!c||p.receivedDate>c.date)m[l.variantId]={date:p.receivedDate,supplierId:p.supplierId,purchaseId:p.id}})});return m})}
+function monthlyRate(){return memo('rate',()=>{const t=todayISO(),vp=variantPerf(isoAddDays(t,-89),t),m={};Object.values(vp).forEach(r=>m[r.id]=r.net/3);return m})}
+function coverage(v){const r=monthlyRate()[v.id];return r>0?v.qty/r:null}
+const coverCell = v=>{const c=coverage(v);return c==null?'<span class="muted">No recent sales</span>':`${c<10?c.toFixed(1):Math.round(c)} mo`};
+const slowCfg = ()=>({...slowDefaults(),...(DB.reportSettings||{})});
+function moveStatus(v){
+  const last=lastSales()[v.id]; if(!last) return {status:'Never Sold',last:'',days:null};
+  const days=daysBetween(last,todayISO()), c=slowCfg();
+  return {status:days>=c.staleDays?'No Recent Sales':days>=c.slowDays?'Slow Moving':'Healthy',last,days};
+}
+const SLOW_STATUSES=['Healthy','Slow Moving','No Recent Sales','Never Sold'];
+function bestSellers(from,to,by,n=10){
+  const key={Units:r=>r.net,Revenue:r=>r.rev,'Gross Profit':r=>r.gp}[by]||(r=>r.net);
+  return Object.values(variantPerf(from,to)).filter(r=>r.net>0&&variantById(r.id)).sort((a,b)=>key(b)-key(a)||b.rev-a.rev).slice(0,n).map(r=>({...r,v:variantById(r.id)}));
+}
+const bestVal = (r,by)=>by==='Units'?n0(r.net)+' units':sgd(Math.round(by==='Gross Profit'?r.gp:r.rev));
+function groupSales(from,to,keyOf){ // net figures per group: sales by sale, returns by their original sale
+  const {sales,rets}=periodSales(from,to), g={};
+  const get=k=>g[k]||(g[k]={key:k,sales:[],rets:[]});
+  sales.forEach(s=>get(keyOf(s)||'Not set').sales.push(s));
+  rets.forEach(r=>{const s=DB.sales.find(x=>x.id===r.saleId);get((s&&keyOf(s))||'Not set').rets.push(r)});
+  return Object.values(g).map(x=>({...x,st:salesStats(x.sales,x.rets)}));
+}
+function lowStockValue(){return round2(attention().filter(v=>v.qty>0).reduce((a,v)=>a+v.qty*v.cost,0))}
+function slowSummary(){return memo('slow',()=>{const m={};SLOW_STATUSES.forEach(s=>m[s]={n:0,value:0,units:0});DB.variants.filter(v=>v.qty>0).forEach(v=>{const x=m[moveStatus(v).status];x.n++;x.value+=v.qty*v.cost;x.units+=v.qty});Object.values(m).forEach(x=>x.value=round2(x.value));return m})}
+function flowReport(from,to,f){
+  const scoped=DB.movements.filter(m=>(!f.product||variantById(m.variantId)?.productId===f.product)&&(!f.variant||m.variantId===f.variant));
+  const opening=scoped.filter(m=>m.date<from).reduce((a,m)=>a+m.change,0), closing=scoped.filter(m=>m.date<=to).reduce((a,m)=>a+m.change,0);
+  const inP=scoped.filter(m=>m.date>=from&&m.date<=to);
+  const lines=FLOW_LINES.map(([label,types])=>{const ms=inP.filter(m=>types.includes(m.type));return {label,types,n:ms.length,units:ms.reduce((a,m)=>a+m.change,0)}});
+  const rows=inP.filter(m=>(!f.type||m.type===f.type)&&(!f.supplier||m.supplierId===f.supplier)&&(!f.customer||m.customerId===f.customer));
+  const groups=MOVE_GROUPS.map(([label,types])=>{const ms=rows.filter(m=>types.includes(m.type));return {label,n:ms.length,inU:ms.filter(m=>m.change>0).reduce((a,m)=>a+m.change,0),outU:ms.filter(m=>m.change<0).reduce((a,m)=>a-m.change,0),noted:ms.reduce((a,m)=>a+(m.unitsNoted||0),0)}}).filter(r=>r.n);
+  return {opening,closing,lines,rows,groups,net:closing-opening};
+}
+const FLOW_LINES=[['Purchases',['purchase','purchase_reversal']],['Sales',['sale','sale_reversal']],['Customer Returns',['customer_return','customer_return_reversal','damaged_return']],['Supplier Returns',['supplier_return','supplier_return_reversal']],['Adjustments and Counts',['adjustment','other','damaged','lost','sample','count']],['Opening Balances Entered',['opening']]];
+
 /* ---------- View state ---------- */
 const blankInvFilters = ()=>({q:'',cat:'',prod:'',gauge:'',colour:'',pack:'',status:'',showInactive:false});
-const S = {mov:blankMovFilters(), movLimit:150, vmov:blankVmovFilters(), vmovFor:'', cnt:{q:'',prod:'',counts:{}}, ret:{tab:'Customer Returns',q:'',status:''}, aud:{q:'',entity:''}, audLimit:200, sal:{...blankSalFilters(),sort:'no',dir:-1}, cus:{q:'',type:'All',status:'Active'}, dash:{range:'6 Months',top:'Revenue'}, rfrom:'', rto:'', pur:{...blankPurFilters(),sort:'no',dir:-1}, sup:{q:'',status:'Active'}, inv:{...blankInvFilters(),sort:'product',dir:1,view:'levels'}, prod:{q:'',cat:'',status:'Active'}, vtab:'Overview', range:'Last 3 Months', rtab:'Sales'};
+const S = {mov:blankMovFilters(), movLimit:150, vmov:blankVmovFilters(), vmovFor:'', cnt:{q:'',prod:'',counts:{}}, ret:{tab:'Customer Returns',q:'',status:''}, aud:{q:'',entity:''}, audLimit:200, sal:{...blankSalFilters(),sort:'no',dir:-1}, cus:{q:'',type:'All',status:'Active'}, dash:{top:'Units'}, period:loadPeriod(), rep:blankRep(), pur:{...blankPurFilters(),sort:'no',dir:-1}, sup:{q:'',status:'Active'}, inv:{...blankInvFilters(),sort:'product',dir:1,view:'levels'}, prod:{q:'',cat:'',status:'Active'}, vtab:'Overview', rtab:'Overview'};
 
 /* ---------- Pages ---------- */
 const PAGES = {};
@@ -1342,9 +1485,9 @@ PAGES.sreturn = id=>{
     <div class="card"><div class="card-head"><h3>Activity</h3></div><div class="card-body">${returnTimeline(r)}</div></div>
   </div>`;
 };
-function returnsCard(list,kind){
+function returnsCard(list,kind,title){
   if(!list.length) return '';
-  return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>${kind==='customer'?'Returns against this sale':'Returns to supplier'}</h3><span class="sub">${list.length} record${list.length===1?'':'s'}</span></div><div class="table-wrap"><table><thead><tr><th>Return</th><th>Date</th><th>Reason</th><th class="num">Units</th>${kind==='customer'?'<th class="num">Restocked</th>':''}<th>Status</th></tr></thead><tbody>
+  return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>${title||(kind==='customer'?'Returns against this sale':'Returns to supplier')}</h3><span class="sub">${list.length} record${list.length===1?'':'s'}</span></div><div class="table-wrap"><table><thead><tr><th>Return</th><th>Date</th><th>Reason</th><th class="num">Units</th>${kind==='customer'?'<th class="num">Restocked</th>':''}<th>Status</th></tr></thead><tbody>
   ${list.map(r=>{const t=kind==='customer'?returnTotals(r):sreturnTotals(r);return `<tr class="click" data-go="${kind==='customer'?'return':'sreturn'}-${r.id}"><td class="mono strong" style="color:var(--fg)">${esc(r.no)}</td><td class="muted">${fmtDate(r.completedDate||r.date)}</td><td>${esc(r.reason)}</td><td class="num strong">${n0(t.units)}</td>${kind==='customer'?`<td class="num">${n0(t.restocked)}</td>`:''}<td>${returnStatusBadge(r.status)}</td></tr>`}).join('')}</tbody></table></div></div>`;
 }
 
@@ -1386,10 +1529,14 @@ function purchaseLineLabel(l){const v=variantById(l.variantId);return v?{name:pr
 
 /* ----- Dashboard ----- */
 function activityFeed(n){
-  const acts=DB.activity.map(a=>({...a}));
+  const acts=DB.activity.filter(a=>a.icon!=='file-plus').map(a=>({...a}));
   const mv=DB.movements.filter(m=>['opening','adjustment','damaged','lost','sample','other'].includes(m.type)).map(m=>{const v=variantById(m.variantId),p=v&&productOf(v),up=m.change>0;
     return {at:m.createdAt,tone:up?'ok':'warn',icon:m.type==='opening'?'package-plus':'sliders-horizontal',title:`${MOVEMENT_TYPES[m.type].label} · ${up?'+':'−'}${n0(Math.abs(m.change))}`,sub:`${p?p.name:''} ${v?variantLabel(v):m.sku} · ${m.reason}`,link:v?'variant-'+v.id:''}});
-  return acts.concat(mv).sort((a,b)=>b.at-a.at).slice(0,n);
+  const seen=new Set(), low=[];
+  DB.movements.slice().sort((a,b)=>b.seq-a.seq).forEach(m=>{const v=variantById(m.variantId);
+    if(!v||seen.has(v.id)||!isLive(v)||stockStatus(v)==='In Stock'||!(m.change<0&&m.prevQty>v.reorder&&m.newQty<=v.reorder)) return;
+    seen.add(v.id); low.push({at:m.createdAt+1,tone:m.newQty<=0?'bad':'warn',icon:'triangle-alert',title:`${m.newQty<=0?'Out of stock':'Low stock'} · ${v.sku}`,sub:`${productOf(v).name} ${variantLabel(v)} fell to ${m.newQty} (reorder level ${v.reorder})`,link:'variant-'+v.id})});
+  return acts.concat(mv,low).sort((a,b)=>b.at-a.at).slice(0,n);
 }
 const activityList = items=>`<div class="list">${items.map(a=>`<div class="list-item ${a.link?'click':''}" ${a.link?`data-go="${a.link}"`:''} style="${a.link?'cursor:pointer':''}"><span class="act-icon" style="background:var(--${a.tone}-bg);color:var(--${a.tone}-fg)">${ic(a.icon,'i i-sm')}</span><div style="min-width:0"><div class="t">${esc(a.title)}</div><div class="d">${esc(a.sub)}</div></div><span class="when">${timeAgo(a.at)}</span></div>`).join('')}</div>`;
 /* ----- Sales analytics (SGD; completed sales only, so drafts, cancelled and reversed sales never count) ----- */
@@ -1404,7 +1551,7 @@ function salesStats(list,rets=[]){
   list.forEach(s=>{const t=saleTotals(s);gross+=t.totalBase;rev+=t.revBase;cogs+=t.cogs;units+=t.units});
   rets.forEach(r=>{const t=returnTotals(r);rRev+=t.revBase;rCogs+=t.cogs;rUnits+=t.units});
   const nRev=round2(rev-rRev), nCogs=round2(cogs-rCogs), gp=round2(nRev-nCogs);
-  return {count:list.length,gross:round2(gross),returns:round2(rRev),returnCount:rets.length,total:round2(gross-rRev),rev:nRev,cogs:nCogs,gp,units:units-rUnits,margin:nRev?gp/nRev:NaN,avg:list.length?round2(gross/list.length):0};
+  return {count:list.length,gross:round2(gross),returns:round2(rRev),returnCount:rets.length,total:round2(gross-rRev),rev:nRev,cogs:nCogs,gp,units:units-rUnits,unitsSold:units,unitsReturned:rUnits,charges:round2(gross-rev),margin:nRev?gp/nRev:NaN,avg:list.length?round2(gross/list.length):0};
 }
 function netGroup(list,rets,keyOf){const m={};list.forEach(s=>{const k=keyOf(s)||'Not set';m[k]=(m[k]||0)+saleTotals(s).totalBase});rets.forEach(r=>{const s=DB.sales.find(x=>x.id===r.saleId);if(!s)return;const k=keyOf(s)||'Not set';m[k]=(m[k]||0)-returnTotals(r).revBase});return Object.entries(m).map(([k,v])=>[k,round2(v)]).filter(r=>r[1]>0).sort((a,b)=>b[1]-a[1])}
 const returnSeries = (b,rets)=>series(b,rets,r=>r.completedDate,r=>returnTotals(r).revBase);
@@ -1433,60 +1580,6 @@ function stockFlow(b){ // units in from purchases vs units out to sales, net of 
 }
 const salesLink = s=>`<a class="ref-link" href="#sale-${s.id}">${esc(s.no)}</a>`;
 const payBadge = p=>badge(p,{Paid:'ok','Partially Paid':'warn',Unpaid:'bad',Refunded:'mute'}[p]);
-
-/* ----- Dashboard ----- */
-const DASH_RANGES={'Last 30 Days':t=>isoAddDays(t,-29),'3 Months':t=>isoAddDays(t,-90),'6 Months':t=>monthStart(t,5),'12 Months':t=>monthStart(t,11)};
-PAGES.dashboard = ()=>{
-  const t=totals(DB.variants), att=attention(), today=todayISO();
-  const lowRows=att.slice().sort((a,b)=>a.qty/(a.reorder||1)-b.qty/(b.reorder||1)).slice(0,6);
-  const recentP=DB.purchases.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,5);
-  const recentS=DB.sales.filter(s=>s.status==='Completed'||s.status==='Confirmed').sort((a,b)=>(b.completedDate||b.date).localeCompare(a.completedDate||a.date)||b.no.localeCompare(a.no)).slice(0,6);
-  const month=salesStats(completedBetween(monthStart(today),today),returnsBetween(monthStart(today),today));
-  const from=DASH_RANGES[S.dash.range](today), b=buckets(from,today), inRange=completedBetween(from,today), retRange=returnsBetween(from,today);
-  const b6=buckets(monthStart(today,5),today), flow=stockFlow(b6);
-  const last90=completedBetween(isoAddDays(today,-89),today);
-  const ret90=returnsBetween(isoAddDays(today,-89),today), top=topVariants(last90,ret90).filter(r=>r.units>0).sort((a,c)=>S.dash.top==='Units'?c.units-a.units:c.rev-a.rev).slice(0,6);
-  const countries=netGroup(last90,ret90,s=>s.country);
-  const feed=activityFeed(7);
-  const dateHead=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  return head('Dashboard',`${dateHead} · overview of stock and sales across Southeast Asia`,btn('Record Purchase','purchase','package-plus')+btn('Record Sale','sale','receipt','primary'))+integrityNotice(true)+
-  `<div class="grid kpis">
-    ${kpi('Inventory Value',money(Math.round(t.value)),`At cost · ${sgd(Math.round(t.retail))} at selling price`,'wallet')}
-    ${kpi('Sales This Month',money(Math.round(month.total)),month.count?`Net of returns · ${month.count} completed${month.returns?` · ${sgd(Math.round(month.returns))} returned`:''} · gross profit ${sgd(Math.round(month.gp))} (${pct(month.margin)})`:'No completed sales yet this month','trending-up')}
-    ${kpi('Units in Stock',n0(t.units),`Across ${DB.variants.length} SKUs of ${DB.products.length} products`,'boxes')}
-    ${kpi('Low Stock Products',att.length,`${att.filter(v=>v.qty<=0).length} out of stock · <button class="link-btn" data-go="inventory" data-status="attention">Review</button>`,'triangle-alert',true)}
-  </div>
-  <div class="grid g-2-1">
-    <div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>Sales Overview</h3><span class="sub">Net sales (completed sales − returns), SGD · ${sgd(Math.round(salesStats(inRange,retRange).total))} in this period</span></div>${filterSeg(Object.keys(DASH_RANGES),S.dash.range,'drange')}</div>
-      <div class="card-body">${(()=>{const g=series(b,inRange,s=>s.completedDate,s=>saleTotals(s).totalBase),rr=returnSeries(b,retRange);return chartFor(b,[{key:'in',name:'Net sales',data:g.map((x,i)=>round2(x-rr[i]))}],{fmt:x=>sgd(x),cap:b.keys.length<=13})})()}</div></div>
-    <div class="card"><div class="card-head"><div><h3>Stock Movement</h3><span class="sub">Units purchased vs sold, last 6 months</span></div></div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:14px">${legend()}${chartFor(b6,[{key:'in',name:'Purchased',data:flow.inU},{key:'out',name:'Sold',data:flow.outU}],{height:212})}</div></div>
-  </div>
-  <div class="grid g-2-1">
-    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Recent Sales</h3><span class="sub">Completed and confirmed</span></div><button class="btn sm ghost" data-go="sales">View all ${ic('arrow-right','i i-sm')}</button></div>
-      ${recentS.length?`<div class="table-wrap"><table><thead><tr><th>Sale</th><th>Customer</th><th>Status</th><th>Payment</th><th class="num">Total</th></tr></thead><tbody>
-      ${recentS.map(s=>{const t=saleTotals(s),c=customerOf(s);return `<tr class="click" data-go="sale-${s.id}"><td class="mono strong" style="color:var(--fg)">${esc(s.no)}<span class="cell-sub">${fmtDate(s.completedDate||s.date)}</span></td><td style="white-space:nowrap"><span class="strong">${esc(c.name)}</span><span class="cell-sub">${esc(s.country)}</span></td><td>${badge(s.status)}</td><td>${payBadge(s.payment)}</td><td class="num strong" style="white-space:nowrap">${cur(t.total,s.currency)}</td></tr>`}).join('')}
-      </tbody></table></div>`:`<div class="empty"><b>No sales yet</b><button class="link-btn" data-action="sale">Record your first sale</button></div>`}</div>
-    <div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>Top Selling Products</h3><span class="sub">Last 90 days</span></div>${filterSeg(['Revenue','Units'],S.dash.top,'dtop')}</div>
-      <div class="card-body">${top.length?`<div class="list">${top.map((r,i)=>`<div class="list-item click" data-go="variant-${r.id}" style="align-items:center;cursor:pointer"><span class="rank">${i+1}</span><div style="min-width:0"><div class="t">${esc(r.name)}</div><div class="d">${esc(r.label)} · ${n0(r.units)} units</div></div><span class="when strong" style="color:var(--fg);font-size:13px">${S.dash.top==='Units'?n0(r.units)+' units':sgd(Math.round(r.rev))}</span></div>`).join('')}</div>`:'<div class="empty" style="padding:24px"><b>No sales in the last 90 days</b></div>'}</div></div>
-  </div>
-  <div class="grid g-2-1">
-    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Low Stock</h3><span class="sub">At or below reorder level · active SKUs</span></div><button class="btn sm ghost" data-go="inventory" data-status="attention">View all ${ic('arrow-right','i i-sm')}</button></div>
-      ${lowRows.length?`<div class="table-wrap"><table><thead><tr><th>Product</th><th>Variant</th><th class="num">Current Stock</th><th class="num">Reorder Level</th><th>Status</th></tr></thead><tbody>
-      ${lowRows.map(v=>`<tr class="click" data-variant="${v.id}"><td class="strong">${esc(productOf(v).name)}</td><td><span style="display:inline-flex;gap:7px;align-items:center;white-space:nowrap">${sw(v.colour)}${esc(variantLabel(v))}</span></td><td class="num strong">${v.qty}</td><td class="num muted">${v.reorder}</td><td>${badge(stockStatus(v))}</td></tr>`).join('')}
-      </tbody></table></div>`:`<div class="empty"><b>Every SKU is above its reorder level</b>Nothing to reorder right now.</div>`}</div>
-    <div class="card"><div class="card-head"><div><h3>Sales by Country</h3><span class="sub">Last 90 days, SGD</span></div><button class="btn sm ghost" data-rtabgo="Sales by Country">Report ${ic('arrow-right','i i-sm')}</button></div>
-      <div class="card-body">${countries.length?hbars(countries.slice(0,6),x=>sgd(Math.round(x))):'<div class="empty" style="padding:24px"><b>No sales in the last 90 days</b></div>'}</div></div>
-  </div>
-  <div class="grid g-2-1">
-    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Recent Purchases</h3><span class="sub">Latest purchase records</span></div><button class="btn sm ghost" data-go="purchases">View all ${ic('arrow-right','i i-sm')}</button></div>
-      ${recentP.length?`<div class="table-wrap"><table><thead><tr><th>Purchase</th><th>Supplier</th><th>Status</th><th class="num">Units</th><th class="num">Total Cost</th></tr></thead><tbody>
-      ${recentP.map(p=>{const t=purchaseTotals(p);return `<tr class="click" data-go="purchase-${p.id}"><td class="mono strong" style="color:var(--fg)">${esc(p.no)}<span class="cell-sub">${fmtDate(p.date)}</span></td><td>${esc(supplierOf(p).name)}</td><td>${badge(p.status)}</td><td class="num">${n0(t.units)}</td><td class="num strong">${cur(t.total,p.currency)}</td></tr>`}).join('')}
-      </tbody></table></div>`:`<div class="empty"><b>No purchases yet</b><button class="link-btn" data-action="purchase">Record your first purchase</button></div>`}</div>
-    <div class="card"><div class="card-head"><h3>Recent Activity</h3><button class="btn sm ghost" data-go="movements">Stock movements ${ic('arrow-right','i i-sm')}</button></div>
-      <div class="card-body">${feed.length?activityList(feed):`<div class="empty" style="padding:24px"><b>No activity yet</b>Add products or record a purchase to get started.</div>`}</div></div>
-  </div>`;
-};
 
 /* ----- Sales ----- */
 function blankSalFilters(){return {q:'',status:'',payment:'',customer:'',country:'',currency:'',product:'',from:'',to:''}}
@@ -1628,7 +1721,7 @@ PAGES.customer = id=>{
       ${list.length?`<div class="table-wrap"><table><thead><tr><th>Sale Number</th><th>Date</th><th>Status</th><th>Payment Status</th><th class="num">Items</th><th class="num">Units</th><th class="num">Total</th><th class="num">Gross Profit</th></tr></thead><tbody>
       ${list.map(s=>{const t=saleTotals(s);return `<tr class="click" data-go="sale-${s.id}"><td class="mono strong" style="color:var(--fg)">${esc(s.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(s.date)}</td><td>${badge(s.status)}</td><td>${payBadge(s.payment)}</td><td class="num">${t.items}</td><td class="num">${n0(t.units)}</td><td class="num strong" style="white-space:nowrap">${cur(t.total,s.currency)}</td><td class="num ${s.status==='Completed'?'':'muted'}" style="white-space:nowrap">${t.hasFx?sgd(Math.round(t.gp)):'—'}${s.status==='Completed'?'':' <span class="muted">·</span>'}</td></tr>`}).join('')}
       </tbody></table></div>`:`<div class="empty"><b>No sales to this customer yet</b>${c.status==='Active'?`<button class="link-btn" data-action="saleFor" data-id="${c.id}">Record a sale</button>`:''}</div>`}</div>
-  </div>`;
+  </div>${returnsCard(DB.returns.filter(r=>r.customerId===c.id).sort((a,b)=>(b.completedDate||b.date).localeCompare(a.completedDate||a.date)),'customer','Returns')}`;
 };
 function variantSalesTab(v){
   const rows=DB.sales.flatMap(s=>{const t=saleTotals(s);return t.lines.filter(x=>x.l.variantId===v.id).map(x=>({s,x}))}).sort((a,b)=>(b.s.completedDate||b.s.date).localeCompare(a.s.completedDate||a.s.date)||b.s.no.localeCompare(a.s.no));
@@ -1638,55 +1731,369 @@ function variantSalesTab(v){
   </tbody></table></div>`;
 }
 
-/* ----- Reports (live) ----- */
-const RTABS=['Sales','Inventory','Inventory Movements','Purchases','Product Performance','Customers','Sales by Country','Gross Profit'];
-function reportRange(){
-  const t=todayISO();
-  switch(S.range){
-    case 'This Month': return [monthStart(t),t];
-    case 'Last Month': return [monthStart(t,1),isoAddDays(monthStart(t),-1)];
-    case 'Last 3 Months': return [monthStart(t,2),t];
-    case 'This Year': return [t.slice(0,4)+'-01-01',t];
-    default: {const f=S.rfrom||monthStart(t,2),to=S.rto||t;return f<=to?[f,to]:[to,f]}
-  }
+/* ----- Report tables: one column spec drives the screen, sorting and the CSV, so exports match what's shown ----- */
+const nameCell = v=>{const p=v&&productOf(v);return v?`<a class="strong" href="#product-${p.id}" style="color:var(--fg);text-decoration:none">${esc(p.name)}</a>`:'<span class="muted">Deleted item</span>'};
+const varCell = v=>v?`<span style="display:inline-flex;gap:7px;align-items:center;white-space:nowrap">${v.colour?sw(v.colour):''}${esc(variantLabel(v))}</span>`:'';
+const sg0 = x=>sgd(Math.round(x));
+const pctCell = x=>isFinite(x)?(x*100).toFixed(1)+'%':'—';
+const pctCsv = x=>isFinite(x)?(x*100).toFixed(1):'';
+const C = {
+  product:{k:'product',label:'Product',v:r=>r.v?productOf(r.v).name:'',h:r=>nameCell(r.v),cls:'nowrap'},
+  variant:{k:'variant',label:'Variant',v:r=>r.v?variantLabel(r.v):'',h:r=>varCell(r.v)},
+  sku:{k:'sku',label:'SKU',v:r=>r.v?r.v.sku:'',cls:'mono'},
+  money:(k,label,get,tip)=>({k,label:label+(tip?tipI(tip):''),csvLabel:label+' (SGD)',num:1,v:get,h:r=>sgd(get(r),2),csv:r=>get(r).toFixed(2)}),
+  int:(k,label,get,tip)=>({k,label:label+(tip?tipI(tip):''),csvLabel:label,num:1,v:get,h:r=>n0(get(r))}),
+  date:(k,label,get)=>({k,label,v:r=>get(r)||'',h:r=>`<span class="muted nowrap">${fmtDate(get(r))}</span>`}),
+};
+function rtable(key,cols,rows,{empty='Nothing to show',click,foot=''}={}){
+  if(!rows.length) return `<div class="empty"><b>${empty}</b></div>`;
+  const s=S.rep.sort[key]||{}, lim=S.rep.limit[key]||50, shown=rows.slice(0,lim);
+  const th=c=>c.nosort?`<th class="${c.num?'num':''}">${c.label}</th>`:`<th class="sortable ${c.num?'num':''} ${s.k===c.k?'sorted':''}" data-rsort="${key}:${c.k}" aria-sort="${s.k===c.k?(s.dir>0?'ascending':'descending'):'none'}">${c.label}${sortIcon()}</th>`;
+  const td=(c,r)=>`<td class="${c.num?'num ':''}${c.cls||''}">${c.h?c.h(r):esc(String(c.v(r)??''))}</td>`;
+  return `<div class="table-wrap"><table><thead><tr>${cols.map(th).join('')}</tr></thead><tbody>${shown.map(r=>{const g=click&&click(r);return `<tr ${g?`class="click" data-go="${g}"`:''}>${cols.map(c=>td(c,r)).join('')}</tr>`}).join('')}${foot}</tbody></table></div>
+  <div class="table-foot"><span>Showing ${n0(shown.length)} of ${n0(rows.length)}</span>${rows.length>shown.length?`<button class="btn sm" data-action="moreRep" data-set="${key}">Show 50 more</button>`:'<span>All rows shown</span>'}</div>`;
 }
-PAGES.reports = ()=>{const [from,to]=reportRange();return head('Reports','Live figures from completed sales, purchases and stock. Money is in SGD; drafts, cancelled and reversed sales are excluded.',btn('Export','export','download'))+
-  `<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">${filterSeg(['This Month','Last Month','Last 3 Months','This Year','Custom Range'],S.range,'range')}
-   ${S.range==='Custom Range'?`<div style="display:flex;gap:8px;align-items:center"><input type="date" class="input" id="rFrom" style="width:auto;height:38px" value="${from}" aria-label="From"><span class="muted">to</span><input type="date" class="input" id="rTo" style="width:auto;height:38px" value="${to}" aria-label="To"></div>`:`<span class="muted" style="font-size:13px">${fmtDate(from)} – ${fmtDate(to)}</span>`}</div>
-  <div class="tabs" role="tablist">${RTABS.map(t=>`<button role="tab" aria-selected="${S.rtab===t}" data-rtab="${t}">${t}</button>`).join('')}</div>
-  ${reportBody(from,to)}`};
+function sortRows(key,cols,rows){
+  const s=S.rep.sort[key]; if(!s) return rows; const c=cols.find(x=>x.k===s.k); if(!c) return rows;
+  return rows.slice().sort((a,b)=>{const x=c.v(a),y=c.v(b);const r=typeof x==='number'||typeof y==='number'?(isNaN(x)?-Infinity:x)-(isNaN(y)?-Infinity:y):String(x).localeCompare(String(y),undefined,{numeric:true});return (r||0)*s.dir});
+}
+
+/* Each dataset: the rows for the current period and filters, sorted as on screen. */
+function DS(name,from,to){
+  const d=DATASETS[name](from,to);
+  return {...d,rows:sortRows(name,d.cols,d.rows)};
+}
+const DATASETS={
+  sales:(from,to)=>({title:'Completed sales',file:'sales',empty:'No sales found for this period.',click:r=>'sale-'+r.s.id,
+    rows:completedBetween(from,to).map(s=>({s,t:saleTotals(s),c:customerOf(s),rets:DB.returns.filter(r=>r.saleId===s.id&&r.status==='Completed')})),
+    cols:[{k:'no',label:'Sale',v:r=>r.s.no,h:r=>`<span class="mono strong">${esc(r.s.no)}</span>`},C.date('date','Completed',r=>r.s.completedDate),
+      {k:'customer',label:'Customer',v:r=>r.c.name,cls:'nowrap'},{k:'country',label:'Country',v:r=>r.s.country||''},C.int('units','Units',r=>r.t.units),
+      {k:'currency',label:'Currency',v:r=>r.s.currency},{k:'total',label:'Sale Total',csvLabel:'Sale Total (sale currency)',num:1,v:r=>r.t.total,h:r=>`<span class="nowrap">${cur(r.t.total,r.s.currency)}</span>`,csv:r=>r.t.total.toFixed(2)},
+      C.money('totalBase','Total',r=>r.t.totalBase),C.money('rev','Product Revenue',r=>r.t.revBase),C.money('cogs','COGS',r=>r.t.cogs),C.money('gp','Gross Profit',r=>r.t.gp),
+      {k:'margin',label:'Margin',num:1,v:r=>r.t.revBase?r.t.gp/r.t.revBase:NaN,h:r=>pctCell(r.t.revBase?r.t.gp/r.t.revBase:NaN),csvLabel:'Margin %',csv:r=>pctCsv(r.t.revBase?r.t.gp/r.t.revBase:NaN)},
+      {k:'returned',label:'Returned',nosort:0,num:1,v:r=>r.rets.reduce((a,x)=>a+returnTotals(x).units,0),h:r=>{const u=r.rets.reduce((a,x)=>a+returnTotals(x).units,0);return u?n0(u):'<span class="muted">—</span>'},csvLabel:'Units Returned (all time)'}]}),
+  products:(from,to)=>{const vp=variantPerf(from,to);
+    return {title:'Product performance',file:'product-performance',empty:'No products sold in this period.',click:r=>r.v?'variant-'+r.v.id:'',
+      rows:DB.variants.map(v=>({v,...(vp[v.id]||NOPERF)})).filter(r=>S.rep.prodAll?true:(r.sold||r.returned)),
+      cols:[C.product,C.variant,C.sku,C.int('sold','Units Sold',r=>r.sold),C.int('returned','Returned',r=>r.returned),C.money('rev','Revenue',r=>r.rev,'Product revenue after discounts, net of customer returns, in SGD.'),C.money('cogs','COGS',r=>r.cogs,DEF.cogs),C.money('gp','Gross Profit',r=>r.gp),
+        {k:'margin',label:'Gross Margin',num:1,v:r=>r.margin,h:r=>pctCell(r.margin),csvLabel:'Gross Margin %',csv:r=>pctCsv(r.margin)},C.int('stock','Current Stock',r=>r.v.qty)]}},
+  inventory:()=>({title:'Inventory value',file:'inventory-value',empty:'No SKUs yet.',click:r=>'variant-'+r.v.id,
+    rows:DB.variants.map(v=>({v})),
+    cols:[C.sku,C.product,C.variant,C.int('qty','Current Quantity',r=>r.v.qty),C.money('cost','Cost Basis',r=>r.v.cost,'Current cost price per unit, in SGD.'),C.money('value','Inventory Value',r=>round2(r.v.qty*r.v.cost),DEF.inv),
+      {k:'status',label:'Stock Status',v:r=>stockStatus(r.v),h:r=>badge(stockStatus(r.v))+(isLive(r.v)?'':' <span class="muted">Inactive</span>'),csv:r=>stockStatus(r.v)+(isLive(r.v)?'':' (inactive)')},
+      {k:'cover',label:'Coverage'+tipI(DEF.cover),csvLabel:'Historical Coverage (months)',num:1,v:r=>coverage(r.v)??Infinity,h:r=>coverCell(r.v),csv:r=>{const c=coverage(r.v);return c==null?'':c.toFixed(1)}}]}),
+  lowstock:()=>{const lp=lastPurchases();
+    return {title:'Low stock',file:'low-stock',empty:'No low-stock products. Every active SKU is above its reorder level.',click:r=>'variant-'+r.v.id,
+      rows:attention().map(v=>({v,lp:lp[v.id],sug:Math.max(v.reorder-v.qty,0)})),
+      cols:[C.sku,C.product,C.variant,C.int('qty','Current Quantity',r=>r.v.qty),C.int('reorder','Reorder Level',r=>r.v.reorder),
+        {k:'sug',label:'Suggested Reorder'+tipI(DEF.reorder),csvLabel:'Suggested Minimum Reorder',num:1,v:r=>r.sug,h:r=>r.sug?`<b>${n0(r.sug)}</b>`:'<span class="muted">—</span>'},
+        {k:'cover',label:'Coverage'+tipI(DEF.cover),csvLabel:'Historical Coverage (months)',num:1,v:r=>coverage(r.v)??Infinity,h:r=>coverCell(r.v),csv:r=>{const c=coverage(r.v);return c==null?'':c.toFixed(1)}},
+        C.date('lastp','Last Purchase',r=>r.lp?r.lp.date:''),
+        {k:'supplier',label:'Last Supplier',v:r=>r.lp?(DB.suppliers.find(s=>s.id===r.lp.supplierId)||{}).name||'':'',h:r=>{const s=r.lp&&DB.suppliers.find(x=>x.id===r.lp.supplierId);return s?`<a href="#supplier-${s.id}">${esc(s.name)}</a>`:'<span class="muted">—</span>'},cls:'nowrap'},
+        {k:'status',label:'Status',v:r=>stockStatus(r.v),h:r=>badge(stockStatus(r.v))}]}},
+  slow:(from,to,only)=>{const vp=variantPerf(from,to), want=only||S.rep.slow;
+    return {title:only?'Never sold':'Slow-moving inventory',file:only?'never-sold':'slow-moving',empty:only?'No never-sold stock. Every SKU with stock on hand has sold at least once.':'No slow-moving products match this filter.',click:r=>'variant-'+r.v.id,
+      rows:DB.variants.filter(v=>v.qty>0).map(v=>({v,...moveStatus(v),sold:(vp[v.id]||NOPERF).sold})).filter(r=>want==='All'||r.status===want),
+      cols:[C.product,C.variant,C.sku,C.int('qty','Current Stock',r=>r.v.qty),C.money('value','Inventory Value',r=>round2(r.v.qty*r.v.cost)),
+        ...(only?[{k:'created',label:'First Stocked',v:r=>{const m=movementsOf(r.v.id)[0];return m?m.date:''},h:r=>{const m=movementsOf(r.v.id)[0];return `<span class="muted nowrap">${m?fmtDate(m.date):'—'}</span>`},csvLabel:'First Stock Date'}]
+          :[C.date('last','Last Sale Date',r=>r.last),C.int('sold','Sold in Period',r=>r.sold),{k:'days',label:'Days Since Last Sale',num:1,v:r=>r.days??Infinity,h:r=>r.days==null?'<span class="muted">Never</span>':n0(r.days),csv:r=>r.days??''}]),
+        {k:'status',label:'Status'+tipI(DEF.slow),csvLabel:'Status',v:r=>SLOW_STATUSES.indexOf(r.status),h:r=>badge(r.status),csv:r=>r.status}]}},
+  never:(from,to)=>DATASETS.slow(from,to,'Never Sold'),
+  customers:(from,to)=>{const last={};DB.sales.forEach(s=>{if(s.status==='Completed'&&(!last[s.customerId]||s.completedDate>last[s.customerId]))last[s.customerId]=s.completedDate});
+    return {title:'Customer performance',file:'customers',empty:'No customer sales in this period.',click:r=>r.c.id?'customer-'+r.c.id:'',
+      rows:groupSales(from,to,s=>s.customerId).map(g=>({c:DB.customers.find(c=>c.id===g.key)||{id:'',name:'Unknown customer',type:'',country:''},st:g.st,last:last[g.key]||''})),
+      cols:[{k:'name',label:'Customer',v:r=>r.c.name,h:r=>`<span class="strong nowrap">${esc(r.c.name)}</span>`},{k:'type',label:'Customer Type',v:r=>r.c.type,h:r=>r.c.type?`<span class="chip">${esc(r.c.type)}</span>`:'—'},{k:'country',label:'Country',v:r=>r.c.country||''},
+        C.int('orders','Orders',r=>r.st.count),C.int('units','Units Purchased',r=>r.st.unitsSold),C.money('gross','Gross Sales',r=>r.st.gross,DEF.gross),C.money('returns','Returns',r=>r.st.returns),C.money('net','Net Sales',r=>r.st.total,DEF.net),C.money('gp','Gross Profit',r=>r.st.gp,DEF.gp),
+        C.money('aov','Avg Order Value',r=>r.st.avg,'Gross sales ÷ orders.'),C.date('last','Last Purchase',r=>r.last)]}},
+  countries:(from,to)=>{const g=groupSales(from,to,s=>s.country), tot=g.reduce((a,x)=>a+x.st.total,0);
+    return {title:'Sales by country',file:'sales-by-country',empty:'No sales found for this period.',
+      rows:g.map(x=>({...x,share:tot?x.st.total/tot:NaN})),
+      cols:[{k:'country',label:'Country',v:r=>r.key,h:r=>`<button class="link-btn strong" data-country="${esc(r.key)}">${esc(r.key)}</button>`},C.int('orders','Orders',r=>r.st.count),C.int('units','Units Sold',r=>r.st.unitsSold),
+        C.money('gross','Gross Sales',r=>r.st.gross,DEF.gross),C.money('returns','Returns',r=>r.st.returns),C.money('net','Net Sales',r=>r.st.total,DEF.net),C.money('gp','Gross Profit',r=>r.st.gp,DEF.gp),
+        {k:'share',label:'Share of Sales'+tipI('Share of net sales across all countries in the period.'),csvLabel:'Share of Net Sales %',num:1,v:r=>r.share,h:r=>pctCell(r.share),csv:r=>pctCsv(r.share)}]}},
+  purchases:(from,to)=>({title:'Received purchases',file:'purchases',empty:'No purchases received in this period.',click:r=>'purchase-'+r.p.id,
+    rows:receivedBetween(from,to).map(p=>({p,t:purchaseBase(p),s:supplierOf(p)})),
+    cols:[{k:'no',label:'Purchase',v:r=>r.p.no,h:r=>`<span class="mono strong">${esc(r.p.no)}</span>`},C.date('date','Received',r=>r.p.receivedDate),{k:'supplier',label:'Supplier',v:r=>r.s.name,cls:'nowrap'},
+      C.int('units','Units',r=>r.t.units),{k:'currency',label:'Currency',v:r=>r.p.currency},{k:'total',label:'Total',csvLabel:'Total (purchase currency)',num:1,v:r=>r.t.total,h:r=>`<span class="nowrap">${cur(r.t.total,r.p.currency)}</span>`,csv:r=>r.t.total.toFixed(2)},
+      {k:'fx',label:'Rate',csvLabel:'SGD per unit of currency',num:1,v:r=>r.t.fx,h:r=>r.p.currency===BASE_CURRENCY?'<span class="muted">—</span>':String(r.t.fx)},
+      C.money('sub','Purchase Value',r=>r.t.subBase),C.money('add','Additional Costs',r=>r.t.addBase),C.money('spend','Total Spend',r=>r.t.totalBase,DEF.spend)]}),
+  suppliers:(from,to)=>{const recv=receivedBetween(from,to), sr=sreturnsBetween(from,to), last={};
+    DB.purchases.forEach(p=>{if(p.status==='Received'&&(!last[p.supplierId]||p.receivedDate>last[p.supplierId]))last[p.supplierId]=p.receivedDate});
+    const ids=[...new Set([...recv.map(p=>p.supplierId),...sr.map(r=>r.supplierId)])];
+    return {title:'Supplier summary',file:'suppliers',empty:'No purchases received or returned in this period.',click:r=>'supplier-'+r.s.id,
+      rows:ids.map(id=>{const s=DB.suppliers.find(x=>x.id===id)||{id,name:'Unknown supplier',country:''},ps=recv.filter(p=>p.supplierId===id).map(purchaseBase),rs=sr.filter(r=>r.supplierId===id);
+        const spend=round2(ps.reduce((a,t)=>a+t.totalBase,0));
+        return {s,count:ps.length,units:ps.reduce((a,t)=>a+t.units,0),sub:round2(ps.reduce((a,t)=>a+t.subBase,0)),add:round2(ps.reduce((a,t)=>a+t.addBase,0)),spend,avg:ps.length?round2(spend/ps.length):0,returned:rs.reduce((a,r)=>a+sreturnTotals(r).units,0),last:last[id]||''}}),
+      cols:[{k:'name',label:'Supplier',v:r=>r.s.name,h:r=>`<span class="strong nowrap">${esc(r.s.name)}</span>`},{k:'country',label:'Country',v:r=>r.s.country||''},C.int('count','Purchases',r=>r.count),C.int('units','Units Received',r=>r.units),
+        C.money('sub','Purchase Value',r=>r.sub),C.money('add','Additional Costs',r=>r.add),C.money('spend','Total Spend',r=>r.spend,DEF.spend),C.money('avg','Avg Purchase Value',r=>r.avg,'Total spend ÷ purchases received in the period.'),
+        C.date('last','Last Purchase',r=>r.last),C.int('returned','Returned Units',r=>r.returned,'Units sent back to the supplier on completed supplier returns in the period.')]}},
+  creturns:(from,to)=>({title:'Customer returns',file:'customer-returns',empty:'No customer returns recorded in this period.',click:r=>'return-'+r.r.id,
+    rows:returnsBetween(from,to).map(r=>({r,t:returnTotals(r),c:DB.customers.find(c=>c.id===r.customerId)||{name:'Unknown customer'},s:DB.sales.find(s=>s.id===r.saleId)})),
+    cols:[{k:'no',label:'Return',v:r=>r.r.no,h:r=>`<span class="mono strong">${esc(r.r.no)}</span>`},C.date('date','Date',r=>r.r.completedDate),{k:'customer',label:'Customer',v:r=>r.c.name,cls:'nowrap'},
+      {k:'sale',label:'Original Sale',v:r=>r.s?r.s.no:'',h:r=>r.s?salesLink(r.s):'—',cls:'mono'},C.int('items','Items',r=>r.r.lines.length),C.int('qty','Returned Qty',r=>r.t.units),C.money('value','Return Value',r=>r.t.revBase,DEF.returns),
+      {k:'cond',label:'Condition',v:r=>[...new Set(r.r.lines.map(l=>l.condition))].join(', ')},{k:'restored',label:'Stock Restored',num:1,v:r=>r.t.restocked,h:r=>r.t.restocked?`<span class="chg-in strong">+${n0(r.t.restocked)}</span>${r.t.notRestocked?` <span class="muted">· ${r.t.notRestocked} not</span>`:''}`:`<span class="muted">0 · ${r.t.notRestocked} not restocked</span>`}]}),
+  sreturns:(from,to)=>({title:'Supplier returns',file:'supplier-returns',empty:'No supplier returns recorded in this period.',click:r=>'sreturn-'+r.r.id,
+    rows:sreturnsBetween(from,to).map(r=>({r,t:sreturnTotals(r),value:sreturnBase(r),s:DB.suppliers.find(x=>x.id===r.supplierId)||{name:'Unknown supplier'},p:DB.purchases.find(p=>p.id===r.purchaseId)})),
+    cols:[{k:'no',label:'Return',v:r=>r.r.no,h:r=>`<span class="mono strong">${esc(r.r.no)}</span>`},C.date('date','Date',r=>r.r.completedDate),{k:'supplier',label:'Supplier',v:r=>r.s.name,cls:'nowrap'},
+      {k:'purchase',label:'Original Purchase',v:r=>r.p?r.p.no:'',h:r=>r.p?purchaseLink(r.p):'—',cls:'mono'},C.int('items','Items',r=>r.r.lines.length),C.int('qty','Returned Qty',r=>r.t.units),C.money('value','Value',r=>r.value,'Purchase cost of the returned units, in SGD at the purchase\'s stored rate.'),{k:'reason',label:'Reason',v:r=>r.r.reason}]}),
+  flow:(from,to)=>{const f=flowReport(from,to,S.rep.mv), sg=x=>`${x>0?'+':x<0?'−':''}${n0(Math.abs(x))}`;
+    const rows=[{label:'Opening Stock',units:f.opening,kind:'total'},...f.lines.map(l=>({...l,kind:'line'})),{label:'Closing Stock',units:f.closing,kind:'total'}];
+    return {title:'Inventory movement',file:'inventory-movement',empty:'No stock in scope.',rows,
+      cols:[{k:'label',label:'Line',nosort:1,v:r=>r.label,h:r=>r.kind==='total'?`<b>${r.label}</b>`:r.label},{k:'n',label:'Movements',nosort:1,num:1,v:r=>r.kind==='total'?'':r.n,h:r=>r.kind==='total'?'':n0(r.n)},
+        {k:'units',label:'Units',nosort:1,num:1,v:r=>r.units,h:r=>r.kind==='total'?`<b>${n0(r.units)}</b>`:`<span class="${r.units>0?'chg-in':r.units<0?'chg-out':'muted'} strong">${sg(r.units)}</span>`}]}},
+  overview:(from,to)=>{const r=periodRange(), c=periodSales(from,to).st, p=periodSales(r.prevFrom,r.prevTo).st, ps=purchaseStats(from,to), pp=purchaseStats(r.prevFrom,r.prevTo), inv=totals();
+    const rows=[['Gross Sales',c.gross,p.gross],['Customer Returns',c.returns,p.returns],['Net Sales',c.total,p.total],['Shipping and Other Charges',c.charges,p.charges],['Product Revenue',c.rev,p.rev],['Cost of Goods Sold',c.cogs,p.cogs],['Gross Profit',c.gp,p.gp],['Gross Margin %',isFinite(c.margin)?round2(c.margin*100):'',isFinite(p.margin)?round2(p.margin*100):''],['Units Sold (net)',c.units,p.units],['Purchase Spend',ps.spend,pp.spend],['Inventory Value (today)',round2(inv.value),''],['Units in Stock (today)',inv.units,'']].map(([m,a,b])=>({m,a,b}));
+    return {title:'Business snapshot',file:'business-snapshot',rows,cols:[{k:'m',label:'Metric',nosort:1,v:r=>r.m},{k:'a',label:'Selected Period',nosort:1,num:1,v:r=>r.a},{k:'b',label:'Previous Period',nosort:1,num:1,v:r=>r.b}]}},
+};
+const csvCell = v=>`"${String(v??'').replace(/"/g,'""')}"`;
+const stripTags = s=>String(s).replace(/<[^>]*>/g,'').trim();
+function downloadCSV(file,lines,note){
+  const csv=lines.map(r=>r.map(csvCell).join(',')).join('\r\n');
+  try{const url=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download=file;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
+    toast('Export started',`${note} If nothing downloads, this viewer blocks downloads; use the live website instead.`,'info');}
+  catch(e){toast('Export failed','This browser blocked the download.','error')}
+  return csv;
+}
+function reportDataset(){
+  const sub={Inventory:{'Inventory Value':'inventory','Low Stock':'lowstock','Slow-Moving':'slow','Never Sold':'never'}[S.rep.inv],Returns:S.rep.ret==='Supplier Returns'?'sreturns':'creturns'};
+  return sub[S.rtab]||{Overview:'overview',Sales:'sales',Products:'products',Customers:'customers',Markets:'countries',Purchases:'purchases',Suppliers:'suppliers','Stock Movements':'flow'}[S.rtab];
+}
+function exportReport(name=reportDataset()){
+  const {from,to}=periodRange(), d=DS(name,from,to);
+  const lines=[d.cols.map(c=>c.csvLabel||stripTags(c.label)),...d.rows.map(r=>d.cols.map(c=>c.csv?c.csv(r):c.v(r)))];
+  return downloadCSV(`${d.file}-${from}-to-${to}.csv`,lines,`${d.title}: ${n0(d.rows.length)} row${d.rows.length===1?'':'s'}, ${fmtDate(from)} – ${fmtDate(to)}.`);
+}
+
+/* ----- Shared chart pieces ----- */
+const emptyCard = msg=>`<div class="empty" style="padding:36px 22px"><b>${msg}</b></div>`;
+const legend2 = (a,b)=>`<div class="legend"><span><i style="background:var(--c-in)"></i>${a}</span><span><i style="background:var(--c-out)"></i>${b}</span></div>`;
+const TREND_METRICS=['Revenue','Units Sold','Gross Profit'];
+function trendSeries(b,from,to,metric){
+  const {sales,rets}=periodSales(from,to), at=s=>s.completedDate;
+  if(metric==='Units Sold'){const a=series(b,sales,at,s=>saleTotals(s).units),r=series(b,rets,at,x=>returnTotals(x).units);return a.map((x,i)=>x-r[i])}
+  if(metric==='Gross Profit'){const a=series(b,sales,at,s=>saleTotals(s).gp),r=series(b,rets,at,x=>returnTotals(x).gpImpact);return a.map((x,i)=>round2(x+r[i]))}
+  const a=series(b,sales,at,s=>saleTotals(s).totalBase),r=returnSeries(b,rets);return a.map((x,i)=>round2(x-r[i]));
+}
+function trendChart(from,to,metric,height=240){
+  const {sales,rets}=periodSales(from,to);
+  if(!sales.length&&!rets.length) return emptyCard('No sales found for this period.');
+  const b=buckets(from,to), data=trendSeries(b,from,to,metric);
+  return chartFor(b,[{key:'in',name:metric==='Revenue'?'Net sales':metric==='Units Sold'?'Units sold (net)':'Gross profit',data:data.map(x=>Math.max(0,x))}],{fmt:metric==='Units Sold'?x=>n0(x)+' units':x=>sgd(Math.round(x)),cap:b.keys.length<=13,height});
+}
+const trendSub = (from,to,metric)=>`${{Revenue:'Net sales (completed sales − returns), SGD','Units Sold':'Units sold, net of returns','Gross Profit':'Gross profit, SGD'}[metric]} · grouped ${grouping(from,to)}`;
+function rankList(rows,valFn,goFn,labelFn,subFn){
+  return `<div class="list">${rows.map((r,i)=>`<div class="list-item click" data-go="${goFn(r)}" style="align-items:center;cursor:pointer"><span class="rank">${i+1}</span><div style="min-width:0"><div class="t">${labelFn(r)}</div><div class="d">${subFn(r)}</div></div><span class="when strong" style="color:var(--fg);font-size:13px;white-space:nowrap">${valFn(r)}</span></div>`).join('')}</div>`;
+}
+const bestList = (rows,by)=>rankList(rows,r=>bestVal(r,by),r=>'variant-'+r.id,r=>`${esc(productOf(r.v).name)} <span class="muted" style="font-weight:500">${esc(variantLabel(r.v))}</span>`,r=>esc(r.v.sku));
+const CUS_RANK={'Net Sales':['net',r=>r.st.total,r=>sgd(Math.round(r.st.total))],'Gross Profit':['gp',r=>r.st.gp,r=>sgd(Math.round(r.st.gp))],Orders:['orders',r=>r.st.count,r=>n0(r.st.count)+' orders'],Units:['units',r=>r.st.unitsSold,r=>n0(r.st.unitsSold)+' units']};
+function topCustomers(from,to,by,n=10){const d=DATASETS.customers(from,to),f=CUS_RANK[by][1];return d.rows.slice().sort((a,b)=>f(b)-f(a)||b.st.total-a.st.total).slice(0,n)}
+const customerList = (rows,by)=>rankList(rows,CUS_RANK[by][2],r=>r.c.id?'customer-'+r.c.id:'customers',r=>esc(r.c.name),r=>`${esc(r.c.type||'—')} · ${esc(r.c.country||'—')} · ${r.st.count} order${r.st.count===1?'':'s'}`);
+const MKT_METRICS={Revenue:[r=>r.st.total,x=>sgd(Math.round(x)),'Net sales, SGD'],'Units Sold':[r=>r.st.unitsSold,x=>n0(x)+' units','Units sold'],'Gross Profit':[r=>r.st.gp,x=>sgd(Math.round(x)),'Gross profit, SGD']};
+function countryBars(from,to,metric,n){
+  const [get,fmt]=MKT_METRICS[metric], rows=DATASETS.countries(from,to).rows.map(r=>[r.key,round2(get(r))]).filter(r=>r[1]>0).sort((a,b)=>b[1]-a[1]);
+  return rows.length?hbars(n?rows.slice(0,n):rows,fmt):emptyCard('No sales found for this period.');
+}
+/* Gross profit bridge: how net sales becomes gross profit. */
+function profitBridge(st,extra=''){
+  const row=(l,v,cls='',tip='')=>`<div class="${cls}"><span>${l}${tip?tipI(tip):''}</span><span>${v}</span></div>`;
+  return `<div class="summary">${row('Gross sales',sgd(st.gross,2),'',DEF.gross)}${row('Customer returns',st.returns?'−'+sgd(st.returns,2):sgd(0,2),'',DEF.returns)}${row('Net sales',sgd(st.total,2),'total',DEF.net)}</div>
+    <div class="summary" style="margin-top:14px">${row('Less shipping and other charges',st.charges?'−'+sgd(st.charges,2):sgd(0,2))}${row('Product revenue',sgd(st.rev,2),'',DEF.rev)}${row('Cost of goods sold',st.cogs?'−'+sgd(st.cogs,2):sgd(0,2),'',DEF.cogs)}${row('Gross profit',sgd(st.gp,2),'total',DEF.gp)}${row('Gross margin',pctCell(st.margin),'',DEF.margin)}</div>${extra}`;
+}
+
+/* ----- Reports ----- */
+const RTABS=['Overview','Sales','Products','Inventory','Customers','Markets','Purchases','Suppliers','Returns','Stock Movements'];
+const RTAB_ALIAS={'Gross Profit':'Sales','Sales by Country':'Markets','Product Performance':'Products','Inventory Movements':'Stock Movements'};
+const INV_VIEWS=['Inventory Value','Low Stock','Slow-Moving','Never Sold'];
+const PROD_RANK={'Units Sold':'sold',Revenue:'rev','Gross Profit':'gp','Gross Margin %':'margin','Return Quantity':'returned','Current Stock':'stock'};
+const SUP_RANK={'Total Spend':'spend','Purchase Count':'count','Units Purchased':'units'};
+function blankRep(){return {metric:'Revenue',best:'Units',prodAll:false,inv:'Inventory Value',slow:'All',crank:'Net Sales',mmetric:'Revenue',country:'',pmetric:'Spend',ret:'Customer Returns',mv:{product:'',variant:'',type:'',supplier:'',customer:''},limit:{},
+  sort:{sales:{k:'date',dir:-1},countrySales:{k:'date',dir:-1},products:{k:'rev',dir:-1},inventory:{k:'value',dir:-1},lowstock:{k:'sug',dir:-1},slow:{k:'days',dir:-1},never:{k:'value',dir:-1},customers:{k:'net',dir:-1},countries:{k:'net',dir:-1},purchases:{k:'date',dir:-1},suppliers:{k:'spend',dir:-1},creturns:{k:'date',dir:-1},sreturns:{k:'date',dir:-1}}}}
+PAGES.reports = ()=>{
+  const {from,to}=periodRange(); if(RTAB_ALIAS[S.rtab]) S.rtab=RTAB_ALIAS[S.rtab];
+  return head('Reports','Live figures from completed sales, received purchases, completed returns and current stock. Money is in SGD. Draft, cancelled and reversed records are left out.',btn('Export CSV','exportReport','download'))+
+  periodBar()+`<div class="tabs" role="tablist">${RTABS.map(t=>`<button role="tab" aria-selected="${S.rtab===t}" data-rtab="${t}">${t}</button>`).join('')}</div>`+reportBody(from,to);
+};
 function reportBody(from,to){
-  const card=(title,sub,body,extra='')=>`<div class="card"><div class="card-head"><div><h3>${title}</h3>${sub?`<span class="sub">${sub}</span>`:''}</div>${extra}</div><div class="card-body">${body}</div></div>`;
-  const list=completedBetween(from,to), rets=returnsBetween(from,to), st=salesStats(list,rets), b=buckets(from,to), none='<div class="empty" style="padding:24px"><b>No completed sales in this period</b></div>';
-  const money0=x=>sgd(Math.round(x));
+  const r=periodRange(), st=periodSales(from,to).st, prev=periodSales(r.prevFrom,r.prevTo).st, ps=purchaseStats(from,to), pps=purchaseStats(r.prevFrom,r.prevTo);
+  const card=(title,sub,body,extra='')=>`<div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>${title}</h3>${sub?`<span class="sub">${sub}</span>`:''}</div>${extra}</div><div class="card-body">${body}</div></div>`;
+  const tbl=(name,sub,extra='',toolbar='')=>{const d=DS(name,from,to);return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px;flex-wrap:wrap"><div><h3>${d.title}</h3>${sub?`<span class="sub">${sub}</span>`:''}</div><div class="actions" style="display:flex;gap:8px;flex-wrap:wrap">${extra}<button class="btn sm" data-action="exportReport" data-set="${name}">${ic('download','i i-sm')}Export CSV</button></div></div>${toolbar?`<div class="toolbar">${toolbar}</div>`:''}${rtable(name,d.cols,d.rows,{empty:d.empty,click:d.click})}</div>`};
+  const more=(tab,label='View all',sub='')=>`<button class="btn sm ghost" data-rtab="${tab}" ${sub?`data-rsub="${sub}"`:''}>${label} ${ic('arrow-right','i i-sm')}</button>`;
+  const noSales=emptyCard('No sales found for this period.'), plural=(n,w)=>`${n0(n)} ${w}${n===1?'':'s'}`;
   switch(S.rtab){
-    case 'Sales': return `<div class="grid kpis">${kpi('Gross Sales',money(Math.round(st.gross)),`${st.count} completed sales`,'trending-up')}${kpi('Returns',money(Math.round(st.returns)),`${st.returnCount} completed customer return${st.returnCount===1?'':'s'}`,'undo-2',st.returns>0)}${kpi('Net Sales',money(Math.round(st.total)),`${n0(st.units)} units net of returns`,'wallet')}${kpi('Gross Profit',money(Math.round(st.gp)),`${pct(st.margin)} margin`,'percent')}</div>
-      <div class="grid g-2-1">${(()=>{const g=series(b,list,s=>s.completedDate,s=>saleTotals(s).totalBase),rr=returnSeries(b,rets);return card('Net sales over time','Completed sales − returns, SGD',chartFor(b,[{key:'in',name:'Net sales',data:g.map((x,i)=>round2(x-rr[i]))}],{fmt:money0,cap:b.keys.length<=13}))})()}${card('Top Customers','Net sales, SGD',list.length?hbars(netGroup(list,rets,s=>customerOf(s).name).slice(0,6),money0):none)}</div>`;
-    case 'Inventory': {const t=totals(), byP=DB.products.map(p=>[p.name,Math.round(totals(variantsOf(p.id)).value)]).filter(r=>r[1]>0).sort((a,c)=>c[1]-a[1]);
+    case 'Overview': {const best=bestSellers(from,to,'Units',5), tc=topCustomers(from,to,'Net Sales',5);
+      return `<div class="grid kpis">
+        ${kpi('Net Sales'+tipI(DEF.net),money(Math.round(st.total)),delta(st.total,prev.total,r.vs),'trending-up')}
+        ${kpi('Gross Profit'+tipI(DEF.gp),money(Math.round(st.gp)),delta(st.gp,prev.gp,r.vs),'wallet')}
+        ${kpi('Gross Margin'+tipI(DEF.margin),pctCell(st.margin),isFinite(prev.margin)?`${pctCell(prev.margin)} in ${r.vs}`:`<span class="muted">Nothing in ${r.vs}</span>`,'percent')}
+        ${kpi('Purchase Spend'+tipI(DEF.spend),money(Math.round(ps.spend)),delta(ps.spend,pps.spend,r.vs),'package-check')}
+      </div>
+      <div class="grid g-2-1">${card('Sales trend',trendSub(from,to,S.rep.metric),trendChart(from,to,S.rep.metric),filterSeg(TREND_METRICS,S.rep.metric,'tmetric'))}
+        ${card('Business snapshot','An operational snapshot, not a profit and loss statement. No operating expenses are deducted.',profitBridge(st,`<div class="summary" style="margin-top:14px"><div><span>Purchase spend (received)${tipI(DEF.spend)}</span><span>${sgd(ps.spend,2)}</span></div><div><span>Inventory value today${tipI(DEF.inv)}</span><span>${sgd(round2(totals().value),2)}</span></div></div>`))}</div>
+      <div class="grid g-3">${card('Best Sellers','Units sold, net of returns',best.length?bestList(best,'Units'):noSales,more('Products'))}
+        ${card('Top Customers','Net sales',tc.length?customerList(tc,'Net Sales'):noSales,more('Customers'))}
+        ${card('Top Markets','Net sales by country',countryBars(from,to,'Revenue',5),more('Markets'))}</div>`;}
+    case 'Sales': return `<div class="grid kpis">
+        ${kpi('Gross Sales'+tipI(DEF.gross),money(Math.round(st.gross)),`${plural(st.count,'completed sale')} · ${delta(st.gross,prev.gross,r.vs)}`,'receipt')}
+        ${kpi('Returns'+tipI(DEF.returns),money(Math.round(st.returns)),`${plural(st.returnCount,'completed customer return')}`,'undo-2',st.returns>0)}
+        ${kpi('Net Sales'+tipI(DEF.net),money(Math.round(st.total)),`${n0(st.units)} units net · ${delta(st.total,prev.total,r.vs)}`,'trending-up')}
+        ${kpi('Gross Profit'+tipI(DEF.gp),money(Math.round(st.gp)),`${pctCell(st.margin)} margin · ${delta(st.gp,prev.gp,r.vs)}`,'wallet')}
+      </div>
+      <div class="grid g-2-1">${card('Sales trend',trendSub(from,to,S.rep.metric),trendChart(from,to,S.rep.metric),filterSeg(TREND_METRICS,S.rep.metric,'tmetric'))}${card('Gross profit','How net sales becomes gross profit',profitBridge(st))}</div>
+      ${tbl('sales',`${fmtDate(from)} – ${fmtDate(to)} · SGD unless noted · cost of goods uses each sale's stored cost`)}`;
+    case 'Products': {const by=S.rep.best, b=bestSellers(from,to,by,10), cfg=slowCfg();
+      const slow=DB.variants.filter(v=>v.qty>0).map(v=>({v,...moveStatus(v)})).filter(x=>x.status!=='Healthy').sort((a,c)=>c.v.qty*c.v.cost-a.v.qty*a.v.cost).slice(0,6);
+      const rk=Object.entries(PROD_RANK).find(([,k])=>k===(S.rep.sort.products||{}).k);
+      return `<div class="grid g-2-1">${card('Best Sellers',`Top ${b.length||10} by ${by==='Units'?'units sold':by.toLowerCase()}, net of returns`,b.length?bestList(b,by):noSales,filterSeg(['Units','Revenue','Gross Profit'],by,'best'))}
+        ${card('Slow movers',`In stock with no sale in ${cfg.slowDays}+ days, by value`,slow.length?`<div class="list">${slow.map(x=>`<div class="list-item click" data-go="variant-${x.v.id}" style="cursor:pointer;align-items:center"><span class="act-icon" style="background:var(--mute-bg);color:var(--mute-fg)">${ic('hourglass','i i-sm')}</span><div style="min-width:0"><div class="t">${esc(productOf(x.v).name)} <span class="muted" style="font-weight:500">${esc(variantLabel(x.v))}</span></div><div class="d">${n0(x.v.qty)} in stock · ${x.days==null?'never sold':`last sale ${n0(x.days)} days ago`}</div></div><span class="when strong" style="color:var(--fg);font-size:13px">${sg0(x.v.qty*x.v.cost)}</span></div>`).join('')}</div>`:emptyCard('No slow-moving products'),more('Inventory','Report','Slow-Moving'))}</div>
+      ${tbl('products','Completed sales in the period, net of customer returns. Click a row for the SKU; click a product name for the product.','',`<span class="field-label" style="margin:0">Rank by</span><select class="select" id="prodRank" style="width:auto;min-width:170px" aria-label="Rank products by">${Object.keys(PROD_RANK).map(k=>`<option ${rk&&rk[0]===k?'selected':''}>${k}</option>`).join('')}</select>${filterSeg(['Sold in period','All SKUs'],S.rep.prodAll?'All SKUs':'Sold in period','pall')}`)}`;}
+    case 'Inventory': {const t=totals(), sl=slowSummary(), outN=attention().filter(v=>v.qty<=0).length;
+      const strip=`<div class="stat-strip">
+        <div><span>Total Inventory Value${tipI(DEF.inv)}</span><b>${sg0(t.value)}</b></div><div><span>Total Units</span><b>${n0(t.units)}</b></div><div><span>Total SKUs</span><b>${n0(DB.variants.length)}</b></div>
+        <div><span>Low Stock Value${tipI(DEF.lowv)}</span><b>${sg0(lowStockValue())}</b></div><div><span>Out of Stock SKUs</span><b>${outN}</b></div><div><span>Never Sold Value</span><b>${sg0(sl['Never Sold'].value)}</b></div></div>`;
+      const seg=`<div>${filterSeg(INV_VIEWS,S.rep.inv,'rinv')}</div>`;
+      if(S.rep.inv==='Low Stock') return strip+seg+tbl('lowstock','Active SKUs at or below their reorder level. Suggested quantities are simple top-ups, not forecasts.',btn('Record Purchase','purchase','package-plus','sm'));
+      if(S.rep.inv==='Slow-Moving'){const cfg=slowCfg();
+        return strip+seg+`<div class="grid kpis">${SLOW_STATUSES.map(s=>`<button class="card kpi kpi-btn" data-slow="${s}" aria-pressed="${S.rep.slow===s}"><div class="kpi-top"><span class="kpi-label">${s}</span></div><div class="kpi-value">${money(Math.round(sl[s].value))}</div><div class="kpi-note">${plural(sl[s].n,'SKU')} · ${n0(sl[s].units)} units</div></button>`).join('')}</div>`+
+          tbl('slow',`Stock on hand by days since its last completed sale. Healthy under ${cfg.slowDays} days · Slow Moving ${cfg.slowDays}+ · No Recent Sales ${cfg.staleDays}+.`,'',`${filterSeg(['All',...SLOW_STATUSES],S.rep.slow,'slow')}<label class="check" style="font-weight:500;margin-left:auto">Slow after <select class="select" id="slowDays" style="width:auto;height:38px">${[30,45,60,90].map(d=>`<option ${d===cfg.slowDays?'selected':''}>${d}</option>`).join('')}</select> days</label><label class="check" style="font-weight:500">No recent sales after <select class="select" id="staleDays" style="width:auto;height:38px">${[90,120,180,365].map(d=>`<option ${d===cfg.staleDays?'selected':''}>${d}</option>`).join('')}</select> days</label>`);}
+      if(S.rep.inv==='Never Sold') return strip+seg+`<div class="grid kpis">${kpi('Never Sold Inventory Value',money(Math.round(sl['Never Sold'].value)),'At cost, today','package-x')}${kpi('Never Sold SKUs',sl['Never Sold'].n,'With stock on hand and no completed sale','boxes')}${kpi('Units',n0(sl['Never Sold'].units),'Sitting in stock','layers')}${kpi('Share of Inventory',pctCell(t.value?sl['Never Sold'].value/t.value:NaN),'Of total inventory value','percent')}</div>`+
+        tbl('never','SKUs with stock on hand that have never had a completed sale. These may need promotion or less purchasing.');
+      const byP=DB.products.map(p=>[p.name,Math.round(totals(variantsOf(p.id)).value)]).filter(x=>x[1]>0).sort((a,c)=>c[1]-a[1]);
       const mb=buckets(monthStart(todayISO(),5),todayISO()), ends=mb.keys.map((k,i)=>i===mb.keys.length-1?todayISO():isoAddDays(monthStart(k+'-01',-1),-1));
       const val=ends.map(d=>Math.round(DB.variants.reduce((a,v)=>a+DB.movements.filter(m=>m.variantId===v.id&&m.date<=d).reduce((q,m)=>q+m.change,0)*v.cost,0)));
-      return `<div class="grid kpis">${kpi('Inventory Value',money(Math.round(t.value)),'At cost, today','wallet')}${kpi('At Selling Price',money(Math.round(t.retail)),'If everything sold at selling price','tag')}${kpi('Units in Stock',n0(t.units),`${DB.variants.length} SKUs`,'boxes')}${kpi('Low or Out of Stock',t.low+t.out,`${t.out} out of stock`,'triangle-alert',true)}</div>
-      <div class="grid g-2-1">${card('Inventory Value','Month-end stock × current cost price',lineChart(mb.labels,val,money0))}${card('Value by Product','At cost, today',byP.length?hbars(byP,money0):'<div class="empty">No stock on hand</div>')}</div>`;}
-    case 'Inventory Movements': {const r=movementReport(from,to), sg=x=>`${x>0?'+':x<0?'−':''}${n0(Math.abs(x))}`;
-      return `<div class="grid kpis">${kpi('Stock In',`<span class="chg-in">+${n0(r.stockIn)}</span>`,'Units added: purchases, returns, increases','arrow-down-to-line')}${kpi('Stock Out',`<span class="chg-out">−${n0(r.stockOut)}</span>`,'Units removed: sales, supplier returns, decreases','arrow-up-from-line')}${kpi('Returns',sg(r.returns),'Customer returns − supplier returns, net','undo-2')}${kpi('Net Change',sg(r.net),`Adjustments and counts: ${sg(r.adjust)}`,'scale')}</div>
-      <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Movement breakdown</h3><span class="sub">Units by movement type, ${fmtDate(from)} – ${fmtDate(to)}</span></div><button class="btn sm ghost" data-go="movements">Open ledger ${ic('arrow-right','i i-sm')}</button></div>
-      ${r.rows.length?`<div class="table-wrap"><table><thead><tr><th>Movement type</th><th class="num">Movements</th><th class="num">Units In</th><th class="num">Units Out</th><th class="num">Net</th></tr></thead><tbody>
-      ${r.rows.map(x=>`<tr><td class="strong">${x.label}</td><td class="num">${n0(x.n)}</td><td class="num chg-in">${x.inU?'+'+n0(x.inU):'—'}</td><td class="num chg-out">${x.outU?'−'+n0(x.outU):'—'}</td><td class="num strong">${x.noted?`0 <span class="muted" style="font-weight:500">· ${n0(x.noted)} not restocked</span>`:sg(x.inU-x.outU)}</td></tr>`).join('')}
-      <tr style="border-top:1.5px solid var(--fg-2)"><td class="strong">Net change</td><td class="num">${n0(r.rows.reduce((a,x)=>a+x.n,0))}</td><td class="num chg-in strong">+${n0(r.stockIn)}</td><td class="num chg-out strong">−${n0(r.stockOut)}</td><td class="num strong">${sg(r.net)}</td></tr></tbody></table></div>`:'<div class="empty"><b>No stock movements in this period</b></div>'}</div>`;}
-    case 'Purchases': {const flow=stockFlow(b), rec=DB.purchases.filter(p=>p.status==='Received'&&p.receivedDate>=from&&p.receivedDate<=to);
-      const bySup=Object.entries(rec.reduce((m,p)=>{const n=supplierOf(p).name;m[n]=(m[n]||0)+purchaseTotals(p).units;return m},{})).sort((a,c)=>c[1]-a[1]);
-      return `<div class="grid g-2-1">${card('Stock Purchased vs Sold','Units, net of reversals',chartFor(b,[{key:'in',name:'Purchased',data:flow.inU},{key:'out',name:'Sold',data:flow.outU}]),legend())}${card('Units Received by Supplier',`${rec.length} purchases received`,bySup.length?hbars(bySup,x=>n0(x)+' units'):'<div class="empty" style="padding:24px"><b>No purchases received in this period</b></div>')}</div>`;}
-    case 'Product Performance': {const top=topVariants(list,rets).filter(r=>r.units>0).sort((a,c)=>c.rev-a.rev), cut=isoAddDays(todayISO(),-45);
-      const slow=DB.variants.filter(v=>isLive(v)&&v.qty>0&&!DB.movements.some(m=>m.variantId===v.id&&m.type==='sale'&&m.date>=cut)).slice(0,6);
-      return `<div class="grid g-2-1">${card('Top Products','Product revenue, SGD',top.length?hbars(top.slice(0,8).map(r=>[r.name,r.rev,r.label]),money0):none)}${card('Slow Movers','In stock, no sale in 45 days',slow.length?`<div class="list">${slow.map(v=>`<div class="list-item click" data-go="variant-${v.id}" style="cursor:pointer"><span class="act-icon" style="background:var(--mute-bg);color:var(--mute-fg)">${ic('hourglass','i i-sm')}</span><div><div class="t">${esc(productOf(v).name)} <span class="muted" style="font-weight:500">${esc(variantLabel(v))}</span></div><div class="d">${n0(v.qty)} in stock · ${sgd(Math.round(v.qty*v.cost))} at cost</div></div></div>`).join('')}</div>`:'<div class="empty" style="padding:24px"><b>Every SKU in stock sold in the last 45 days</b></div>')}</div>
-      <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>By SKU</h3><span class="sub">Completed sales in this period</span></div>${top.length?`<div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th class="num">Units Sold</th><th class="num">Revenue</th><th class="num">COGS</th><th class="num">Gross Profit</th><th class="num">Margin</th></tr></thead><tbody>
-      ${top.map(r=>`<tr class="click" data-go="variant-${r.id}"><td><span class="strong">${esc(r.name)}</span><span class="cell-sub">${esc(r.label)}</span></td><td class="mono">${esc(r.sku)}</td><td class="num">${n0(r.units)}</td><td class="num">${sgd(r.rev,2)}</td><td class="num muted">${sgd(round2(r.rev-r.gp),2)}</td><td class="num strong">${sgd(r.gp,2)}</td><td class="num">${pct(r.rev?r.gp/r.rev:NaN)}</td></tr>`).join('')}</tbody></table></div>`:none}</div>`;}
-    case 'Customers': return `<div class="grid g-1-1">${card('Top Customers','Sales, SGD',list.length?hbars(netGroup(list,rets,s=>customerOf(s).name).slice(0,8).map(([n,v])=>[n,v,(DB.customers.find(c=>c.name===n)||{}).country]),money0):none)}${card('Sales by Customer Type','Sales, SGD',list.length?hbars(netGroup(list,rets,s=>customerOf(s).type),money0):none)}</div>`;
-    case 'Sales by Country': {const rows=netGroup(list,rets,s=>s.country), tot=rows.reduce((a,r)=>a+r[1],0);
-      return `<div class="grid g-2-1">${card('Sales by Country','Completed sales, SGD',rows.length?hbars(rows,money0):none)}${card('Share of Sales','',rows.length?`<div class="list">${rows.map(r=>`<div class="list-item" style="align-items:center"><div class="t" style="flex:1">${esc(r[0])}</div><span class="muted" style="font-size:13px">${money0(r[1])}</span><span class="strong" style="min-width:44px;text-align:right">${pct(r[1]/tot)}</span></div>`).join('')}</div>`:none)}</div>`;}
-    case 'Gross Profit': return `<div class="grid kpis">${kpi('Product Revenue',money(Math.round(st.rev)),`After discounts and ${sgd(Math.round(st.returns))} of returns, excl. shipping`,'trending-up')}${kpi('Cost of Goods Sold',money(Math.round(st.cogs)),'Cost snapshot at each sale, less restocked returns','package')}${kpi('Gross Profit',money(Math.round(st.gp)),'','wallet')}${kpi('Margin',pct(st.margin),'Gross profit ÷ product revenue','percent')}</div>
-      ${card('Gross Profit over time','SGD',chartFor(b,[{key:'in',name:'Gross profit',data:series(b,list,s=>s.completedDate,s=>saleTotals(s).gp).map((x,i,a)=>round2(x-series(b,rets,r=>r.completedDate,r=>-returnTotals(r).gpImpact)[i]))}],{fmt:money0,cap:b.keys.length<=13}))}`;
+      return strip+seg+`<div class="grid g-2-1">${card('Inventory value over time','Month-end stock × current cost price',lineChart(mb.labels,val,sg0))}${card('Value by product','At cost, today',byP.length?hbars(byP,sg0):emptyCard('No stock on hand'))}</div>`+tbl('inventory','Every SKU, current quantity × current cost price. Totals match the Inventory page.');}
+    case 'Customers': {const by=S.rep.crank, tc=topCustomers(from,to,by,10), types=groupSales(from,to,s=>customerOf(s).type).map(g=>[g.key,g.st.total]).filter(x=>x[1]>0).sort((a,c)=>c[1]-a[1]);
+      return `<div class="grid g-2-1">${card('Top Customers',`Top ${tc.length||10} by ${by.toLowerCase()}`,tc.length?customerList(tc,by):noSales,filterSeg(Object.keys(CUS_RANK),by,'crank'))}${card('Sales by customer type','Net sales, SGD',types.length?hbars(types,sg0):noSales)}</div>
+      ${tbl('customers','Customers with completed sales or returns in the period. Last purchase is their latest completed sale overall.')}`;}
+    case 'Markets': {const m=S.rep.mmetric, d=DS('countries',from,to), tot=k=>d.rows.reduce((a,x)=>a+k(x),0);
+      const foot=d.rows.length?`<tr style="border-top:1.5px solid var(--fg-2)"><td class="strong">Total</td><td class="num strong">${n0(tot(x=>x.st.count))}</td><td class="num strong">${n0(tot(x=>x.st.unitsSold))}</td><td class="num strong">${sgd(round2(tot(x=>x.st.gross)),2)}</td><td class="num strong">${sgd(round2(tot(x=>x.st.returns)),2)}</td><td class="num strong">${sgd(round2(tot(x=>x.st.total)),2)}</td><td class="num strong">${sgd(round2(tot(x=>x.st.gp)),2)}</td><td class="num strong">100.0%</td></tr>`:'';
+      let drill='';
+      if(S.rep.country){const s=DATASETS.sales(from,to), rows=sortRows('countrySales',s.cols,s.rows.filter(x=>(x.s.country||'Not set')===S.rep.country)), cr=returnsBetween(from,to).filter(x=>{const sl=DB.sales.find(y=>y.id===x.saleId);return sl&&(sl.country||'Not set')===S.rep.country});
+        drill=`<div class="card" style="overflow:hidden" id="countryDrill"><div class="card-head" style="padding-bottom:16px;flex-wrap:wrap"><div><h3>Sales in ${esc(S.rep.country)}</h3><span class="sub">${plural(rows.length,'completed sale')}${cr.length?` · ${plural(cr.length,'return')} (${sgd(round2(cr.reduce((a,x)=>a+returnTotals(x).revBase,0)),2)})`:''} · ${fmtDate(from)} – ${fmtDate(to)}</span></div><div style="display:flex;gap:8px"><button class="btn sm" data-action="countryToSales">${ic('external-link','i i-sm')}Open in Sales</button><button class="btn sm ghost" data-country="">${ic('x','i i-sm')}Close</button></div></div>${rtable('countrySales',s.cols.filter(c=>c.k!=='country'),rows,{empty:'No completed sales in this country for the period.',click:s.click})}</div>`;}
+      return `<div class="grid g-2-1">${card('Sales by country',MKT_METRICS[m][2]+' · click a country below for its sales',countryBars(from,to,m),filterSeg(Object.keys(MKT_METRICS),m,'mmetric'))}
+        ${card('Share of net sales','',d.rows.length?`<div class="list">${d.rows.slice().sort((a,c)=>c.st.total-a.st.total).map(x=>`<button class="list-item" data-country="${esc(x.key)}" style="align-items:center;width:100%;background:none;border:none;text-align:left;cursor:pointer"><div class="t" style="flex:1">${esc(x.key)}</div><span class="muted" style="font-size:13px">${sg0(x.st.total)}</span><span class="strong" style="min-width:52px;text-align:right">${pctCell(x.share)}</span></button>`).join('')}</div>`:noSales)}</div>
+      ${`<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px;flex-wrap:wrap"><div><h3>${d.title}</h3><span class="sub">Country is taken from each sale; returns count against the original sale's country</span></div><button class="btn sm" data-action="exportReport" data-set="countries">${ic('download','i i-sm')}Export CSV</button></div>${rtable('countries',d.cols,d.rows,{empty:d.empty,foot})}</div>`}${drill}`;}
+    case 'Purchases': {const b=buckets(from,to), list=ps.list, {sales,rets}=periodSales(from,to), sp=S.rep.pmetric==='Spend';
+      const pIn=series(b,list,p=>p.receivedDate,p=>sp?purchaseBase(p).totalBase:purchaseTotals(p).units);
+      const sOut=sp?trendSeries(b,from,to,'Revenue'):trendSeries(b,from,to,'Units Sold');
+      const chart=list.length||sales.length||rets.length?`<div style="display:flex;flex-direction:column;gap:14px">${legend2(sp?'Purchase spend':'Units received',sp?'Net sales':'Units sold (net)')}${chartFor(b,[{key:'in',name:sp?'Purchase spend':'Units received',data:pIn},{key:'out',name:sp?'Net sales':'Units sold',data:sOut.map(x=>Math.max(0,x))}],{fmt:sp?sg0:x=>n0(x)+' units'})}<p class="note">${ic('info','i i-sm')}Purchases arrive before they sell, so the gap between the bars is not profit.</p></div>`:emptyCard('No purchases or sales in this period.');
+      return `<div class="grid kpis">${kpi('Purchase Spend'+tipI(DEF.spend),money(Math.round(ps.spend)),delta(ps.spend,pps.spend,r.vs),'wallet')}${kpi('Purchases Received',ps.count,`${delta(ps.count,pps.count,r.vs)}`,'package-check')}${kpi('Units Received',n0(ps.units),delta(ps.units,pps.units,r.vs),'boxes')}${kpi('Additional Costs',money(Math.round(ps.add)),'Shipping, duties and other costs','truck')}</div>
+        ${card('Purchases and sales over time',`${sp?'SGD':'Units'} · grouped ${grouping(from,to)}`,chart,filterSeg(['Spend','Units'],S.rep.pmetric,'pmetric'))}
+        ${tbl('purchases','Received purchases only, in SGD at the rate stored when each was received. Reversed purchases are excluded.')}`;}
+    case 'Suppliers': {const d=DS('suppliers',from,to), rk=Object.entries(SUP_RANK).find(([,k])=>k===(S.rep.sort.suppliers||{}).k), sr=sreturnsBetween(from,to);
+      return `<div class="grid g-2-1">${card('Spend by supplier','Received purchases incl. additional costs, SGD',d.rows.filter(x=>x.spend>0).length?hbars(d.rows.filter(x=>x.spend>0).sort((a,c)=>c.spend-a.spend).map(x=>[x.s.name,x.spend,x.s.country]),sg0):emptyCard('No purchases received in this period.'))}
+        ${card('Returned to suppliers','Completed supplier returns in the period',sr.length?`<div class="summary"><div><span>Returns</span><span>${sr.length}</span></div><div><span>Units returned</span><span>${n0(sr.reduce((a,x)=>a+sreturnTotals(x).units,0))}</span></div><div class="total"><span>Value at purchase cost</span><span>${sgd(round2(sr.reduce((a,x)=>a+sreturnBase(x),0)),2)}</span></div></div>`:emptyCard('No supplier returns in this period.'),more('Returns','Returns'))}</div>
+        ${tbl('suppliers','Suppliers with received purchases or returns in the period. Click a supplier for its purchase history.','',`<span class="field-label" style="margin:0">Rank by</span>${filterSeg(Object.keys(SUP_RANK),rk?rk[0]:'',`srank`)}`)}`;}
+    case 'Returns': {const cr=returnsBetween(from,to), sr=sreturnsBetween(from,to), dmg=cr.reduce((a,x)=>a+returnTotals(x).notRestocked,0), su=sr.reduce((a,x)=>a+sreturnTotals(x).units,0);
+      const rate=st.unitsSold?st.unitsReturned/st.unitsSold:NaN, rateV=st.gross?st.returns/st.gross:NaN;
+      return `<div class="grid kpis">${kpi('Customer Return Value'+tipI(DEF.returns),money(Math.round(st.returns)),`${plural(cr.length,'completed return')} · ${pctCell(rateV)} of gross sales${tipI(DEF.rateV)}`,'undo-2')}
+        ${kpi('Customer Return Rate (units)'+tipI(DEF.rate),pctCell(rate),`${n0(st.unitsReturned)} of ${n0(st.unitsSold)} units sold`,'percent')}
+        ${kpi('Supplier Return Quantity',n0(su),`${plural(sr.length,'completed supplier return')} · ${sgd(Math.round(sr.reduce((a,x)=>a+sreturnBase(x),0)))}`,'package-minus')}
+        ${kpi('Damaged Return Quantity',n0(dmg),'Customer returns recorded but not restocked','circle-x',dmg>0)}</div>
+        <div>${filterSeg(['Customer Returns','Supplier Returns'],S.rep.ret,'rret')}</div>
+        ${S.rep.ret==='Supplier Returns'?tbl('sreturns','Completed supplier returns, dated when completed.'):tbl('creturns','Completed customer returns, dated when completed. Value is the price on the original sale.')}`;}
+    case 'Stock Movements': {const f=S.rep.mv, fr=flowReport(from,to,f), ok=fr.opening+fr.lines.reduce((a,l)=>a+l.units,0)===fr.closing, sg=x=>`${x>0?'+':x<0?'−':''}${n0(Math.abs(x))}`;
+      const prods=DB.products.slice().sort((a,c)=>a.name.localeCompare(c.name)), vars=DB.variants.filter(v=>!f.product||v.productId===f.product).sort((a,c)=>a.sku.localeCompare(c.sku));
+      const active=Object.values(f).some(Boolean);
+      const toolbar=`<select class="select" data-mvf="product" aria-label="Product">${opt(prods.map(p=>[p.id,p.name]),f.product,'All products')}</select>
+        <select class="select" data-mvf="variant" aria-label="Variant">${opt(vars.map(v=>[v.id,v.sku]),f.variant,'All variants')}</select>
+        <select class="select" data-mvf="type" aria-label="Movement type">${opt(Object.entries(MOVEMENT_TYPES).map(([k,t])=>[k,t.label]),f.type,'All movement types')}</select>
+        <select class="select" data-mvf="supplier" aria-label="Supplier">${opt(DB.suppliers.slice().sort((a,c)=>a.name.localeCompare(c.name)).map(s=>[s.id,s.name]),f.supplier,'All suppliers')}</select>
+        <select class="select" data-mvf="customer" aria-label="Customer">${opt(DB.customers.slice().sort((a,c)=>a.name.localeCompare(c.name)).map(c=>[c.id,c.name]),f.customer,'All customers')}</select>
+        <button class="btn sm ghost" data-action="resetRepMv" ${active?'':'disabled'}>${ic('rotate-ccw','i i-sm')}Reset Filters</button>`;
+      const d=DS('flow',from,to);
+      return `<div class="card" style="overflow:hidden"><div class="toolbar">${toolbar}</div></div>
+        <div class="grid kpis">${kpi('Opening Stock',n0(fr.opening),`Units on ${fmtDate(isoAddDays(from,-1))}`,'archive')}${kpi('Stock In',`<span class="chg-in">+${n0(fr.rows.filter(m=>m.change>0).reduce((a,m)=>a+m.change,0))}</span>`,f.type||f.supplier||f.customer?'Matching the filters':'Purchases, returns, increases','arrow-down-to-line')}${kpi('Stock Out',`<span class="chg-out">−${n0(fr.rows.filter(m=>m.change<0).reduce((a,m)=>a-m.change,0))}</span>`,f.type||f.supplier||f.customer?'Matching the filters':'Sales, supplier returns, decreases','arrow-up-from-line')}${kpi('Closing Stock',n0(fr.closing),`Units on ${fmtDate(to)} · net ${sg(fr.net)}`,'boxes')}</div>
+        <div class="grid g-1-1"><div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px;flex-wrap:wrap"><div><h3>Opening to closing stock</h3><span class="sub">${f.product||f.variant?'Selected products':'All SKUs'} · ${fmtDate(from)} – ${fmtDate(to)}</span></div><div style="display:flex;gap:8px;align-items:center">${ok?badge('Reconciles','ok'):badge('Does not reconcile','bad')}<button class="btn sm" data-action="exportReport" data-set="flow">${ic('download','i i-sm')}Export CSV</button></div></div>${rtable('flow',d.cols,d.rows,{})}</div>
+          <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px;flex-wrap:wrap"><div><h3>By movement type</h3><span class="sub">${f.type||f.supplier||f.customer?'Matching the type, supplier and customer filters':'Every movement in the period'}</span></div><button class="btn sm ghost" data-action="repToLedger">Open in ledger ${ic('arrow-right','i i-sm')}</button></div>
+          ${fr.groups.length?`<div class="table-wrap"><table><thead><tr><th>Movement type</th><th class="num">Movements</th><th class="num">Units In</th><th class="num">Units Out</th><th class="num">Net</th></tr></thead><tbody>${fr.groups.map(x=>`<tr><td class="strong">${x.label}</td><td class="num">${n0(x.n)}</td><td class="num chg-in">${x.inU?'+'+n0(x.inU):'—'}</td><td class="num chg-out">${x.outU?'−'+n0(x.outU):'—'}</td><td class="num strong">${x.noted?`0 <span class="muted" style="font-weight:500">· ${n0(x.noted)} not restocked</span>`:sg(x.inU-x.outU)}</td></tr>`).join('')}</tbody></table></div>`:emptyCard('No stock movements match in this period.')}</div></div>`;}
   }
+  return '';
+}
+
+/* ----- Dashboard ----- */
+function alertItems(){
+  const att=attention(), low=att.filter(v=>v.qty>0).length, out=att.length-low, sl=slowSummary(), c=slowCfg(), iss=ledgerCheck().length, a=[], s=n=>n===1?'':'s';
+  if(iss) a.push({tone:'bad',icon:'triangle-alert',t:`Inventory discrepancy on ${iss} SKU${s(iss)}`,d:'Stock and movement history do not match',attr:'data-go="movements"'});
+  if(low) a.push({tone:'warn',icon:'triangle-alert',t:`${low} SKU${s(low)} low stock`,d:'At or below reorder level',attr:'data-rtabgo="Inventory" data-rsub="Low Stock"'});
+  if(out) a.push({tone:'bad',icon:'circle-x',t:`${out} SKU${s(out)} out of stock`,d:'Active SKUs with nothing on hand',attr:'data-rtabgo="Inventory" data-rsub="Low Stock"'});
+  const nr=sl['No Recent Sales']; if(nr.n) a.push({tone:'mute',icon:'hourglass',t:`${sgd(Math.round(nr.value))} in inventory has not sold in ${c.staleDays} days`,d:`${nr.n} SKU${s(nr.n)} · ${n0(nr.units)} units`,attr:'data-rtabgo="Inventory" data-rsub="Slow-Moving" data-rslow="No Recent Sales"'});
+  const sm=sl['Slow Moving']; if(sm.n) a.push({tone:'mute',icon:'hourglass',t:`${sm.n} SKU${s(sm.n)} slow moving`,d:`No sale in ${c.slowDays}+ days · ${sgd(Math.round(sm.value))} at cost`,attr:'data-rtabgo="Inventory" data-rsub="Slow-Moving" data-rslow="Slow Moving"'});
+  const nv=sl['Never Sold']; if(nv.n) a.push({tone:'mute',icon:'package-x',t:`${nv.n} SKU${s(nv.n)} with stock ${nv.n===1?'has':'have'} never sold`,d:`${sgd(Math.round(nv.value))} at cost`,attr:'data-rtabgo="Inventory" data-rsub="Never Sold"'});
+  return a;
+}
+PAGES.dashboard = ()=>{
+  const r=periodRange(), {from,to}=r, st=periodSales(from,to).st, prev=periodSales(r.prevFrom,r.prevTo).st, inv=totals(), att=attention(), lowN=att.filter(v=>v.qty>0).length, ps=purchaseStats(from,to);
+  const lowRows=att.slice().sort((a,b)=>a.qty/(a.reorder||1)-b.qty/(b.reorder||1)).slice(0,6);
+  const recentP=DB.purchases.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,5);
+  const recentS=DB.sales.filter(s=>s.status==='Completed'||s.status==='Confirmed').sort((a,b)=>(b.completedDate||b.date).localeCompare(a.completedDate||a.date)||b.no.localeCompare(a.no)).slice(0,6);
+  const by=S.dash.top, best=bestSellers(from,to,by,5), feed=activityFeed(8), alerts=alertItems();
+  const dateHead=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  const stat=(label,val,attr,tip)=>`<div ${attr?`class="click" ${attr}`:''}><span>${label}${tip?tipI(tip):''}</span><b>${val}</b></div>`;
+  return head('Dashboard',`${dateHead} · overview of stock and sales across Southeast Asia`,btn('Record Purchase','purchase','package-plus')+btn('Record Sale','sale','receipt','primary'))+periodBar()+integrityNotice(true)+
+  `<div class="grid kpis">
+    ${kpi('Net Sales'+tipI(DEF.net),money(Math.round(st.total)),st.count||st.returns?`${delta(st.total,prev.total,r.vs)}`:'No completed sales in this period','trending-up')}
+    ${kpi('Gross Profit'+tipI(DEF.gp),money(Math.round(st.gp)),st.count||st.returns?`${pctCell(st.margin)} margin · ${delta(st.gp,prev.gp,r.vs)}`:'No completed sales in this period','percent')}
+    ${kpi('Inventory Value'+tipI(DEF.inv),money(Math.round(inv.value)),`At cost, today · ${sgd(Math.round(inv.retail))} at selling price`,'wallet')}
+    ${kpi('Units in Stock'+tipI(DEF.units),n0(inv.units),`Across ${DB.variants.length} SKUs of ${DB.products.length} products`,'boxes')}
+  </div>
+  <div class="stat-strip">
+    ${stat('Low Stock SKUs',lowN,'data-rtabgo="Inventory" data-rsub="Low Stock"','Active SKUs that still have stock but are at or below their reorder level.')}
+    ${stat('Out of Stock SKUs',att.length-lowN,'data-rtabgo="Inventory" data-rsub="Low Stock"')}
+    ${stat('Units Sold',n0(st.unitsSold),'data-rtabgo="Products"','Units on completed sales in the period, before returns.')}
+    ${stat('Orders',n0(st.count),'data-rtabgo="Sales"')}
+    ${stat('Purchases',sg0(ps.spend),'data-rtabgo="Purchases"',DEF.spend)}
+    ${stat('Returns',sg0(st.returns),'data-rtabgo="Returns"',DEF.returns)}
+  </div>
+  <div class="grid g-2-1">
+    <div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>Sales Overview</h3><span class="sub">${trendSub(from,to,S.rep.metric)} · ${S.rep.metric==='Units Sold'?n0(st.units)+' units':sgd(Math.round(S.rep.metric==='Gross Profit'?st.gp:st.total))} in this period</span></div>${filterSeg(TREND_METRICS,S.rep.metric,'tmetric')}</div>
+      <div class="card-body">${trendChart(from,to,S.rep.metric)}</div></div>
+    <div class="card"><div class="card-head"><div><h3>Alerts</h3><span class="sub">Stock to act on today</span></div><button class="btn sm ghost" data-rtabgo="Inventory" data-rsub="Low Stock">Reports ${ic('arrow-right','i i-sm')}</button></div>
+      <div class="card-body">${alerts.length?`<div class="list">${alerts.map(a=>`<div class="list-item click" ${a.attr} style="cursor:pointer;align-items:center"><span class="act-icon" style="background:var(--${a.tone}-bg);color:var(--${a.tone}-fg)">${ic(a.icon,'i i-sm')}</span><div style="min-width:0"><div class="t">${esc(a.t)}</div><div class="d">${esc(a.d)}</div></div>${ic('chevron-right','i i-sm')}</div>`).join('')}</div>`:emptyCard('No alerts. Stock levels and sales look settled.')}</div></div>
+  </div>
+  <div class="grid g-2-1">
+    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Recent Sales</h3><span class="sub">Completed and confirmed</span></div><button class="btn sm ghost" data-go="sales">View all ${ic('arrow-right','i i-sm')}</button></div>
+      ${recentS.length?`<div class="table-wrap"><table><thead><tr><th>Sale</th><th>Customer</th><th>Status</th><th>Payment</th><th class="num">Total</th></tr></thead><tbody>
+      ${recentS.map(s=>{const t=saleTotals(s),c=customerOf(s);return `<tr class="click" data-go="sale-${s.id}"><td class="mono strong" style="color:var(--fg)">${esc(s.no)}<span class="cell-sub">${fmtDate(s.completedDate||s.date)}</span></td><td style="white-space:nowrap"><span class="strong">${esc(c.name)}</span><span class="cell-sub">${esc(s.country)}</span></td><td>${badge(s.status)}</td><td>${payBadge(s.payment)}</td><td class="num strong" style="white-space:nowrap">${cur(t.total,s.currency)}</td></tr>`}).join('')}
+      </tbody></table></div>`:`<div class="empty"><b>No sales yet</b><button class="link-btn" data-action="sale">Record your first sale</button></div>`}</div>
+    <div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>Best Sellers</h3><span class="sub">This period, net of returns</span></div>${filterSeg(['Units','Revenue','Gross Profit'],by,'dtop')}</div>
+      <div class="card-body">${best.length?bestList(best,by):emptyCard('No sales found for this period.')}</div></div>
+  </div>
+  <div class="grid g-2-1">
+    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Low Stock</h3><span class="sub">At or below reorder level · active SKUs</span></div><button class="btn sm ghost" data-rtabgo="Inventory" data-rsub="Low Stock">View all ${ic('arrow-right','i i-sm')}</button></div>
+      ${lowRows.length?`<div class="table-wrap"><table><thead><tr><th>Product</th><th>Variant</th><th class="num">Current Stock</th><th class="num">Reorder Level</th><th>Status</th></tr></thead><tbody>
+      ${lowRows.map(v=>`<tr class="click" data-variant="${v.id}"><td class="strong">${esc(productOf(v).name)}</td><td>${varCell(v)}</td><td class="num strong">${v.qty}</td><td class="num muted">${v.reorder}</td><td>${badge(stockStatus(v))}</td></tr>`).join('')}
+      </tbody></table></div>`:`<div class="empty"><b>No low-stock products</b>Every active SKU is above its reorder level.</div>`}</div>
+    <div class="card"><div class="card-head"><div><h3>Sales by Country</h3><span class="sub">Net sales this period, SGD</span></div><button class="btn sm ghost" data-rtabgo="Markets">Report ${ic('arrow-right','i i-sm')}</button></div>
+      <div class="card-body">${countryBars(from,to,'Revenue',6)}</div></div>
+  </div>
+  <div class="grid g-2-1">
+    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Recent Purchases</h3><span class="sub">Latest purchase records</span></div><button class="btn sm ghost" data-go="purchases">View all ${ic('arrow-right','i i-sm')}</button></div>
+      ${recentP.length?`<div class="table-wrap"><table><thead><tr><th>Purchase</th><th>Supplier</th><th>Status</th><th class="num">Units</th><th class="num">Total Cost</th></tr></thead><tbody>
+      ${recentP.map(p=>{const t=purchaseTotals(p);return `<tr class="click" data-go="purchase-${p.id}"><td class="mono strong" style="color:var(--fg)">${esc(p.no)}<span class="cell-sub">${fmtDate(p.date)}</span></td><td>${esc(supplierOf(p).name)}</td><td>${badge(p.status)}</td><td class="num">${n0(t.units)}</td><td class="num strong">${cur(t.total,p.currency)}</td></tr>`}).join('')}
+      </tbody></table></div>`:`<div class="empty"><b>No purchases yet</b><button class="link-btn" data-action="purchase">Record your first purchase</button></div>`}</div>
+    <div class="card"><div class="card-head"><h3>Recent Activity</h3><button class="btn sm ghost" data-go="audit">Audit trail ${ic('arrow-right','i i-sm')}</button></div>
+      <div class="card-body">${feed.length?activityList(feed):`<div class="empty" style="padding:24px"><b>No activity yet</b>Add products or record a purchase to get started.</div>`}</div></div>
+  </div>`;
+};
+
+/* ----- SKU drill-down tabs ----- */
+function variantPerfTab(v){
+  const r=periodRange(), p=variantPerf(r.from,r.to)[v.id]||NOPERF, all=variantPerf('0000-01-01',todayISO())[v.id]||NOPERF, ms=moveStatus(v), rate=monthlyRate()[v.id], lp=lastPurchases()[v.id], sup=lp&&DB.suppliers.find(s=>s.id===lp.supplierId);
+  const block=(title,x)=>`<div><h3 style="font-size:15px;margin-bottom:12px">${title}</h3><dl class="spec"><dt>Units sold</dt><dd>${n0(x.sold)}</dd><dt>Units returned</dt><dd>${n0(x.returned)}</dd><dt>Revenue${tipI('Product revenue after discounts, net of customer returns, in SGD.')}</dt><dd>${sgd(x.rev,2)}</dd><dt>COGS${tipI(DEF.cogs)}</dt><dd>${sgd(x.cogs,2)}</dd><dt>Gross profit</dt><dd>${sgd(x.gp,2)}</dd><dt>Gross margin</dt><dd>${pctCell(x.margin)}</dd></dl></div>`;
+  return `<div class="card-body" style="display:flex;flex-direction:column;gap:22px">${periodBar()}
+    <div class="grid g-3" style="gap:28px">${block('Selected period',p)}${block('All time',all)}
+      <div><h3 style="font-size:15px;margin-bottom:12px">Movement</h3><dl class="spec"><dt>Status</dt><dd>${v.qty>0?badge(ms.status):'<span class="muted">No stock on hand</span>'}</dd><dt>Last sale</dt><dd>${ms.last?`${fmtDate(ms.last)} <span class="muted" style="font-weight:500">· ${n0(ms.days)} days ago</span>`:'Never'}</dd>
+        <dt>Monthly sales${tipI('Average units sold per month over the last 90 days, net of returns.')}</dt><dd>${rate>0?`${rate.toFixed(1)} units`:'—'}</dd><dt>Coverage${tipI(DEF.cover)}</dt><dd>${coverCell(v)}</dd>
+        <dt>Last purchase</dt><dd>${lp?`<a href="#purchase-${lp.purchaseId}">${fmtDate(lp.date)}</a>`:'—'}</dd><dt>Last supplier</dt><dd>${sup?`<a href="#supplier-${sup.id}">${esc(sup.name)}</a>`:'—'}</dd></dl></div></div>
+    <div><button class="btn sm" data-rtabgo="Products">${ic('chart-column','i i-sm')}Open product performance report</button></div></div>`;
+}
+function variantReturnsTab(v){
+  const rows=[...DB.returns.flatMap(r=>r.lines.filter(l=>l.variantId===v.id).map(l=>({kind:'Customer',r,l,party:(DB.customers.find(c=>c.id===r.customerId)||{}).name||'',src:DB.sales.find(s=>s.id===r.saleId),go:'return-'+r.id,detail:`${l.condition}${l.restock?'':' · not restocked'}`}))),
+    ...DB.supplierReturns.flatMap(r=>r.lines.filter(l=>l.variantId===v.id).map(l=>({kind:'Supplier',r,l,party:(DB.suppliers.find(s=>s.id===r.supplierId)||{}).name||'',src:DB.purchases.find(p=>p.id===r.purchaseId),go:'sreturn-'+r.id,detail:r.reason})))]
+    .sort((a,b)=>(b.r.completedDate||b.r.date).localeCompare(a.r.completedDate||a.r.date));
+  if(!rows.length) return `<div class="empty"><b>No returns recorded</b>Customer and supplier returns for this SKU will show here.</div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>Return</th><th>Type</th><th>Date</th><th>Customer / Supplier</th><th>Original</th><th class="num">Quantity</th><th>Condition / Reason</th><th>Status</th></tr></thead><tbody>
+  ${rows.map(x=>`<tr class="click" data-go="${x.go}"><td class="mono strong" style="color:var(--fg)">${esc(x.r.no)}</td><td><span class="chip">${x.kind}</span></td><td class="muted nowrap">${fmtDate(x.r.completedDate||x.r.date)}</td><td class="nowrap">${esc(x.party)}</td><td class="mono">${x.src?esc(x.src.no):'—'}</td><td class="num strong">${n0(x.l.qty)}</td><td>${esc(x.detail)}</td><td>${returnStatusBadge(x.r.status)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 /* ----- Purchases ----- */
@@ -1942,7 +2349,7 @@ PAGES.variant = id=>{
     (!mv.length&&!usedInPurchases(v.id)?btn('Delete','deleteVariant','trash-2','ghost danger-btn',`data-id="${v.id}"`):'')+
     (DB.purchases.some(p=>p.status==='Received'&&p.lines.some(l=>l.variantId===v.id))?btn('Return to Supplier','returnVariantToSupplier','package-minus','',`data-id="${v.id}"`):'')+
     btn('Adjust Stock','adjust','sliders-horizontal','primary',`data-id="${v.id}"`);
-  const tabs=['Overview','Stock Movement','Purchases','Sales'], nPur=DB.purchases.filter(p=>p.lines.some(l=>l.variantId===v.id)).length, nSal=DB.sales.filter(x=>x.lines.some(l=>l.variantId===v.id)).length;
+  const tabs=['Overview','Performance','Stock Movement','Purchases','Sales','Returns'], nPur=DB.purchases.filter(p=>p.lines.some(l=>l.variantId===v.id)).length, nSal=DB.sales.filter(x=>x.lines.some(l=>l.variantId===v.id)).length;
   return head(`${esc(p.name)} ${esc(variantLabel(v).replace(/ \/ /g,' – '))}`,`<span class="mono">${esc(v.sku)}</span> · ${esc(c.name)}`,actions,crumbs(['Products','products'],[p.name,'product-'+p.id],[variantLabel(v)]))+
   (v.status!=='Active'||p.status!=='Active'?`<div class="notice">${ic('circle-pause','i i-sm')}${v.status!=='Active'?'This variant is inactive.':'The parent product is inactive.'} Its stock history is kept, and it won't be offered in new transactions.</div>`:'')+
   `<div class="stat-strip">
@@ -1969,6 +2376,8 @@ PAGES.variant = id=>{
     :S.vtab==='Stock Movement'?variantLedger(v)
     :S.vtab==='Purchases'?variantPurchasesTab(v)
     :S.vtab==='Sales'?variantSalesTab(v)
+    :S.vtab==='Performance'?variantPerfTab(v)
+    :S.vtab==='Returns'?variantReturnsTab(v)
     :`<div class="empty"><b>${S.vtab} arrive in a later phase</b>Once ${S.vtab.toLowerCase()} are recorded they will update this SKU's stock and show here.</div>`}
   </div>`;
 };
@@ -1989,7 +2398,7 @@ PAGES.settings = ()=>{
     <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
       ${sec('categories','Product Categories','Group products. Turn on Gauge for categories that need it, such as strings.',`<div>${cats}</div><form class="sku-row" id="addCatForm" style="margin-top:16px;max-width:460px"><input class="input" name="name" placeholder="New category, e.g. Bags" aria-label="New category name"><button class="btn" type="submit">${ic('plus','i i-sm')}Add Category</button></form><span class="err" id="catErr"></span>`)}
       ${sec('company','Company Information','Shown on invoices and purchase orders',`<div class="form-grid">${f('Company name','MSV Southeast Asia Pte. Ltd.')}${f('UEN','202412345K')}${f('Email','orders@msv-sea.com','email')}${f('Phone','+65 6123 4567')}<label class="field span-2"><span class="field-label">Address</span><input class="input" value="21 Kallang Avenue, #04-160, Singapore 339412"></label></div>`)}
-      ${sec('currency','Currency and exchange rates','Stock, profit and reports are in SGD. Sales and purchases can be in any currency below.',`<div class="table-wrap" style="border:1px solid var(--line);border-radius:12px;max-width:520px"><table><thead><tr><th>Currency</th><th>1 unit = SGD</th><th></th></tr></thead><tbody>${DB.currencies.map(c=>{const used=DB.purchases.some(p=>p.currency===c)||DB.sales.some(x=>x.currency===c)||DB.suppliers.some(x=>x.currency===c)||DB.customers.some(x=>x.currency===c);return `<tr><td class="strong">${esc(c)}${c===BASE_CURRENCY?' <span class="muted" style="font-weight:500">· base</span>':''}</td><td>${c===BASE_CURRENCY?'1':`<input class="input" type="number" step="any" min="0" data-fx="${esc(c)}" value="${DB.fxRates[c]||''}" placeholder="Not set" style="max-width:160px;height:36px" aria-label="SGD per 1 ${esc(c)}">`}</td><td class="num">${c!==BASE_CURRENCY&&!used?`<button class="link-btn" data-action="removeCurrency" data-code="${esc(c)}" style="font-size:12.5px">Remove</button>`:''}</td></tr>`}).join('')}</tbody></table></div><form class="sku-row" id="addCurForm" style="margin-top:14px;max-width:360px"><input class="input" name="code" maxlength="3" placeholder="Add a code, e.g. AUD" aria-label="Currency code"><button class="btn" type="submit">${ic('plus','i i-sm')}Add Currency</button></form><span class="err" id="curErr"></span><div class="note" style="margin-top:10px">${ic('info','i i-sm')}Rates are entered by you, not live. New sales start from these rates; each completed sale keeps the rate it was completed with.</div>`)}
+      ${sec('currency','Currency and exchange rates','Stock, profit and reports are in SGD. Sales and purchases can be in any currency below.',`<div class="table-wrap" style="border:1px solid var(--line);border-radius:12px;max-width:520px"><table><thead><tr><th>Currency</th><th>1 unit = SGD</th><th></th></tr></thead><tbody>${DB.currencies.map(c=>{const used=DB.purchases.some(p=>p.currency===c)||DB.sales.some(x=>x.currency===c)||DB.suppliers.some(x=>x.currency===c)||DB.customers.some(x=>x.currency===c);return `<tr><td class="strong">${esc(c)}${c===BASE_CURRENCY?' <span class="muted" style="font-weight:500">· base</span>':''}</td><td>${c===BASE_CURRENCY?'1':`<input class="input" type="number" step="any" min="0" data-fx="${esc(c)}" value="${DB.fxRates[c]||''}" placeholder="Not set" style="max-width:160px;height:36px" aria-label="SGD per 1 ${esc(c)}">`}</td><td class="num">${c!==BASE_CURRENCY&&!used?`<button class="link-btn" data-action="removeCurrency" data-code="${esc(c)}" style="font-size:12.5px">Remove</button>`:''}</td></tr>`}).join('')}</tbody></table></div><form class="sku-row" id="addCurForm" style="margin-top:14px;max-width:360px"><input class="input" name="code" maxlength="3" placeholder="Add a code, e.g. AUD" aria-label="Currency code"><button class="btn" type="submit">${ic('plus','i i-sm')}Add Currency</button></form><span class="err" id="curErr"></span><div class="note" style="margin-top:10px">${ic('info','i i-sm')}Rates are entered by you, not live. New sales start from these rates; each completed sale and received purchase keeps the rate it had at the time, so past reports don't change.</div>`)}
       ${sec('markets','Countries / Markets','Where you sell',`<div class="variants">${['Singapore','Malaysia','Thailand','Indonesia','Vietnam','Philippines'].map(c=>`<span class="chip" style="height:32px">${ic('check','i i-sm')}${c}</span>`).join('')}<button class="btn sm ghost">${ic('plus','i i-sm')}Add market</button></div>`)}
       ${sec('inventory','Inventory Preferences','How stock is tracked',`${pref('Allow negative stock','Off: stock can never go below zero',false)}${pref('Include landed costs in cost price','Arrives with Purchases',false)}`)}
       ${sec('notifications','Notifications','What you get alerted about',`${pref('Low stock alerts','When a variant reaches its reorder level',true)}${pref('Overdue invoices','When a customer passes their payment terms',true)}${pref('Weekly summary email','Every Monday at 8:00',false)}`)}
@@ -2944,6 +3353,7 @@ const NAV=[['dashboard','Dashboard','layout-dashboard'],['inventory','Inventory'
 const PARENT={product:'products',variant:'products',customer:'customers',purchase:'purchases',supplier:'suppliers',sale:'sales',movement:'movements',stockcount:'movements',return:'returns',sreturn:'returns'};
 function route(){ const h=location.hash.slice(1); const m=h.match(/^(product|variant|purchase|supplier|sale|customer|movement|return|sreturn)-(.+)$/); if(m) return [m[1],m[2]]; return [PAGES[h]?h:'dashboard',null]; }
 function render(){
+  clearMemo();
   const [r,id]=route(), active=PARENT[r]||r, att=attention().length, ledgerIssues=ledgerCheck().length;
   $('#nav').innerHTML=NAV.map(([k,label,icon])=>`<a href="#${k}" ${k===active?'aria-current="page"':''}>${ic(icon)}<span>${label}</span>${k==='inventory'&&att?`<span class="count" title="Low or out of stock">${att}</span>`:''}${k==='movements'&&ledgerIssues?`<span class="count" style="background:var(--bad-fg);color:#FFFFFF" title="Inventory discrepancies">${ledgerIssues}</span>`:''}</a>`).join('');
   $('#app').innerHTML=(Store.available?'':`<div class="notice">${ic('triangle-alert','i i-sm')}This browser is blocking storage. You can try things out, but changes will be lost when you close the page.</div>`)+PAGES[r](id);
@@ -3032,11 +3442,15 @@ const ACTIONS={
   deleteCat:d=>{const c=DB.categories.find(x=>x.id===d.id);confirmDialog({title:'Delete category?',body:`${esc(c.name)} has no products.`,confirm:'Delete Category',onConfirm:()=>{DB.categories=DB.categories.filter(x=>x.id!==c.id);persist();render();toast('Category deleted',c.name)}})},
   restoreSample:()=>confirmDialog({title:'Restore sample data?',body:'This replaces all products, suppliers, purchases, customers, sales and stock movements in this browser with the MSV sample data.',confirm:'Restore Sample Data',onConfirm:()=>{DB=seedDb();persist();render();toast('Sample data restored','')}}),
   clearData:()=>confirmDialog({title:'Clear all data?',body:'This removes every product, supplier, purchase, customer, sale and stock movement saved in this browser. Categories and currencies are kept. This can\'t be undone.',confirm:'Clear Data',onConfirm:()=>{DB=emptyDb();persist();go('products');toast('Data cleared','Add your first product to get started.')}}),
-  export:()=>openDemo('export'),
+  exportReport:d=>exportReport(d.set||undefined),
+  moreRep:d=>{S.rep.limit[d.set]=(S.rep.limit[d.set]||50)+50;render()},
+  resetRepMv:()=>{S.rep.mv=blankRep().mv;render()},
+  repToLedger:()=>{const {from,to}=periodRange(),f=S.rep.mv,v=f.variant&&variantById(f.variant);S.mov={...blankMovFilters(),from,to,product:f.product,type:f.type,supplier:f.supplier,customer:f.customer,q:v?v.sku:''};S.movLimit=150;go('movements')},
+  countryToSales:()=>{const {from,to}=periodRange();S.sal={...blankSalFilters(),sort:'date',dir:-1,status:'Completed',country:S.rep.country==='Not set'?'':S.rep.country,from,to};go('sales')},
 };
 document.addEventListener('click',e=>{
   if(e.target.closest('a[href^="#"]:not([data-action])')&&!e.target.closest('#mForm')) return;
-  const el=e.target.closest('[data-action],[data-go],[data-variant],[data-product],[data-vtab],[data-rtab],[data-range],[data-sort],[data-scroll],[data-pstatus],[data-setstatus],[data-psort],[data-sstatus],[data-ssort],[data-drange],[data-dtop],[data-ctype],[data-cstatus],[data-rtabgo],[data-rettab],[data-retstatus]');
+  const el=e.target.closest('[data-action],[data-go],[data-variant],[data-product],[data-vtab],[data-rtab],[data-range],[data-sort],[data-scroll],[data-pstatus],[data-setstatus],[data-psort],[data-sstatus],[data-ssort],[data-drange],[data-dtop],[data-ctype],[data-cstatus],[data-rtabgo],[data-rettab],[data-retstatus],[data-tmetric],[data-best],[data-pall],[data-rinv],[data-slow],[data-crank],[data-mmetric],[data-country],[data-pmetric],[data-srank],[data-rret],[data-rsort]');
   if(!el) return;
   const d=el.dataset;
   if(d.action){ if(['suggestSku','addVariantCard','removeVariantCard','addPLine','removePLine','newSupplierInline','addSLine','removeSLine','newCustomerInline'].includes(d.action)) return; const fn=ACTIONS[d.action]; if(fn){ if(el.tagName==='A'&&d.action==='close'){closeModal();return} e.preventDefault(); fn(d,el);} return; }
@@ -3044,19 +3458,29 @@ document.addEventListener('click',e=>{
   if(d.variant) return go('variant-'+d.variant);
   if(d.product) return go('product-'+d.product);
   if(d.vtab){S.vtab=d.vtab;return render();}
-  if(d.rtab){S.rtab=d.rtab;return render();}
-  if(d.range){S.range=d.range;return render();}
+  if(d.rtab){S.rtab=RTAB_ALIAS[d.rtab]||d.rtab;if(d.rsub)S.rep.inv=d.rsub;return render();}
+  if(d.tmetric){S.rep.metric=d.tmetric;return render();}
+  if(d.best){S.rep.best=d.best;return render();}
+  if(d.pall){S.rep.prodAll=d.pall==='All SKUs';return render();}
+  if(d.rinv){S.rep.inv=d.rinv;return render();}
+  if(d.slow){S.rep.slow=d.slow;S.rep.limit.slow=50;return render();}
+  if(d.crank){S.rep.crank=d.crank;S.rep.sort.customers={k:CUS_RANK[d.crank][0],dir:-1};return render();}
+  if(d.mmetric){S.rep.mmetric=d.mmetric;return render();}
+  if(d.country!==undefined){S.rep.country=d.country;render();const c=$('#countryDrill');if(c)c.scrollIntoView({behavior:'smooth',block:'start'});return}
+  if(d.pmetric){S.rep.pmetric=d.pmetric;return render();}
+  if(d.srank){S.rep.sort.suppliers={k:SUP_RANK[d.srank],dir:-1};return render();}
+  if(d.rret){S.rep.ret=d.rret;return render();}
+  if(d.rsort){const [k,c]=d.rsort.split(':'),cur=S.rep.sort[k];S.rep.sort[k]={k:c,dir:cur&&cur.k===c?-cur.dir:(el.classList.contains('num')?-1:1)};return render();}
   if(d.pstatus){S.prod.status=d.pstatus;return render();}
   if(d.invview){S.inv.view=d.invview;return render();}
   if(d.setstatus){Object.assign(S.inv,{status:d.setstatus,view:'levels'});return render();}
   if(d.rettab){S.ret.tab=d.rettab;return render();}
   if(d.retstatus!==undefined){S.ret.status=d.retstatus;return render();}
   if(d.ssort){const f=S.sal;f.dir=f.sort===d.ssort?-f.dir:1;f.sort=d.ssort;return renderSalTable();}
-  if(d.drange){S.dash.range=d.drange;return render();}
   if(d.dtop){S.dash.top=d.dtop;return render();}
   if(d.ctype){S.cus.type=d.ctype;return render();}
   if(d.cstatus){S.cus.status=d.cstatus;return render();}
-  if(d.rtabgo){S.rtab=d.rtabgo;return go('reports');}
+  if(d.rtabgo){S.rtab=RTAB_ALIAS[d.rtabgo]||d.rtabgo;if(d.rsub)S.rep.inv=d.rsub;if(d.rslow)S.rep.slow=d.rslow;else if(d.rsub==='Slow-Moving')S.rep.slow='All';return go('reports');}
   if(d.psort){const f=S.pur;f.dir=f.sort===d.psort?-f.dir:1;f.sort=d.psort;return renderPurTable();}
   if(d.sstatus){S.sup.status=d.sstatus;return render();}
   if(d.sort){const f=S.inv;f.dir=f.sort===d.sort?-f.dir:1;f.sort=d.sort;return renderInvTable();}
@@ -3071,7 +3495,11 @@ document.addEventListener('change',e=>{
   if(t.id==='cntProd'){S.cnt.prod=t.value;rerenderKeepFocus('cntQ');return}
   if(t.id==='audEnt'){S.aud.entity=t.value;S.audLimit=200;rerenderKeepFocus('audQ');return}
   if(t.dataset.sfilter){S.sal[t.dataset.sfilter]=t.value;rerenderKeepFocus('salQ');return}
-  if(t.id==='rFrom'||t.id==='rTo'){S[t.id==='rFrom'?'rfrom':'rto']=t.value;render();return}
+  if(t.id==='period'){const r=periodRange();S.period={range:t.value,from:S.period.from||r.from,to:S.period.to||r.to};if(t.value!=='Custom Range')Object.assign(S.period,{from:'',to:''});else Object.assign(S.period,{from:r.from,to:r.to});S.rep.limit={};savePeriod();render();return}
+  if(t.id==='pFrom'||t.id==='pTo'){if(!t.value)return;S.period[t.id==='pFrom'?'from':'to']=t.value;savePeriod();render();return}
+  if(t.id==='slowDays'||t.id==='staleDays'){DB.reportSettings={...slowCfg(),[t.id]:+t.value};persist();render();return}
+  if(t.id==='prodRank'){S.rep.sort.products={k:PROD_RANK[t.value],dir:-1};if(t.value==='Current Stock')S.rep.prodAll=true;render();return}
+  if(t.dataset.mvf){S.rep.mv[t.dataset.mvf]=t.value;if(t.dataset.mvf==='product')S.rep.mv.variant='';render();return}
   if(t.dataset.fx){const r=parseFloat(t.value);if(r>0){DB.fxRates[t.dataset.fx]=r;persist();toast('Exchange rate updated',`1 ${t.dataset.fx} = ${r} SGD. Completed sales keep their own rate.`)}else toast('Rate not saved','Enter a number greater than 0.','error');return}
   if(t.dataset.pfilter){S.pur[t.dataset.pfilter]=t.value;rerenderKeepFocus('purQ');return}
   if(t.id==='showInactive'){S.inv.showInactive=t.checked;render();return}

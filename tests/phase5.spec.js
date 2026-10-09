@@ -277,11 +277,11 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
     await page.click('[data-action=resetMov]');
   });
   await check('inventory movements report totals and breakdown are correct', async () => {
-    await page.goto(FILE + '#reports'); await page.click('[data-range="This Year"]'); await page.click('[data-rtab="Inventory Movements"]');
+    await page.goto(FILE + '#reports'); await page.selectOption('#period', 'This Year'); await page.click('[data-rtab="Stock Movements"]');
     const exp = await page.evaluate(() => { const t = todayISO(), f = t.slice(0, 4) + '-01-01', ms = DB.movements.filter(m => m.date >= f && m.date <= t); const i = ms.filter(m => m.change > 0).reduce((a, m) => a + m.change, 0), o = ms.filter(m => m.change < 0).reduce((a, m) => a - m.change, 0); return { i, o, n: i - o }; });
     const k = await page.$$eval('.kpi .kpi-value', e => e.map(x => x.innerText.replace(/\s+/g, '')));
-    eq(k[0], '+' + exp.i.toLocaleString('en-SG')); eq(k[1], '−' + exp.o.toLocaleString('en-SG'));
-    const t = await page.textContent('#app'); ok(t.includes('Customer Returns') && t.includes('Supplier Returns') && t.includes('Stock Count Corrections') && t.includes('Net change'));
+    eq(k[1], '+' + exp.i.toLocaleString('en-SG')); eq(k[2], '−' + exp.o.toLocaleString('en-SG'));
+    const t = await page.textContent('#app'); ok(t.includes('Customer Returns') && t.includes('Supplier Returns') && t.includes('Stock Count Corrections') && t.includes('Closing Stock') && t.includes('Reconciles'));
   });
   await check('sales report separates gross sales, returns and net sales', async () => {
     await page.click('[data-rtab="Sales"]');

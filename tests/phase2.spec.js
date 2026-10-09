@@ -304,7 +304,8 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     await page.goto(FILE + '#dashboard');
     const t = await page.evaluate(() => ({ v: Math.round(totals().value), u: totals().units, a: attention().length }));
     const k = await page.$$eval('.kpi .kpi-value', els => els.map(e => e.innerText.replace(/\s+/g, '')));
-    eq(k[0], 'SGD' + t.v.toLocaleString('en-SG')); eq(k[2], t.u.toLocaleString('en-SG')); eq(k[3], String(t.a));
+    eq(k[2], 'SGD' + t.v.toLocaleString('en-SG')); eq(k[3], t.u.toLocaleString('en-SG'));
+    const strip = await page.$$eval('.stat-strip > div b', e => e.map(x => +x.innerText.replace(/\D/g, ''))); eq(strip[0] + strip[1], t.a, 'low + out of stock');
   });
 
   await check('no script errors', async () => { eq(errors.length, 0, 'errors: ' + errors.join(' | ')); });

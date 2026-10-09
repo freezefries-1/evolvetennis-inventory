@@ -285,20 +285,20 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
 
   console.log('Dashboard');
   await check('dashboard sales figures use completed sales', async () => {
-    await page.goto(FILE + '#dashboard');
+    await page.goto(FILE + '#dashboard'); await page.selectOption('#period', 'This Month');
     const live = await page.evaluate(() => { const t = todayISO(); const m = salesStats(completedBetween(monthStart(t), t), returnsBetween(monthStart(t), t)); return { total: Math.round(m.total) }; });
     const k = await page.$$eval('.kpi .kpi-value', e => e.map(x => x.innerText.replace(/\s+/g, '')));
-    eq(k[1], 'SGD' + live.total.toLocaleString('en-SG'));
+    eq(k[0], 'SGD' + live.total.toLocaleString('en-SG'));
     const txt = await page.textContent('#app');
     ok(txt.includes(saleNo), 'recent sales'); ok(txt.includes(`Sale ${saleNo} completed`), 'activity');
     ok(txt.includes('Sales by Country') && txt.includes('Singapore'), 'country card');
     ok(txt.includes('MSV Focus Hex'), 'top products');
   });
   await check('sales overview chart totals the completed sales in range', async () => {
-    for (const r of ['Last 30 Days', '3 Months', '6 Months', '12 Months']) {
-      await page.click(`[data-drange="${r}"]`);
-      const exp = await page.evaluate(r => { const t = todayISO(); const f = DASH_RANGES[r](t); return Math.round(salesStats(completedBetween(f, t), returnsBetween(f, t)).total); }, r);
-      ok((await page.textContent('.card-head .sub')).includes('SGD ' + exp.toLocaleString('en-SG')), r);
+    for (const r of ['Last 30 Days', 'Last 3 Months', 'Last 6 Months', 'This Year']) {
+      await page.selectOption('#period', r);
+      const exp = await page.evaluate(() => { const p = periodRange(); return Math.round(salesStats(completedBetween(p.from, p.to), returnsBetween(p.from, p.to)).total); });
+      ok((await page.textContent('#app')).includes('SGD ' + exp.toLocaleString('en-SG') + ' in this period'), r);
     }
   });
   await check('top products can rank by units', async () => {
@@ -346,8 +346,8 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
   });
   await check('reports tabs render with live figures', async () => {
     await page.goto(FILE + '#reports');
-    for (const t of ['Sales', 'Product Performance', 'Customers', 'Sales by Country', 'Gross Profit', 'Inventory', 'Purchases']) { await page.click(`[data-rtab="${t}"]`); ok(!(await page.textContent('#app')).includes('Sample data'), t); }
-    await page.click('[data-range="This Year"]'); await page.click('[data-rtab="Sales by Country"]');
+    for (const t of ['Overview', 'Sales', 'Products', 'Inventory', 'Customers', 'Markets', 'Purchases', 'Suppliers', 'Returns', 'Stock Movements']) { await page.click(`[data-rtab="${t}"]`); ok(!(await page.textContent('#app')).includes('Sample data'), t); }
+    await page.selectOption('#period', 'This Year'); await page.click('[data-rtab="Markets"]');
     ok((await page.textContent('#app')).includes('Malaysia'));
   });
   await check('no script errors', async () => eq(errors.length, 0, errors.join(' | ')));
