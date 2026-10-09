@@ -393,6 +393,11 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
 .tl-dot{width:10px;height:10px;border-radius:50%;margin-top:5px}
 .btn[disabled].danger{opacity:.45}
 @media (max-width:640px){.p-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.p-line .combo-cell{grid-column:1/-1}.p-line.line-head{display:none}.p-line .line-total{text-align:left}}
+.s-line{display:grid;grid-template-columns:minmax(0,1fr) 90px 140px 130px 120px 36px;gap:10px;align-items:start}
+.s-line .line-total{padding-top:10px;text-align:right;font-weight:600}
+.s-line.line-head{align-items:end}
+.line-warn.stock-short{color:var(--bad-fg)}
+@media (max-width:640px){.s-line{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.s-line .combo-cell{grid-column:1/-1}.s-line.line-head{display:none}.s-line .line-total{text-align:left}}
 .backdrop{display:none}
 
 @media (max-width:1180px){
@@ -441,7 +446,7 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
       <div><b>MSV Southeast Asia</b><span>Inventory Management</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
-    <div class="side-foot"><strong>Phase 3</strong>Products, inventory and purchasing are live</div>
+    <div class="side-foot"><strong>Phase 4</strong>Inventory, purchasing and sales are live</div>
   </aside>
   <div class="backdrop" id="backdrop"></div>
   <div class="main">
@@ -453,7 +458,7 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
         <span class="kbd">/</span>
       </form>
       <div class="top-right">
-        <span class="proto-tag">Phase 3 · saved in this browser</span>
+        <span class="proto-tag">Phase 4 · saved in this browser</span>
         <div style="position:relative">
           <button class="icon-btn" id="notifBtn" aria-label="Notifications" aria-haspopup="true"><i data-lucide="bell" class="i"></i><span class="dot" id="notifDot"></span></button>
           <div class="pop" id="notifPop" hidden></div>
@@ -476,7 +481,8 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
    MSV Southeast Asia · Inventory Management · Phase 2
    Live: product catalogue, variants/SKUs, stock levels, valuation,
    reorder levels, manual adjustments, stock movement ledger.
-   Still sample data (MOCK): sales, purchases, customers, reports charts.
+   Live: suppliers, purchases (stock in), customers, sales (stock out),
+   revenue, gross profit and reports.
    ===================================================================== */
 
 /* ---------- Helpers ---------- */
@@ -516,28 +522,54 @@ const MOVEMENT_TYPES={
   adjustment:{label:'Manual Adjustment',tone:'warn'},
   purchase:{label:'Purchase',tone:'ok'},
   purchase_reversal:{label:'Purchase Reversal',tone:'bad'},
-  sale:{label:'Sale',tone:'info'},           // Sales phase
-  return:{label:'Return',tone:'ok'},         // later
+  sale:{label:'Sale',tone:'info'},
+  sale_reversal:{label:'Sale Reversal',tone:'ok'},
+  return:{label:'Return',tone:'ok'},         // later: customer returns
 };
 const ADJ_REASONS=['Opening Balance','Stock Count Correction','Damaged Item','Lost Item','Sample / Giveaway','Returned Stock','Other'];
 const GAUGES=['1.18','1.20','1.23','1.25','1.27','1.30'];
 const COLOURS={Black:'#1E2421',White:'#FFFFFF',Red:'#C8473D',Blue:'#3567B5',Yellow:'#E8D23C',Green:'#3D9B5F',Natural:'#E9E0C9',Silver:'#C7CDD1'};
 const PACKAGING=['Reel','Set','Other'];
 const BASE_CURRENCY='SGD';
-const DEFAULT_CURRENCIES=['SGD','USD','EUR','GBP','MYR','THB','CNY','JPY'];
+const DEFAULT_CURRENCIES=['SGD','USD','EUR','GBP','MYR','THB','IDR','PHP','CNY','JPY'];
+/* Manual exchange rates: SGD per 1 unit of currency. Not live; editable in Settings. */
+const DEFAULT_FX={USD:1.29,EUR:1.45,GBP:1.68,MYR:0.29,THB:0.037,IDR:0.000083,PHP:0.023,VND:0.000052,CNY:0.18,JPY:0.0087};
 const PURCHASE_STATUSES=['Draft','Ordered','Received','Cancelled','Reversed'];
+const SALE_STATUSES=['Draft','Confirmed','Completed','Cancelled','Reversed'];
+const PAYMENT_STATUSES=['Unpaid','Partially Paid','Paid','Refunded'];
+const CUSTOMER_TYPES=['Distributor','Retail Shop','Tennis Academy','Tennis Coach','Individual Customer','Other'];
+const MARKETS=['Singapore','Malaysia','Thailand','Indonesia','Philippines','Vietnam','Brunei','Cambodia'];
 const COST_FIELDS=[['shipping','Shipping / Freight'],['duties','Import Duties'],['customs','Customs Fees'],['handling','Handling Fees'],['other','Other Costs']];
 const emptyCosts = ()=>({shipping:0,duties:0,customs:0,handling:0,other:0,otherDesc:''});
+const emptyCharges = ()=>({discount:0,shipping:0,other:0,otherDesc:''});
+function isoAddDays(iso,n){const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
+function seedRng(a){return ()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
 function seedSuppliers(t0){return [
   {id:'s-msv',name:'MSV GmbH',contact:'Katrin Weber',country:'Germany',email:'export@msv.example',phone:'+49 2304 000 120',address:'Industriestrasse 12, Schwerte, Germany',currency:'EUR',notes:'Main string supplier. Sea freight 6–8 weeks, air freight about 10 days.',status:'Active',createdAt:t0},
   {id:'s-msvasia',name:'MSV Asia Logistics',contact:'Daniel Tan',country:'Singapore',email:'ops@msv-asia.example',phone:'+65 6000 2290',address:'2 Changi South Lane, Singapore',currency:'SGD',notes:'Local top-up orders from regional stock.',status:'Active',createdAt:t0+1},
   {id:'s-formosa',name:'Formosa Grip Works',contact:'Lin Mei-Hua',country:'Taiwan',email:'sales@formosagrip.example',phone:'+886 4 0000 1172',address:'Gongye 1st Road, Taichung, Taiwan',currency:'USD',notes:'Overgrips and small accessories.',status:'Active',createdAt:t0+2},
 ]}
+function seedCustomers(t0){
+  const C=[
+    ['c-rlkl','Racquet Lab KL','Distributor','Malaysia','Farid Hassan','orders@racquetlab.example','+60 3 0000 4410','Kuala Lumpur, Malaysia','MYR','Main Malaysian distributor. 30-day terms.'],
+    ['c-bkk','Bangkok Pro Racquet','Distributor','Thailand','Niran Somchai','buy@bkkpro.example','+66 2 000 5520','Bangkok, Thailand','USD','Invoiced in USD.'],
+    ['c-jts','Jakarta Tennis Supply','Distributor','Indonesia','Rina Wijaya','rina@jts.example','+62 21 000 0198','Jakarta, Indonesia','USD','45-day terms.'],
+    ['c-kth','Kallang Tennis Hub','Tennis Academy','Singapore','Marcus Ong','pro@kallangtennis.example','+65 6000 1182','Kallang, Singapore','SGD','Restrings for academy players.'],
+    ['c-tta','Tanglin Tennis Academy','Tennis Academy','Singapore','Priya Nair','admin@tanglinta.example','+65 6000 9020','Tanglin, Singapore','SGD',''],
+    ['c-saigon','Saigon Racket House','Retail Shop','Vietnam','Tran Bao','shop@saigonracket.example','+84 28 0000 0471','Ho Chi Minh City, Vietnam','USD','Prepaid orders.'],
+    ['c-manila','Manila Stringing Co.','Retail Shop','Philippines','Paolo Reyes','paolo@manilastring.example','+63 2 0000 3301','Manila, Philippines','USD',''],
+    ['c-penang','Penang String Studio','Retail Shop','Malaysia','Lim Wei Jie','hello@penangstring.example','+60 4 000 7713','George Town, Malaysia','MYR',''],
+    ['c-dlim','Coach Daniel Lim','Tennis Coach','Singapore','Daniel Lim','daniel.lim@coach.example','+65 9000 4471','Singapore','SGD',''],
+    ['c-bsb','Brunei Racquet Centre','Retail Shop','Brunei','Hajah Siti','orders@bruneiracquet.example','+673 200 0099','Bandar Seri Begawan, Brunei','SGD','Brunei dollar is at par with SGD; invoiced in SGD.'],
+    ['c-stan','Sarah Tan','Individual Customer','Singapore','Sarah Tan','sarah.tan@mail.example','+65 8000 1190','Singapore','SGD',''],
+  ];
+  return C.map(([id,name,type,country,contact,email,phone,address,currency,notes],i)=>({id,name,type,country,contact,email,phone,address,currency,notes,status:'Active',createdAt:t0+i}));
+}
 
 function seedDb(){
-  const t0=Date.UTC(2026,8,1), day=86400000;
-  const db={version:3,categories:[],products:[],variants:[],movements:[],seq:0,suppliers:seedSuppliers(t0),purchases:[],activity:[],counters:{},currencies:DEFAULT_CURRENCIES.slice()};
+  const t0=Date.UTC(2026,3,1), day=86400000;
+  const db={version:4,categories:[],products:[],variants:[],movements:[],seq:0,suppliers:seedSuppliers(t0),purchases:[],customers:seedCustomers(t0),sales:[],activity:[],counters:{},currencies:DEFAULT_CURRENCIES.slice(),fxRates:{...DEFAULT_FX}};
   const cat=(id,name,usesGauge)=>db.categories.push({id,name,usesGauge});
   cat('cat-strings','Tennis Strings',true);cat('cat-grips','Grips',false);cat('cat-acc','Accessories',false);cat('cat-equip','Equipment',false);cat('cat-other','Other',false);
   const P=[
@@ -584,27 +616,65 @@ function seedDb(){
     {supplierId:'s-msvasia',date:'2026-10-07',expectedDate:'',invoiceNo:'',currency:'SGD',status:'Draft',notes:'Top-up for Kallang Tennis Hub order.',
       lines:[['MSV-CF-118-RED-S',40,7.6]],costs:{}},
   ];
-  const received={};
-  SEEDP.filter(s=>s.status==='Received').forEach(s=>s.lines.forEach(([sku,q])=>received[sku]=(received[sku]||0)+q));
-  // Post in date order so every movement's previous/new quantity chains correctly.
-  plan.forEach(({v,qty,adj},i)=>{const opening=qty-adj-(received[v.sku]||0);
-    if(opening>0) postMovement(db,v.id,{type:'opening',change:opening,date:'2026-09-01',reason:'Opening Balance',notes:'Stock on hand at system setup',createdAt:t0+i*10});});
-  SEEDP.forEach((s,i)=>{
-    const at=Date.parse(s.date+'T09:00:00Z');
-    const p=createPurchaseRecord(db,{...s,lines:s.lines.map(([sku,qty,unitCost])=>({variantId:bySku(sku),qty,unitCost}))},{at,year:2026});
-    if(s.status==='Received') receivePurchase(db,p,{date:s.receivedDate,at:Date.parse(s.receivedDate+'T10:00:00Z')});
+  // Sample sales, April to early October, generated from a fixed seed so the data is the same every time.
+  const R=seedRng(20261009), W=[['c-rlkl',.13],['c-bkk',.1],['c-jts',.08],['c-kth',.16],['c-tta',.12],['c-saigon',.07],['c-manila',.05],['c-penang',.06],['c-dlim',.1],['c-bsb',.04],['c-stan',.09]];
+  const pickCust=()=>{let x=R();for(const [id,w] of W){if(x<w)return db.customers.find(c=>c.id===id);x-=w}return db.customers[0]};
+  const live=db.variants.filter(v=>v.sku!=='MSV-FHU-130-BLU-R'&&v.sku!=='MSV-HT-123-BLK-S');
+  const SEEDS=[];
+  for(let d='2026-04-06';d<='2026-10-08';d=isoAddDays(d,1)){
+    if(R()>.34) continue;
+    const c=pickCust(), fx=c.currency==='SGD'?1:DEFAULT_FX[c.currency], dist=c.type==='Distributor', shop=c.type==='Retail Shop';
+    const n=1+Math.floor(R()*(dist?4:2)), used=new Set(), lines=[];
+    for(let i=0;i<n;i++){
+      const v=live[Math.floor(R()*live.length)]; if(used.has(v.id)) continue; used.add(v.id);
+      const reel=v.packaging==='Reel', set=v.packaging==='Set';
+      const qty=reel?(dist?2+Math.floor(R()*4):shop?1+Math.floor(R()*2):1):set?(dist?20+10*Math.floor(R()*4):c.type==='Tennis Academy'?6+6*Math.floor(R()*2):1+Math.floor(R()*3)):(dist?24+24*Math.floor(R()*2):2+Math.floor(R()*4));
+      const factor=dist?.82:shop?.88:c.type==='Tennis Academy'?.92:1;
+      const unitPrice=round2(Math.round(v.price*factor/fx*2)/2);
+      lines.push({variantId:v.id,qty,unitPrice,discount:R()<.12?round2(Math.round(unitPrice*qty*.05)):0});
+    }
+    const charges={...emptyCharges(),shipping:dist||shop?(c.country==='Singapore'||c.country==='Brunei'?0:round2(Math.round((25+R()*40)/fx))):0};
+    SEEDS.push({date:d,customer:c,lines,charges,reference:dist?`PO-${c.name.split(' ')[0].toUpperCase().slice(0,4)}-${100+SEEDS.length}`:''});
+  }
+  const last=SEEDS.length-1;
+  SEEDS.forEach((s,i)=>{const age=(Date.parse('2026-10-09')-Date.parse(s.date))/day;
+    s.status=i===last?'Draft':i===last-1?'Confirmed':'Completed';
+    s.payment=s.status!=='Completed'?'Unpaid':age>35?'Paid':['Paid','Unpaid','Partially Paid'][Math.floor(R()*3)];
   });
-  plan.forEach(({v,adj},i)=>{ if(adj) postMovement(db,v.id,{type:'adjustment',change:adj,date:'2026-10-0'+(5+i%3),reason:'Damaged Item',notes:'Found during weekly stock check',createdAt:t0+day*35+i}); });
+  const finalQty=Object.fromEntries(plan.map(x=>[x.v.id,x.qty]));
+  const rev=SEEDS.find(s=>s.date>='2026-09-10'&&s.status==='Completed'&&s.lines.every(l=>finalQty[l.variantId]>=l.qty+10)); if(rev){rev.reverse=isoAddDays(rev.date,1);rev.payment='Refunded'}
+  const received={}, sold={};
+  SEEDP.filter(s=>s.status==='Received').forEach(s=>s.lines.forEach(([sku,q])=>received[sku]=(received[sku]||0)+q));
+  SEEDS.filter(s=>s.status==='Completed'&&!s.reverse).forEach(s=>s.lines.forEach(l=>sold[l.variantId]=(sold[l.variantId]||0)+l.qty));
+  // Opening balance = today's quantity − receipts − adjustments + sales, so the history replays to today's stock.
+  plan.forEach(({v,qty,adj},i)=>{const opening=qty-adj-(received[v.sku]||0)+(sold[v.id]||0);
+    if(opening>0) postMovement(db,v.id,{type:'opening',change:opening,date:'2026-04-01',reason:'Opening Balance',notes:'Stock on hand at system setup',createdAt:t0+i*10});});
+  const ev=[];
+  SEEDP.forEach(s=>{
+    let p; ev.push({date:s.date,o:0,fn:()=>{p=createPurchaseRecord(db,{...s,lines:s.lines.map(([sku,qty,unitCost])=>({variantId:bySku(sku),qty,unitCost}))},{at:Date.parse(s.date+'T09:00:00Z'),year:2026})}});
+    if(s.status==='Received') ev.push({date:s.receivedDate,o:1,fn:()=>receivePurchase(db,p,{date:s.receivedDate,at:Date.parse(s.receivedDate+'T10:00:00Z')})});
+  });
+  SEEDS.forEach((s,i)=>{
+    let sale; const at=Date.parse(s.date+'T11:00:00Z')+i;
+    ev.push({date:s.date,o:2,fn:()=>{sale=createSaleRecord(db,{customerId:s.customer.id,date:s.date,country:s.customer.country,currency:s.customer.currency,fxRate:s.customer.currency==='SGD'?1:DEFAULT_FX[s.customer.currency],status:s.status==='Confirmed'?'Confirmed':s.status==='Draft'?'Draft':'Completed',payment:s.payment,reference:s.reference,notes:'',lines:s.lines,charges:s.charges},{at,year:2026});
+      if(s.status==='Completed') completeSale(db,sale,{date:s.date,at:at+5});
+      sale.payment=s.payment;}});
+    if(s.reverse) ev.push({date:s.reverse,o:3,fn:()=>reverseSale(db,sale,{date:s.reverse,reason:'Recorded in error',notes:'Order was entered twice',at:Date.parse(s.reverse+'T12:00:00Z')})});
+  });
+  plan.forEach(({v,adj},i)=>{ if(adj){const d='2026-10-0'+(5+i%3);ev.push({date:d,o:4,fn:()=>postMovement(db,v.id,{type:'adjustment',change:adj,date:d,reason:'Damaged Item',notes:'Found during weekly stock check',createdAt:Date.parse(d+'T16:00:00Z')+i})})} });
+  ev.sort((a,b)=>a.date.localeCompare(b.date)||a.o-b.o).forEach(e=>e.fn());
   return db;
 }
-function emptyDb(){const s=seedDb();return {version:3,categories:s.categories,products:[],variants:[],movements:[],seq:0,suppliers:[],purchases:[],activity:[],counters:DB&&DB.counters?{...DB.counters}:{},currencies:DB&&DB.currencies?DB.currencies.slice():DEFAULT_CURRENCIES.slice()}}
+function emptyDb(){const s=seedDb();return {version:4,categories:s.categories,products:[],variants:[],movements:[],seq:0,suppliers:[],purchases:[],customers:[],sales:[],activity:[],counters:DB&&DB.counters?{...DB.counters}:{},currencies:DB&&DB.currencies?DB.currencies.slice():DEFAULT_CURRENCIES.slice(),fxRates:DB&&DB.fxRates?{...DB.fxRates}:{...DEFAULT_FX}}}
 function migrate(db){
   if(!db) return seedDb();
-  if(db.version===2){ // Phase 2 data: keep every product, variant and movement; add the purchasing tables.
-    Object.assign(db,{version:3,suppliers:seedSuppliers(Date.now()),purchases:[],activity:[],counters:{},currencies:DEFAULT_CURRENCIES.slice()});
+  if(db.version===2) Object.assign(db,{version:3,suppliers:seedSuppliers(Date.now()),purchases:[],activity:[],counters:{},currencies:DEFAULT_CURRENCIES.slice()});
+  if(db.version===3){ // Phase 3 data: keep everything; add customers, sales and exchange rates.
+    Object.assign(db,{version:4,customers:seedCustomers(Date.now()),sales:[],fxRates:{...DEFAULT_FX}});
+    ['IDR','PHP'].forEach(c=>{if(!db.currencies.includes(c))db.currencies.push(c)});
     return db;
   }
-  return db.version===3?db:seedDb();
+  return db.version===4?db:seedDb();
 }
 
 let DB=migrate(Store.load());
@@ -687,12 +757,96 @@ function reversePurchase(db,p,{date,reason,notes='',at=Date.now()}){
   logActivity(db,{at,tone:'bad',icon:'undo-2',title:`Purchase ${p.no} reversed`,sub:`−${n0(units)} units · ${reason}`,link:'purchase-'+p.id});
   return units;
 }
+
+/* ---------- Sales engine ----------
+   Customer → Sale → Sale lines → Variants → Stock movements → Inventory.
+   Only completing a sale removes stock, and only once. completeSale() checks
+   stock for every line first, snapshots each line's unit cost (SGD), then posts
+   one 'sale' movement per line. reverseSale() posts 'sale_reversal' movements
+   and keeps the originals. Callers wrap both in transact() so a failure leaves
+   no partial changes. */
+function transact(fn){const snap=JSON.stringify(DB);try{return fn()}catch(e){DB=JSON.parse(snap);throw e}}
+function fxOf(db,c){return c===BASE_CURRENCY?1:(+(db.fxRates||{})[c]||0)}
+function nextSaleNo(db,year){const k='SAL-'+year;db.counters[k]=(db.counters[k]||0)+1;return `${k}-${String(db.counters[k]).padStart(4,'0')}`}
+function saleLineCalc(l){const gross=round2(l.qty*l.unitPrice), disc=round2(+l.discount||0);return {gross,disc,net:round2(gross-disc)}}
+/* Totals in the sale's currency, plus SGD revenue, cost of goods and gross profit.
+   Completed and reversed sales use the cost snapshot stored on each line;
+   open sales show an estimate from today's cost price. Shipping and other
+   charges are part of the sale total but not of product revenue or profit. */
+function saleTotals(s,db=DB){
+  const c=s.charges||{}, rows=s.lines.map(l=>({l,...saleLineCalc(l)}));
+  const gross=round2(rows.reduce((a,x)=>a+x.gross,0)), lineDisc=round2(rows.reduce((a,x)=>a+x.disc,0)), sub=round2(rows.reduce((a,x)=>a+x.net,0));
+  const orderDisc=round2(+c.discount||0), ship=round2(+c.shipping||0), other=round2(+c.other||0);
+  const productRevenue=round2(sub-orderDisc), total=round2(productRevenue+ship+other);
+  const snap=s.status==='Completed'||s.status==='Reversed', fx=+s.fxRate||fxOf(db,s.currency);
+  const lines=rows.map(x=>{
+    const v=db.variants.find(y=>y.id===x.l.variantId), share=sub>0?x.net/sub:0, rev=round2(x.net-orderDisc*share);
+    const unitCost=snap&&x.l.unitCost!=null?x.l.unitCost:(v?v.cost:0), cogs=round2(x.l.qty*unitCost), revBase=round2(rev*fx);
+    return {...x,rev,unitCost,cogs,revBase,gp:round2(revBase-cogs),estimated:!(snap&&x.l.unitCost!=null)};
+  });
+  const cogs=round2(lines.reduce((a,x)=>a+x.cogs,0)), revBase=round2(productRevenue*fx), gp=round2(revBase-cogs);
+  return {lines,items:s.lines.length,units:s.lines.reduce((a,l)=>a+l.qty,0),gross,lineDisc,sub,orderDisc,discount:round2(lineDisc+orderDisc),ship,other,charges:round2(ship+other),
+    productRevenue,total,fx,totalBase:round2(total*fx),revBase,cogs,gp,margin:revBase?gp/revBase:0,estimated:!snap,hasFx:fx>0};
+}
+function createSaleRecord(db,d,{at=Date.now(),year=new Date().getFullYear()}={}){
+  const c=db.customers.find(x=>x.id===d.customerId);
+  const s={id:uid('sa'),no:nextSaleNo(db,year),customerId:d.customerId,date:d.date,country:d.country||'',currency:d.currency,fxRate:d.currency===BASE_CURRENCY?1:(+d.fxRate||0),
+    status:d.status==='Confirmed'?'Confirmed':'Draft',payment:d.payment||'Unpaid',reference:d.reference||'',notes:d.notes||'',charges:{...emptyCharges(),...(d.charges||{})},
+    lines:d.lines.map(l=>({id:uid('sl'),variantId:l.variantId,qty:l.qty,unitPrice:l.unitPrice,discount:+l.discount||0})),createdAt:at,history:[]};
+  db.sales.push(s);
+  addHistory(s,d.status==='Completed'?'Created':`Created as ${s.status}`,'created',at);
+  if(d.status!=='Completed') logActivity(db,{at,tone:s.status==='Confirmed'?'info':'mute',icon:'file-plus',title:`Sale ${s.no} created`,sub:`${c?c.name:'Customer'} · ${s.status}`,link:'sale-'+s.id});
+  return s;
+}
+function saleShortfalls(db,s){
+  const need={}; s.lines.forEach(l=>need[l.variantId]=(need[l.variantId]||0)+l.qty);
+  return Object.entries(need).map(([id,q])=>{const v=db.variants.find(x=>x.id===id);return {v,q,have:v?v.qty:0}}).filter(x=>!x.v||x.have<x.q);
+}
+function completeSale(db,s,{date,at=Date.now()}){
+  // 1. Validate
+  if(!['Draft','Confirmed'].includes(s.status)) throw new Error(`${s.no} is ${s.status.toLowerCase()}, so it can't be completed again.`);
+  if(db.movements.some(m=>m.saleId===s.id&&m.type==='sale')) throw new Error(`${s.no} has already removed stock.`);
+  if(!s.lines.length) throw new Error('A sale needs at least one item before it can be completed.');
+  for(const l of s.lines){
+    if(!(Number.isInteger(l.qty)&&l.qty>0)) throw new Error('Every item needs a quantity greater than 0.');
+    if(!(l.unitPrice>=0)) throw new Error('Selling prices cannot be negative.');
+  }
+  const fx=+s.fxRate||fxOf(db,s.currency);
+  if(!(fx>0)) throw new Error(`Enter an exchange rate for ${s.currency} before completing, so revenue and profit can be shown in SGD.`);
+  const short=saleShortfalls(db,s);
+  if(short.length) throw new Error(short.map(x=>x.v?`Only ${x.have} ${x.v.sku} ${x.have===1?'unit is':'units are'} available (needs ${x.q}).`:'An item on this sale no longer exists.').join(' '));
+  const c=db.customers.find(x=>x.id===s.customerId);
+  // 2–3. Record the cost snapshot and revenue on each line
+  s.fxRate=fx;
+  s.lines.forEach(l=>{l.unitCost=db.variants.find(v=>v.id===l.variantId).cost});
+  s.status='Completed'; // saleTotals now reads the snapshot
+  const t=saleTotals(s,db);
+  t.lines.forEach(x=>Object.assign(x.l,{revenue:x.rev,revenueBase:x.revBase,cogs:x.cogs,grossProfit:x.gp}));
+  // 4–5. Reduce stock through the ledger
+  s.lines.forEach((l,i)=>postMovement(db,l.variantId,{type:'sale',change:-l.qty,date,reason:`Sold to ${c?c.name:'customer'}`,notes:s.reference?`Customer ref ${s.reference}`:'',reference:s.no,unitCost:l.unitCost,currency:BASE_CURRENCY,unitPrice:l.unitPrice,saleCurrency:s.currency,saleId:s.id,lineId:l.id,customerId:s.customerId,createdAt:at+i}));
+  // 6. Mark completed
+  Object.assign(s,{completedDate:date,completedAt:at});
+  addHistory(s,`Completed · ${n0(t.units)} units removed from inventory · gross profit ${sgd(t.gp,2)}`,'completed',at);
+  logActivity(db,{at,tone:'ok',icon:'receipt',title:`Sale ${s.no} completed`,sub:`${n0(t.units)} units sold to ${c?c.name:'customer'}`,link:'sale-'+s.id});
+  return t.units;
+}
+function reverseSale(db,s,{date,reason,notes='',at=Date.now()}){
+  if(s.status!=='Completed') throw new Error('Only completed sales can be reversed.');
+  if(s.lines.some(l=>!db.variants.some(v=>v.id===l.variantId))) throw new Error('An item on this sale no longer exists.');
+  let units=0;
+  s.lines.forEach((l,i)=>{postMovement(db,l.variantId,{type:'sale_reversal',change:l.qty,date,reason:`Reversal: ${reason}`,notes,reference:s.no,unitCost:l.unitCost,currency:BASE_CURRENCY,saleId:s.id,lineId:l.id,customerId:s.customerId,createdAt:at+i});units+=l.qty});
+  Object.assign(s,{status:'Reversed',reversedDate:date,reversedAt:at,reverseReason:reason});
+  addHistory(s,`Reversed · ${n0(units)} units returned to inventory · ${reason}${notes?' · '+notes:''}`,'reversed',at);
+  logActivity(db,{at,tone:'bad',icon:'undo-2',title:`Completed sale ${s.no} reversed`,sub:`+${n0(units)} units back in stock · ${reason}`,link:'sale-'+s.id});
+  return units;
+}
+
 const stockStatus = v=>v.qty<=0?'Out of Stock':v.qty<=v.reorder?'Low Stock':'In Stock';
 const productOf = v=>DB.products.find(p=>p.id===v.productId);
 const categoryOf = p=>DB.categories.find(c=>c.id===p.categoryId)||{name:'Uncategorised',usesGauge:false};
 const variantsOf = pid=>DB.variants.filter(v=>v.productId===pid);
 const movementsOf = vid=>DB.movements.filter(m=>m.variantId===vid).sort((a,b)=>a.seq-b.seq);
-const usedInPurchases = vid=>DB.purchases.some(p=>p.lines.some(l=>l.variantId===vid));
+const usedInPurchases = vid=>DB.purchases.some(p=>p.lines.some(l=>l.variantId===vid))||DB.sales.some(x=>x.lines.some(l=>l.variantId===vid));
 const isLive = v=>v.status==='Active'&&productOf(v)?.status==='Active';
 function variantLabel(v){const parts=[v.gauge?gaugeLabel(v.gauge):'',v.colour,v.packaging].filter(Boolean);return parts.length?parts.join(' / '):'Standard'}
 const gaugeLabel = g=>/^\d+(\.\d+)?$/.test(g)?g+'mm':g;
@@ -717,69 +871,28 @@ function totals(list=DB.variants){
 }
 const attention = ()=>DB.variants.filter(v=>isLive(v)&&stockStatus(v)!=='In Stock');
 
-/* ---------- MOCK data (replace in Purchases / Sales / Customers phases) ---------- */
-const MOCK = {
-  months:['May','Jun','Jul','Aug','Sep','Oct'],
-  salesByMonth:[11240,10460,12980,14310,15620,13840],
-  costByMonth:[7650,7120,8820,9590,10460,9280],
-  unitsIn:[480,120,360,240,520,180], unitsOut:[322,298,341,365,402,378],
-  invValueByMonth:[44900,42300,45100,43800,49600,null],
-  salesThisMonth:13840, salesDelta:'−11%',
-  country:[['Singapore',15420],['Malaysia',9860],['Thailand',7240],['Indonesia',5980],['Vietnam',3310],['Philippines',2150]],
-  topProducts:[['MSV Focus Hex 1.23','Black / Reel',148,17760],['MSV Swift 1.25','Black / Reel',96,11040],['MSV Co-Focus','1.23 / Red / Reel',72,9000],['MSV Hepta Twist','1.27 / Black / Reel',61,7808],['MSV Focus Hex Ultra','1.25 / Blue / Reel',54,7452]],
-};
-const CUSTOMERS = [
-  {id:'c1', name:'Racquet Lab KL',        type:'Distributor',     country:'Malaysia',    city:'Kuala Lumpur', contact:'Farid Hassan',  email:'orders@racquetlab.my',  phone:'+60 3 2201 4410', terms:'30 days', orders:18, total:21460, last:'24 Oct 2026'},
-  {id:'c2', name:'Bangkok Pro Racquet',   type:'Distributor',     country:'Thailand',    city:'Bangkok',      contact:'Niran Somchai', email:'buy@bkkpro.co.th',      phone:'+66 2 118 5520',  terms:'30 days', orders:14, total:16820, last:'21 Oct 2026'},
-  {id:'c3', name:'Jakarta Tennis Supply', type:'Distributor',     country:'Indonesia',   city:'Jakarta',      contact:'Rina Wijaya',   email:'rina@jts.co.id',        phone:'+62 21 555 0198', terms:'45 days', orders:11, total:13590, last:'16 Oct 2026'},
-  {id:'c4', name:'Kallang Tennis Hub',    type:'Tennis Academy',  country:'Singapore',   city:'Singapore',    contact:'Marcus Ong',    email:'pro@kallangtennis.sg',  phone:'+65 6345 1182',   terms:'14 days', orders:22, total:9840,  last:'27 Oct 2026'},
-  {id:'c5', name:'Saigon Racket House',   type:'Retail Shop',     country:'Vietnam',     city:'Ho Chi Minh City', contact:'Tran Bao',  email:'shop@saigonracket.vn',  phone:'+84 28 3822 0471',terms:'Prepaid', orders:9,  total:6120,  last:'19 Oct 2026'},
-  {id:'c6', name:'Tanglin Tennis Academy',type:'Tennis Academy',  country:'Singapore',   city:'Singapore',    contact:'Priya Nair',    email:'admin@tanglinta.sg',    phone:'+65 6735 9020',   terms:'14 days', orders:16, total:7480,  last:'22 Oct 2026'},
-  {id:'c7', name:'Manila Stringing Co.',  type:'Retail Shop',     country:'Philippines', city:'Manila',       contact:'Paolo Reyes',   email:'paolo@manilastring.ph', phone:'+63 2 8812 3301', terms:'Prepaid', orders:7,  total:4310,  last:'09 Oct 2026'},
-  {id:'c8', name:'Penang String Studio',  type:'Retail Shop',     country:'Malaysia',    city:'George Town',  contact:'Lim Wei Jie',   email:'hello@penangstring.my', phone:'+60 4 226 7713',  terms:'Prepaid', orders:8,  total:3960,  last:'14 Oct 2026'},
-  {id:'c9', name:'Coach Daniel Lim',      type:'Tennis Coach',    country:'Singapore',   city:'Singapore',    contact:'Daniel Lim',    email:'daniel.lim@coachmail.sg',phone:'+65 9123 4471',  terms:'Prepaid', orders:12, total:2640,  last:'26 Oct 2026'},
-  {id:'c10',name:'Coach Nguyen Minh',     type:'Tennis Coach',    country:'Vietnam',     city:'Hanoi',        contact:'Nguyen Minh',   email:'minh.tennis@mail.vn',   phone:'+84 91 552 3380', terms:'Prepaid', orders:5,  total:1180,  last:'02 Oct 2026'},
-  {id:'c11',name:'Sarah Tan',             type:'Individual',      country:'Singapore',   city:'Singapore',    contact:'Sarah Tan',     email:'sarah.tan@gmail.com',   phone:'+65 8234 1190',   terms:'Prepaid', orders:4,  total:420,   last:'20 Oct 2026'},
-];
-const CM = Object.fromEntries(CUSTOMERS.map(c=>[c.id,c]));
-const SALES = [
-  {no:'INV-1094', date:'27 Oct 2026', cid:'c4', products:'Focus Hex 1.23 Black Set, Swift 1.25 White Set', units:36, amount:496, status:'Paid'},
-  {no:'INV-1093', date:'26 Oct 2026', cid:'c9', products:'Focus Hex 1.23 Black Reel', units:2, amount:240, status:'Paid'},
-  {no:'INV-1092', date:'24 Oct 2026', cid:'c1', products:'Focus Hex, Hepta Twist, Swift (5 lines)', units:84, amount:3280, status:'Pending'},
-  {no:'INV-1091', date:'22 Oct 2026', cid:'c6', products:'Co-Focus 1.23 Red Reel, Soft Touch 1.30 Set', units:14, amount:812, status:'Processing'},
-  {no:'INV-1090', date:'21 Oct 2026', cid:'c2', products:'Focus Hex Ultra, Focus Hex (4 lines)', units:62, amount:2960, status:'Paid'},
-  {no:'INV-1089', date:'20 Oct 2026', cid:'c11',products:'Soft Touch 1.30 White Set', units:3, amount:54, status:'Paid'},
-  {no:'INV-1088', date:'19 Oct 2026', cid:'c5', products:'Focus Hex 1.25 Black Reel, Bussard 1.25 Reel', units:8, amount:952, status:'Paid'},
-  {no:'INV-1087', date:'16 Oct 2026', cid:'c3', products:'Bussard, Swift, Co-Focus (3 lines)', units:48, amount:1870, status:'Overdue'},
-  {no:'INV-1086', date:'14 Oct 2026', cid:'c8', products:'Hepta Twist 1.27 Black Reel', units:4, amount:512, status:'Paid'},
-  {no:'INV-1085', date:'09 Oct 2026', cid:'c7', products:'Focus Hex 1.18 Black Reel, Swift 1.25 Reel', units:6, amount:705, status:'Paid'},
-  {no:'INV-1084', date:'06 Oct 2026', cid:'c4', products:'Focus Hex 1.23 White Set', units:24, amount:336, status:'Paid'},
-  {no:'INV-1083', date:'02 Oct 2026', cid:'c10',products:'Soft Touch 1.25 White Reel', units:2, amount:310, status:'Cancelled'},
-  {no:'INV-1082', date:'—',           cid:'c1', products:'Focus Hex Ultra 1.25 Blue Reel', units:10, amount:1380, status:'Draft'},
-];
-
 /* ---------- UI helpers ---------- */
 const TONE = {'In Stock':'ok','Paid':'ok','Completed':'ok','Received':'ok','Active':'ok',
   'Low Stock':'warn','Pending':'warn','Partially Paid':'warn',
   'Out of Stock':'bad','Cancelled':'bad','Overdue':'bad',
   'Processing':'info','In Transit':'info','Ordered':'info',
-  'Draft':'mute','Inactive':'mute','Reversed':'bad'};
+  'Draft':'mute','Inactive':'mute','Reversed':'bad','Confirmed':'info'};
 const badge = (s,tone)=>`<span class="badge b-${tone||TONE[s]||'mute'}">${esc(s)}</span>`;
 const sw = c=>`<span class="sw" style="background:${COLOURS[c]||'transparent'};${COLOURS[c]?'':'border-style:dashed'}"></span>`;
 function niceMax(v){if(!v)return 10;const p=Math.pow(10,Math.floor(Math.log10(v)));for(const m of [1,1.5,2,2.5,3,4,5,6,8,10]){if(m*p>=v)return m*p}return 10*p}
 const short = n=>n>=1000?(n/1000).toFixed(n%1000===0?0:1).replace(/\.0$/,'')+'k':String(Math.round(n));
-const sample = ()=>`<span class="sample-tag" title="Connected in a later phase">Sample data</span>`;
 
-function columnChart({labels,series,fmt=n0,height=240,cap=false}){
+function columnChart({labels,series,fmt=n0,height=240,cap=false,tips}){
+  const every=labels.length>16?Math.ceil(labels.length/10):1;
   const max=niceMax(Math.max(...series.flatMap(s=>s.data))*1.08), ticks=4;
   const grid=Array.from({length:ticks+1},(_,i)=>`<div class="gridline" style="bottom:${i/ticks*100}%"></div>`).join('');
   const ylabels=Array.from({length:ticks+1},(_,i)=>`<span>${short(max/ticks*i)}</span>`).join('');
   const cols=labels.map((l,i)=>{
-    const tip=`<b>${esc(l)}</b>`+series.map(s=>`<div class="row"><i style="background:var(--c-${s.key})"></i>${s.name}: ${fmt(s.data[i])}</div>`).join('');
+    const tip=`<b>${esc(tips?tips[i]:l)}</b>`+series.map(s=>`<div class="row"><i style="background:var(--c-${s.key})"></i>${s.name}: ${fmt(s.data[i])}</div>`).join('');
     const bars=series.map(s=>`<div class="bar ${s.key}" style="height:${s.data[i]/max*100}%"></div>`).join('');
     const c=cap&&i===labels.length-1?`<span class="cap" style="--h:${series[0].data[i]/max*100}%">${short(series[0].data[i])}</span>`:'';
     return `<div class="col" data-tip="${esc(tip)}">${bars}${c}</div>`}).join('');
-  return `<div class="chart" style="height:${height}px"><div class="y-axis">${ylabels}</div><div class="plot"><div class="plot-area">${grid}${cols}</div><div class="x-axis">${labels.map(l=>`<span>${esc(l)}</span>`).join('')}</div></div></div>`;
+  return `<div class="chart" style="height:${height}px"><div class="y-axis">${ylabels}</div><div class="plot"><div class="plot-area">${grid}${cols}</div><div class="x-axis">${labels.map((l,i)=>`<span>${i%every===0?esc(l):''}</span>`).join('')}</div></div></div>`;
 }
 function lineChart(labels,data,fmt){
   const W=640,H=220,pl=48,pr=16,pt=16,pb=30,max=niceMax(Math.max(...data)*1.05),min=0;
@@ -810,7 +923,7 @@ const crumbs = (...parts)=>`<div class="crumb">${parts.map((p,i)=>i<parts.length
 
 /* ---------- View state ---------- */
 const blankInvFilters = ()=>({q:'',cat:'',prod:'',gauge:'',colour:'',pack:'',status:'',showInactive:false});
-const S = {pur:{...blankPurFilters(),sort:'no',dir:-1}, sup:{q:'',status:'Active'}, inv:{...blankInvFilters(),sort:'product',dir:1,view:'levels'}, prod:{q:'',cat:'',status:'Active'}, vtab:'Overview', customer:'c1', range:'Last 3 Months', rtab:'Sales', salesFilter:'All', purchFilter:'All', custType:'All', custQ:''};
+const S = {sal:{...blankSalFilters(),sort:'no',dir:-1}, cus:{q:'',type:'All',status:'Active'}, dash:{range:'6 Months',top:'Revenue'}, rfrom:'', rto:'', pur:{...blankPurFilters(),sort:'no',dir:-1}, sup:{q:'',status:'Active'}, inv:{...blankInvFilters(),sort:'product',dir:1,view:'levels'}, prod:{q:'',cat:'',status:'Active'}, vtab:'Overview', range:'Last 3 Months', rtab:'Sales'};
 
 /* ---------- Pages ---------- */
 const PAGES = {};
@@ -833,36 +946,86 @@ function activityFeed(n){
   return acts.concat(mv).sort((a,b)=>b.at-a.at).slice(0,n);
 }
 const activityList = items=>`<div class="list">${items.map(a=>`<div class="list-item ${a.link?'click':''}" ${a.link?`data-go="${a.link}"`:''} style="${a.link?'cursor:pointer':''}"><span class="act-icon" style="background:var(--${a.tone}-bg);color:var(--${a.tone}-fg)">${ic(a.icon,'i i-sm')}</span><div style="min-width:0"><div class="t">${esc(a.title)}</div><div class="d">${esc(a.sub)}</div></div><span class="when">${timeAgo(a.at)}</span></div>`).join('')}</div>`;
+/* ----- Sales analytics (SGD; completed sales only, so drafts, cancelled and reversed sales never count) ----- */
+const customerOf = s=>DB.customers.find(c=>c.id===s.customerId)||{id:'',name:'Unknown customer',type:'',country:'',currency:''};
+const pct = x=>isFinite(x)?Math.round(x*100)+'%':'—';
+const completedBetween = (from,to)=>DB.sales.filter(s=>s.status==='Completed'&&s.completedDate>=from&&s.completedDate<=to);
+function salesStats(list){
+  let total=0,rev=0,cogs=0,gp=0,units=0;
+  list.forEach(s=>{const t=saleTotals(s);total+=t.totalBase;rev+=t.revBase;cogs+=t.cogs;gp+=t.gp;units+=t.units});
+  return {count:list.length,total:round2(total),rev:round2(rev),cogs:round2(cogs),gp:round2(gp),units,margin:rev?gp/rev:NaN,avg:list.length?round2(total/list.length):0};
+}
+const monthStart = (iso,back=0)=>{const d=new Date(Date.UTC(+iso.slice(0,4),+iso.slice(5,7)-1-back,1));return d.toISOString().slice(0,10)};
+function buckets(from,to){
+  const days=Math.round((Date.parse(to)-Date.parse(from))/864e5)+1, keys=[], labels=[];
+  if(days<=45){for(let d=from;d<=to;d=isoAddDays(d,1)){keys.push(d);labels.push(String(+d.slice(8)))} return {keys,labels,full:keys.map(fmtDate),keyOf:d=>d}}
+  if(days<=120){const mon=d=>{const x=new Date(d+'T00:00:00Z');return isoAddDays(d,-((x.getUTCDay()+6)%7))};
+    for(let d=mon(from);d<=to;d=isoAddDays(d,7)){keys.push(d);labels.push(`${+d.slice(8)} ${MON[+d.slice(5,7)-1]}`)} return {keys,labels,full:keys.map(k=>'Week of '+fmtDate(k)),keyOf:mon}}
+  for(let d=monthStart(from);d<=to;d=monthStart(isoAddDays(d,32))){keys.push(d.slice(0,7));labels.push(MON[+d.slice(5,7)-1])}
+  return {keys,labels,full:keys.map(k=>`${MON[+k.slice(5,7)-1]} ${k.slice(0,4)}`),keyOf:d=>d.slice(0,7)};
+}
+function series(b,items,dateOf,valOf){const m=Object.fromEntries(b.keys.map(k=>[k,0]));items.forEach(x=>{const k=b.keyOf(dateOf(x));if(k in m)m[k]+=valOf(x)});return b.keys.map(k=>round2(m[k]))}
+function chartFor(b,seriesList,opts={}){return columnChart({labels:b.labels,tips:b.full,series:seriesList,...opts})}
+function topVariants(list){
+  const m={};
+  list.forEach(s=>saleTotals(s).lines.forEach(x=>{const id=x.l.variantId;m[id]=m[id]||{id,units:0,rev:0,gp:0};m[id].units+=x.l.qty;m[id].rev+=x.revBase;m[id].gp+=x.gp}));
+  return Object.values(m).map(r=>{const v=variantById(r.id);return {...r,rev:round2(r.rev),gp:round2(r.gp),v,name:v?productOf(v).name:'Deleted item',label:v?variantLabel(v):'',sku:v?v.sku:''}});
+}
+function groupSum(list,keyOf,valOf=s=>saleTotals(s).totalBase){const m={};list.forEach(s=>{const k=keyOf(s)||'Not set';m[k]=(m[k]||0)+valOf(s)});return Object.entries(m).map(([k,v])=>[k,round2(v)]).sort((a,b)=>b[1]-a[1])}
+function stockFlow(b){ // units in from purchases vs units out to sales, net of reversals
+  const mv=DB.movements;
+  return {inU:series(b,mv.filter(m=>m.type==='purchase'||m.type==='purchase_reversal'),m=>m.date,m=>m.change),
+          outU:series(b,mv.filter(m=>m.type==='sale'||m.type==='sale_reversal'),m=>m.date,m=>-m.change)};
+}
+const salesLink = s=>`<a class="ref-link" href="#sale-${s.id}">${esc(s.no)}</a>`;
+const payBadge = p=>badge(p,{Paid:'ok','Partially Paid':'warn',Unpaid:'bad',Refunded:'mute'}[p]);
+
+/* ----- Dashboard ----- */
+const DASH_RANGES={'Last 30 Days':t=>isoAddDays(t,-29),'3 Months':t=>isoAddDays(t,-90),'6 Months':t=>monthStart(t,5),'12 Months':t=>monthStart(t,11)};
 PAGES.dashboard = ()=>{
-  const t=totals(DB.variants), att=attention();
+  const t=totals(DB.variants), att=attention(), today=todayISO();
   const lowRows=att.slice().sort((a,b)=>a.qty/(a.reorder||1)-b.qty/(b.reorder||1)).slice(0,6);
   const recentP=DB.purchases.slice().sort((a,b)=>b.createdAt-a.createdAt).slice(0,5);
-  const recvM=DB.purchases.filter(p=>p.status==='Received'&&thisMonth(p.receivedDate));
-  const today=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  const feed=activityFeed(6);
-  return head('Dashboard',`${today} · overview of stock and sales across Southeast Asia`,btn('Record Purchase','purchase','package-plus')+btn('Record Sale','sale','receipt','primary'))+
+  const recentS=DB.sales.filter(s=>s.status==='Completed'||s.status==='Confirmed').sort((a,b)=>(b.completedDate||b.date).localeCompare(a.completedDate||a.date)||b.no.localeCompare(a.no)).slice(0,6);
+  const month=salesStats(completedBetween(monthStart(today),today));
+  const from=DASH_RANGES[S.dash.range](today), b=buckets(from,today), inRange=completedBetween(from,today);
+  const b6=buckets(monthStart(today,5),today), flow=stockFlow(b6);
+  const last90=completedBetween(isoAddDays(today,-89),today);
+  const top=topVariants(last90).sort((a,c)=>S.dash.top==='Units'?c.units-a.units:c.rev-a.rev).slice(0,6);
+  const countries=groupSum(last90,s=>s.country);
+  const feed=activityFeed(7);
+  const dateHead=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  return head('Dashboard',`${dateHead} · overview of stock and sales across Southeast Asia`,btn('Record Purchase','purchase','package-plus')+btn('Record Sale','sale','receipt','primary'))+
   `<div class="grid kpis">
     ${kpi('Inventory Value',money(Math.round(t.value)),`At cost · ${sgd(Math.round(t.retail))} at selling price`,'wallet')}
-    ${kpi('Sales This Month',money(MOCK.salesThisMonth),`<span class="delta down">${MOCK.salesDelta}</span> vs September ${sample()}`,'trending-up')}
+    ${kpi('Sales This Month',money(Math.round(month.total)),month.count?`${month.count} completed · gross profit ${sgd(Math.round(month.gp))} (${pct(month.margin)})`:'No completed sales yet this month','trending-up')}
     ${kpi('Units in Stock',n0(t.units),`Across ${DB.variants.length} SKUs of ${DB.products.length} products`,'boxes')}
     ${kpi('Low Stock Products',att.length,`${att.filter(v=>v.qty<=0).length} out of stock · <button class="link-btn" data-go="inventory" data-status="attention">Review</button>`,'triangle-alert',true)}
   </div>
   <div class="grid g-2-1">
-    <div class="card"><div class="card-head"><div><h3>Sales Overview</h3><span class="sub">Monthly revenue, SGD</span></div>${sample()}</div>
-      <div class="card-body">${columnChart({labels:MOCK.months,series:[{key:'in',name:'Sales',data:MOCK.salesByMonth}],fmt:sgd,cap:true})}</div></div>
-    <div class="card"><div class="card-head"><div><h3>Stock Movement</h3><span class="sub">Units purchased vs sold</span></div>${sample()}</div>
-      <div class="card-body" style="display:flex;flex-direction:column;gap:14px">${legend()}${columnChart({labels:MOCK.months,series:[{key:'in',name:'Purchased',data:MOCK.unitsIn},{key:'out',name:'Sold',data:MOCK.unitsOut}],height:212})}</div></div>
+    <div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>Sales Overview</h3><span class="sub">Completed sales, SGD · ${sgd(Math.round(salesStats(inRange).total))} in this period</span></div>${filterSeg(Object.keys(DASH_RANGES),S.dash.range,'drange')}</div>
+      <div class="card-body">${chartFor(b,[{key:'in',name:'Sales',data:series(b,inRange,s=>s.completedDate,s=>saleTotals(s).totalBase)}],{fmt:x=>sgd(x),cap:b.keys.length<=13})}</div></div>
+    <div class="card"><div class="card-head"><div><h3>Stock Movement</h3><span class="sub">Units purchased vs sold, last 6 months</span></div></div>
+      <div class="card-body" style="display:flex;flex-direction:column;gap:14px">${legend()}${chartFor(b6,[{key:'in',name:'Purchased',data:flow.inU},{key:'out',name:'Sold',data:flow.outU}],{height:212})}</div></div>
+  </div>
+  <div class="grid g-2-1">
+    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Recent Sales</h3><span class="sub">Completed and confirmed</span></div><button class="btn sm ghost" data-go="sales">View all ${ic('arrow-right','i i-sm')}</button></div>
+      ${recentS.length?`<div class="table-wrap"><table><thead><tr><th>Sale</th><th>Customer</th><th>Status</th><th>Payment</th><th class="num">Total</th></tr></thead><tbody>
+      ${recentS.map(s=>{const t=saleTotals(s),c=customerOf(s);return `<tr class="click" data-go="sale-${s.id}"><td class="mono strong" style="color:var(--fg)">${esc(s.no)}<span class="cell-sub">${fmtDate(s.completedDate||s.date)}</span></td><td style="white-space:nowrap"><span class="strong">${esc(c.name)}</span><span class="cell-sub">${esc(s.country)}</span></td><td>${badge(s.status)}</td><td>${payBadge(s.payment)}</td><td class="num strong" style="white-space:nowrap">${cur(t.total,s.currency)}</td></tr>`}).join('')}
+      </tbody></table></div>`:`<div class="empty"><b>No sales yet</b><button class="link-btn" data-action="sale">Record your first sale</button></div>`}</div>
+    <div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>Top Selling Products</h3><span class="sub">Last 90 days</span></div>${filterSeg(['Revenue','Units'],S.dash.top,'dtop')}</div>
+      <div class="card-body">${top.length?`<div class="list">${top.map((r,i)=>`<div class="list-item click" data-go="variant-${r.id}" style="align-items:center;cursor:pointer"><span class="rank">${i+1}</span><div style="min-width:0"><div class="t">${esc(r.name)}</div><div class="d">${esc(r.label)} · ${n0(r.units)} units</div></div><span class="when strong" style="color:var(--fg);font-size:13px">${S.dash.top==='Units'?n0(r.units)+' units':sgd(Math.round(r.rev))}</span></div>`).join('')}</div>`:'<div class="empty" style="padding:24px"><b>No sales in the last 90 days</b></div>'}</div></div>
   </div>
   <div class="grid g-2-1">
     <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Low Stock</h3><span class="sub">At or below reorder level · active SKUs</span></div><button class="btn sm ghost" data-go="inventory" data-status="attention">View all ${ic('arrow-right','i i-sm')}</button></div>
       ${lowRows.length?`<div class="table-wrap"><table><thead><tr><th>Product</th><th>Variant</th><th class="num">Current Stock</th><th class="num">Reorder Level</th><th>Status</th></tr></thead><tbody>
-      ${lowRows.map(v=>`<tr class="click" data-variant="${v.id}"><td class="strong">${esc(productOf(v).name)}</td><td><span style="display:inline-flex;gap:7px;align-items:center">${sw(v.colour)}${esc(variantLabel(v))}</span></td><td class="num strong">${v.qty}</td><td class="num muted">${v.reorder}</td><td>${badge(stockStatus(v))}</td></tr>`).join('')}
+      ${lowRows.map(v=>`<tr class="click" data-variant="${v.id}"><td class="strong">${esc(productOf(v).name)}</td><td><span style="display:inline-flex;gap:7px;align-items:center;white-space:nowrap">${sw(v.colour)}${esc(variantLabel(v))}</span></td><td class="num strong">${v.qty}</td><td class="num muted">${v.reorder}</td><td>${badge(stockStatus(v))}</td></tr>`).join('')}
       </tbody></table></div>`:`<div class="empty"><b>Every SKU is above its reorder level</b>Nothing to reorder right now.</div>`}</div>
-    <div class="card"><div class="card-head"><h3>Top Selling Products</h3>${sample()}</div>
-      <div class="card-body"><div class="list">${MOCK.topProducts.map((p,i)=>`<div class="list-item" style="align-items:center"><span class="rank">${i+1}</span><div style="min-width:0"><div class="t">${p[0]}</div><div class="d">${p[1]} · ${p[2]} units</div></div><span class="when strong" style="color:var(--fg);font-size:13px">${sgd(p[3])}</span></div>`).join('')}</div></div></div>
+    <div class="card"><div class="card-head"><div><h3>Sales by Country</h3><span class="sub">Last 90 days, SGD</span></div><button class="btn sm ghost" data-rtabgo="Sales by Country">Report ${ic('arrow-right','i i-sm')}</button></div>
+      <div class="card-body">${countries.length?hbars(countries.slice(0,6),x=>sgd(Math.round(x))):'<div class="empty" style="padding:24px"><b>No sales in the last 90 days</b></div>'}</div></div>
   </div>
   <div class="grid g-2-1">
-    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Recent Purchases</h3><span class="sub">This month: ${recvM.length} received · ${n0(recvM.reduce((a,p)=>a+purchaseTotals(p).units,0))} units in</span></div><button class="btn sm ghost" data-go="purchases">View all ${ic('arrow-right','i i-sm')}</button></div>
+    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Recent Purchases</h3><span class="sub">Latest purchase records</span></div><button class="btn sm ghost" data-go="purchases">View all ${ic('arrow-right','i i-sm')}</button></div>
       ${recentP.length?`<div class="table-wrap"><table><thead><tr><th>Purchase</th><th>Supplier</th><th>Status</th><th class="num">Units</th><th class="num">Total Cost</th></tr></thead><tbody>
       ${recentP.map(p=>{const t=purchaseTotals(p);return `<tr class="click" data-go="purchase-${p.id}"><td class="mono strong" style="color:var(--fg)">${esc(p.no)}<span class="cell-sub">${fmtDate(p.date)}</span></td><td>${esc(supplierOf(p).name)}</td><td>${badge(p.status)}</td><td class="num">${n0(t.units)}</td><td class="num strong">${cur(t.total,p.currency)}</td></tr>`}).join('')}
       </tbody></table></div>`:`<div class="empty"><b>No purchases yet</b><button class="link-btn" data-action="purchase">Record your first purchase</button></div>`}</div>
@@ -870,6 +1033,200 @@ PAGES.dashboard = ()=>{
       <div class="card-body">${feed.length?activityList(feed):`<div class="empty" style="padding:24px"><b>No activity yet</b>Add products or record a purchase to get started.</div>`}</div></div>
   </div>`;
 };
+
+/* ----- Sales ----- */
+function blankSalFilters(){return {q:'',status:'',payment:'',customer:'',country:'',currency:'',product:'',from:'',to:''}}
+function saleSearchText(s){const c=customerOf(s);return [s.no,c.name,s.country,c.type,s.reference,s.notes,s.currency,s.status,s.payment,...s.lines.flatMap(l=>{const v=variantById(l.variantId);return v?[v.sku,productOf(v).name,variantLabel(v)]:[]})].join(' ').toLowerCase()}
+function salRows(){
+  const f=S.sal;
+  const rows=DB.sales.filter(s=>(!f.q||matches(saleSearchText(s),f.q))&&(!f.status||s.status===f.status)&&(!f.payment||s.payment===f.payment)&&(!f.customer||s.customerId===f.customer)
+    &&(!f.country||s.country===f.country)&&(!f.currency||s.currency===f.currency)&&(!f.product||s.lines.some(l=>variantById(l.variantId)?.productId===f.product))&&(!f.from||s.date>=f.from)&&(!f.to||s.date<=f.to));
+  const key={no:s=>s.no,date:s=>s.date,customer:s=>customerOf(s).name,country:s=>s.country,status:s=>SALE_STATUSES.indexOf(s.status),payment:s=>PAYMENT_STATUSES.indexOf(s.payment),items:s=>s.lines.length,units:s=>saleTotals(s).units,currency:s=>s.currency,sub:s=>saleTotals(s).sub,total:s=>saleTotals(s).total}[f.sort];
+  rows.sort((a,b)=>{const x=key(a),y=key(b);return (typeof x==='number'?x-y:String(x).localeCompare(String(y),undefined,{numeric:true}))*f.dir||b.no.localeCompare(a.no,undefined,{numeric:true})});
+  return rows;
+}
+const salFiltersActive = ()=>Object.entries(S.sal).some(([k,v])=>!['sort','dir'].includes(k)&&v);
+PAGES.sales = ()=>{
+  const f=S.sal, today=todayISO(), month=salesStats(completedBetween(monthStart(today),today));
+  const open=DB.sales.filter(s=>s.status==='Confirmed'), unpaid=DB.sales.filter(s=>s.status==='Completed'&&(s.payment==='Unpaid'||s.payment==='Partially Paid'));
+  const products=DB.products.filter(p=>DB.sales.some(s=>s.lines.some(l=>variantById(l.variantId)?.productId===p.id))).sort((a,b)=>a.name.localeCompare(b.name));
+  return head('Sales',`${DB.sales.length} sales to ${new Set(DB.sales.map(s=>s.customerId)).size} customers. Stock is removed only when a sale is Completed.`,btn('Customers','gocustomers','users')+btn('Record Sale','sale','receipt','primary'))+
+  `<div class="grid kpis">
+    ${kpi('Sales This Month',money(Math.round(month.total)),`${month.count} completed · ${n0(month.units)} units`,'trending-up')}
+    ${kpi('Gross Profit This Month',money(Math.round(month.gp)),month.count?`${pct(month.margin)} margin on product revenue`:'No completed sales yet','percent')}
+    ${kpi('Confirmed Orders',open.length,open.length?`${n0(open.reduce((a,s)=>a+saleTotals(s).units,0))} units waiting to ship`:'Nothing waiting to ship','clipboard-check')}
+    ${kpi('Awaiting Payment',money(Math.round(unpaid.reduce((a,s)=>a+saleTotals(s).totalBase,0))),`${unpaid.length} completed sale${unpaid.length===1?'':'s'} unpaid or part-paid`,'clock',unpaid.length>0)}
+  </div>
+  <div class="card" style="overflow:hidden">
+    <div class="toolbar">
+      <div class="field-search">${ic('search')}<input class="input" id="salQ" placeholder="Search number, customer, product, SKU, country, reference, notes" value="${esc(f.q)}" aria-label="Search sales"></div>
+      <select class="select" data-sfilter="status" aria-label="Status">${opt(SALE_STATUSES,f.status,'All statuses')}</select>
+      <select class="select" data-sfilter="payment" aria-label="Payment status">${opt(PAYMENT_STATUSES,f.payment,'All payments')}</select>
+      <select class="select" data-sfilter="customer" aria-label="Customer">${opt(DB.customers.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(c=>[c.id,c.name]),f.customer,'All customers')}</select>
+      <select class="select" data-sfilter="country" aria-label="Country">${opt(uniqSorted(DB.sales.map(s=>s.country)),f.country,'All countries')}</select>
+      <select class="select" data-sfilter="currency" aria-label="Currency">${opt(uniqSorted(DB.sales.map(s=>s.currency)),f.currency,'All currencies')}</select>
+      <select class="select" data-sfilter="product" aria-label="Product">${opt(products.map(p=>[p.id,p.name]),f.product,'All products')}</select>
+      <label class="check" style="font-weight:500">From <input type="date" class="input" data-sfilter="from" value="${f.from}" style="width:auto;height:38px" aria-label="From date"></label>
+      <label class="check" style="font-weight:500">To <input type="date" class="input" data-sfilter="to" value="${f.to}" style="width:auto;height:38px" aria-label="To date"></label>
+      <button class="btn sm ghost" data-action="resetSal" ${salFiltersActive()?'':'disabled'}>${ic('rotate-ccw','i i-sm')}Reset Filters</button>
+    </div>
+    <div id="salTable"></div>
+  </div>`;
+};
+function renderSalTable(){
+  const box=$('#salTable'); if(!box) return;
+  const f=S.sal, rows=salRows();
+  const th=(label,key,num)=>`<th class="sortable ${num?'num':''} ${f.sort===key?'sorted':''}" data-ssort="${key}" aria-sort="${f.sort===key?(f.dir>0?'ascending':'descending'):'none'}">${label}${sortIcon()}</th>`;
+  const amt=(n,c)=>cur(n,c).replace(c+' ','');
+  box.innerHTML=rows.length?`<div class="table-wrap"><table><thead><tr>${th('Sale Number','no')}${th('Date','date')}${th('Customer','customer')}${th('Country','country')}${th('Status','status')}${th('Payment Status','payment')}${th('Items','items',1)}${th('Units','units',1)}${th('Currency','currency')}${th('Subtotal','sub',1)}${th('Total Sale','total',1)}<th class="num">Actions</th></tr></thead><tbody>
+    ${rows.map(s=>{const t=saleTotals(s),c=customerOf(s);return `<tr class="click" data-go="sale-${s.id}"><td class="mono strong" style="color:var(--fg)">${esc(s.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(s.date)}</td><td style="white-space:nowrap"><span class="strong">${esc(c.name)}</span><span class="cell-sub">${esc(c.type)}</span></td><td>${esc(s.country)||'—'}</td><td>${badge(s.status)}</td><td>${payBadge(s.payment)}</td><td class="num">${t.items}</td><td class="num strong">${n0(t.units)}</td><td>${esc(s.currency)}</td><td class="num">${amt(t.sub,s.currency)}</td><td class="num strong">${amt(t.total,s.currency)}</td><td class="num" style="white-space:nowrap">${['Draft','Confirmed'].includes(s.status)?`<button class="btn sm" data-action="completeSale" data-id="${s.id}">Complete</button>`:`<button class="btn sm ghost" data-go="sale-${s.id}">View</button>`}</td></tr>`}).join('')}
+    </tbody></table></div><div class="table-foot"><span>Showing ${rows.length} of ${DB.sales.length} sales</span><span>Amounts are in each sale's own currency</span></div>`
+    :`<div class="empty"><b>${DB.sales.length?'No sales match those filters':'No sales yet'}</b>${DB.sales.length?`Try another search or <button class="link-btn" data-action="resetSal">reset the filters</button>.`:`<button class="link-btn" data-action="sale">Record your first sale</button>`}</div>`;
+  refreshIcons();
+}
+
+PAGES.sale = id=>{
+  const s=DB.sales.find(x=>x.id===id); if(!s) return notFound('sale');
+  const c=customerOf(s), t=saleTotals(s), cy=s.currency, mv=DB.movements.filter(m=>m.saleId===s.id);
+  const A=(l,a,i,k='')=>btn(l,a,i,k,`data-id="${s.id}"`);
+  const later=A('Update Payment','paySale','wallet')+A('Add Note','noteSale','message-square-plus')+A('Copy as New','copySale','copy');
+  const actions={Draft:A('Edit','editSale','pencil')+A('Delete','deleteSale','trash-2','ghost danger-btn')+A('Confirm','confirmSale','clipboard-check')+A('Complete Sale','completeSale','package-check','primary'),
+    Confirmed:A('Edit','editSale','pencil')+A('Cancel Sale','cancelSale','circle-x','ghost danger-btn')+A('Update Payment','paySale','wallet')+A('Complete Sale','completeSale','package-check','primary'),
+    Completed:A('Reverse Sale','reverseSale','undo-2','ghost danger-btn')+later,Cancelled:later,Reversed:later}[s.status];
+  const notice={Draft:['info','file-pen-line','Draft. This sale has not changed stock. Stock is removed once, when you complete it.'],
+    Confirmed:['info','clipboard-check','Confirmed order. Stock is removed once, when you complete the sale (handed over or shipped).'],
+    Completed:['ok','package-check',`Completed ${fmtDate(s.completedDate)}. ${n0(t.units)} units were removed from inventory. Items, prices and costs are now locked; to undo, use Reverse Sale.`],
+    Cancelled:['mute','circle-x',`Cancelled${s.cancelledDate?' '+fmtDate(s.cancelledDate):''}${s.cancelReason?` · ${s.cancelReason}`:''}. No stock was affected.`],
+    Reversed:['bad','undo-2',`Reversed ${fmtDate(s.reversedDate)} · ${s.reverseReason||''}. The stock was returned; both the sale and the reversal stay in the stock history. It no longer counts as revenue.`]}[s.status];
+  const amt=n=>cur(n,cy);
+  return head(`${esc(s.no)} <span style="vertical-align:5px">${badge(s.status)} ${payBadge(s.payment)}</span>`,`${esc(c.name)} · ${esc(s.country)||'No country'} · ${fmtDate(s.date)} · ${esc(cy)}`,actions,crumbs(['Sales','sales'],[s.no]))+
+  `<div class="notice" style="background:var(--${notice[0]}-bg);color:var(--${notice[0]}-fg)">${ic(notice[1],'i i-sm')}${esc(notice[2])}</div>
+  <div class="stat-strip">
+    <div><span>Total Units</span><b>${n0(t.units)}</b></div>
+    <div><span>Subtotal</span><b>${amt(t.gross)}</b></div>
+    <div><span>Discount</span><b>${t.discount?'−'+amt(t.discount):amt(0)}</b></div>
+    <div><span>Shipping / Other</span><b>${amt(t.charges)}</b></div>
+    <div><span>Final Sale Total</span><b>${amt(t.total)}</b></div>
+    <div><span>Gross Profit${t.estimated?' (est.)':''}</span><b class="${t.gp<0?'chg-out':''}">${t.hasFx?sgd(t.gp,2):'—'}</b></div>
+  </div>
+  <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Items</h3><span class="sub">${t.estimated?'Unit cost is today\'s cost price; it is locked in when the sale is completed.':'Unit cost was locked in when the sale was completed.'} Revenue and profit in SGD${cy!==BASE_CURRENCY?` at 1 ${esc(cy)} = ${t.fx} SGD`:''}.</span></div></div>
+    <div class="table-wrap"><table><thead><tr><th>Product</th><th>Variant</th><th>SKU</th><th class="num">Quantity</th><th class="num">Unit Selling Price</th>${t.lineDisc?'<th class="num">Discount</th>':''}<th class="num">Line Revenue</th><th class="num">Unit Cost</th><th class="num">Gross Profit</th>${mv.length?'<th>Stock</th>':''}</tr></thead><tbody>
+    ${t.lines.map(x=>{const L=purchaseLineLabel(x.l),ms=mv.filter(m=>m.lineId===x.l.id);return `<tr ${L.v?`class="click" data-variant="${L.v.id}"`:''}><td class="strong" style="white-space:nowrap">${esc(L.name)}</td><td style="white-space:nowrap">${L.v&&L.v.colour?sw(L.v.colour)+' ':''}${esc(L.variant)}</td><td class="mono">${esc(L.sku)}</td><td class="num strong">${n0(x.l.qty)}</td><td class="num">${amt(x.l.unitPrice)}</td>${t.lineDisc?`<td class="num muted">${x.disc?'−'+amt(x.disc):'—'}</td>`:''}<td class="num strong">${amt(x.rev)}</td><td class="num">${sgd(x.unitCost,2)}${x.estimated?' <span class="muted">est.</span>':''}</td><td class="num strong ${x.gp<0?'chg-out':''}">${t.hasFx?sgd(x.gp,2):'—'}</td>${mv.length?`<td style="white-space:nowrap">${ms.map(m=>`<span class="${m.change>0?'chg-in':'chg-out'} strong">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</span> <span class="muted">${m.prevQty} → ${m.newQty}</span>`).join('<br>')}</td>`:''}</tr>`}).join('')}
+    </tbody></table></div></div>
+  <div class="grid g-3">
+    <div class="card"><div class="card-head"><h3>Details</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:130px minmax(0,1fr)">
+      <dt>Customer</dt><dd>${c.id?`<a href="#customer-${c.id}">${esc(c.name)}</a>`:esc(c.name)}</dd><dt>Customer type</dt><dd>${esc(c.type)||'—'}</dd><dt>Country</dt><dd>${esc(s.country)||'—'}</dd>
+      <dt>Sale date</dt><dd>${fmtDate(s.date)}</dd><dt>Completed</dt><dd>${fmtDate(s.completedDate)}</dd><dt>Customer ref</dt><dd>${esc(s.reference)||'—'}</dd>
+      <dt>Currency</dt><dd>${esc(cy)}${cy!==BASE_CURRENCY?` <span class="muted" style="font-weight:500">· 1 = ${t.fx||'?'} SGD</span>`:''}</dd><dt>Status</dt><dd>${badge(s.status)}</dd><dt>Payment</dt><dd>${payBadge(s.payment)}</dd></dl></div></div>
+    <div class="card"><div class="card-head"><h3>Totals</h3></div><div class="card-body" style="display:flex;flex-direction:column;gap:16px">
+      <div class="summary"><div><span>Subtotal · ${n0(t.units)} units</span><span>${amt(t.gross)}</span></div>
+        <div><span>Line discounts</span><span class="${t.lineDisc?'':'muted'}">${t.lineDisc?'−':''}${amt(t.lineDisc)}</span></div>
+        <div><span>Order discount</span><span class="${t.orderDisc?'':'muted'}">${t.orderDisc?'−':''}${amt(t.orderDisc)}</span></div>
+        <div><span>Shipping charge</span><span class="${t.ship?'':'muted'}">${amt(t.ship)}</span></div>
+        <div><span>${s.charges.otherDesc?'Other: '+esc(s.charges.otherDesc):'Other charge'}</span><span class="${t.other?'':'muted'}">${amt(t.other)}</span></div>
+        <div class="total"><span>Final Sale Total</span><span>${amt(t.total)}</span></div></div>
+      <div class="summary"><div><span>Product revenue (SGD)</span><span>${t.hasFx?sgd(t.revBase,2):'—'}</span></div><div><span>Cost of goods sold</span><span>−${sgd(t.cogs,2)}</span></div><div class="total"><span>Gross profit${t.estimated?' (est.)':''}</span><span>${t.hasFx?`${sgd(t.gp,2)} · ${pct(t.margin)}`:'—'}</span></div></div>
+      <div><div class="field-label" style="margin-bottom:4px">Notes</div><p class="desc">${s.notes?esc(s.notes):'<span class="muted">No notes</span>'}</p></div></div></div>
+    <div class="card"><div class="card-head"><h3>Activity</h3></div><div class="card-body"><div class="timeline">${s.history.slice().reverse().map(h=>`<div class="tl-item"><span class="tl-dot" style="background:var(--${{completed:'ok-fg',reversed:'bad-fg',cancelled:'bad-fg',confirmed:'info-fg',payment:'warn-fg',note:'warn-fg'}[h.kind]||'fg-3'})"></span><span>${esc(h.text)}</span><span class="muted" style="white-space:nowrap;font-size:12.5px">${fmtStamp(h.at)}</span></div>`).join('')}</div></div></div>
+  </div>`;
+};
+
+/* ----- Customers ----- */
+function customerStats(c){
+  const all=DB.sales.filter(s=>s.customerId===c.id), done=all.filter(s=>s.status==='Completed'), st=salesStats(done);
+  return {all,done,...st,last:done.map(s=>s.completedDate).sort().pop()||''};
+}
+PAGES.customers = ()=>{
+  const f=S.cus, types=['All',...CUSTOMER_TYPES];
+  const rows=DB.customers.filter(c=>(f.type==='All'||c.type===f.type)&&(f.status==='All'||c.status===f.status)&&(!f.q||matches([c.name,c.type,c.country,c.contact,c.email,c.phone,c.notes].join(' ').toLowerCase(),f.q))).map(c=>({c,st:customerStats(c)})).sort((a,b)=>b.st.total-a.st.total||a.c.name.localeCompare(b.c.name));
+  return head('Customers',`${DB.customers.length} customers in ${new Set(DB.customers.map(c=>c.country).filter(Boolean)).size} countries`,btn('Add Customer','addCustomer','user-plus','primary'))+
+  `<div class="card" style="overflow:hidden">
+    <div class="toolbar">${filterSeg(types,f.type,'ctype')}<div class="field-search" style="margin-left:auto">${ic('search')}<input class="input" id="cusQ" placeholder="Search name, country, contact, email" value="${esc(f.q)}" aria-label="Search customers"></div>${filterSeg(['Active','Inactive','All'],f.status,'cstatus')}</div>
+    ${rows.length?`<div class="table-wrap"><table><thead><tr><th>Customer Name</th><th>Customer Type</th><th>Country</th><th>Currency</th><th class="num">Orders</th><th class="num">Units</th><th class="num">Total Sales (SGD)</th><th>Last Purchase</th><th>Status</th></tr></thead><tbody>
+    ${rows.map(({c,st})=>`<tr class="click ${c.status==='Active'?'':'inactive-row'}" data-go="customer-${c.id}"><td><div style="display:flex;gap:12px;align-items:center"><span class="avatar" style="width:32px;height:32px;font-size:12px">${esc(c.name.replace(/^Coach /,'').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase())}</span><span style="white-space:nowrap"><span class="strong">${esc(c.name)}</span><span class="cell-sub">${esc(c.contact)||'—'}</span></span></div></td><td><span class="chip">${esc(c.type)}</span></td><td>${esc(c.country)||'—'}</td><td>${esc(c.currency)}</td><td class="num">${st.count}</td><td class="num">${n0(st.units)}</td><td class="num strong">${sgd(Math.round(st.total))}</td><td class="muted" style="white-space:nowrap">${fmtDate(st.last)}</td><td>${badge(c.status)}</td></tr>`).join('')}
+    </tbody></table></div>`:`<div class="empty"><b>${DB.customers.length?'No customers match':'No customers yet'}</b>${DB.customers.length?'Try another search, type or status.':'<button class="link-btn" data-action="addCustomer">Add your first customer</button>'}</div>`}
+  </div>`;
+};
+PAGES.customer = id=>{
+  const c=DB.customers.find(x=>x.id===id); if(!c) return notFound('customer');
+  const st=customerStats(c), list=st.all.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.no.localeCompare(a.no));
+  const actions=btn('Edit Customer','editCustomer','pencil','',`data-id="${c.id}"`)+
+    (c.status==='Active'?btn('Deactivate','toggleCustomer','circle-pause','ghost',`data-id="${c.id}"`):btn('Reactivate','toggleCustomer','circle-play','',`data-id="${c.id}"`))+
+    (!st.all.length?btn('Delete','deleteCustomer','trash-2','ghost danger-btn',`data-id="${c.id}"`):'')+
+    (c.status==='Active'?btn('Record Sale','saleFor','receipt','primary',`data-id="${c.id}"`):'');
+  return head(esc(c.name),`${esc(c.type)} · ${esc(c.country)||'No country'} · default currency ${esc(c.currency)}`,actions,crumbs(['Customers','customers'],[c.name]))+
+  (c.status!=='Active'?`<div class="notice">${ic('circle-pause','i i-sm')}This customer is inactive. Past sales stay visible, but they won't be offered on new sales.</div>`:'')+
+  `<div class="stat-strip">
+    <div><span>Total Orders</span><b>${st.count}</b></div>
+    <div><span>Total Units Purchased</span><b>${n0(st.units)}</b></div>
+    <div><span>Total Revenue</span><b>${sgd(Math.round(st.total))}</b></div>
+    <div><span>Gross Profit</span><b>${sgd(Math.round(st.gp))}</b></div>
+    <div><span>Average Order Value</span><b>${st.count?sgd(Math.round(st.avg)):'—'}</b></div>
+    <div><span>Last Order Date</span><b style="font-size:16px">${fmtDate(st.last)}</b></div>
+  </div>
+  <div class="split">
+    <div class="card"><div class="card-head"><h3>Customer Information</h3>${badge(c.status)}</div><div class="card-body"><dl class="spec" style="grid-template-columns:110px minmax(0,1fr)">
+      <dt>Type</dt><dd>${esc(c.type)}</dd><dt>Contact</dt><dd>${esc(c.contact)||'—'}</dd><dt>Email</dt><dd style="word-break:break-all">${esc(c.email)||'—'}</dd><dt>Phone</dt><dd>${esc(c.phone)||'—'}</dd>
+      <dt>Address</dt><dd style="font-weight:500">${esc(c.address)||'—'}</dd><dt>Country</dt><dd>${esc(c.country)||'—'}</dd><dt>Currency</dt><dd>${esc(c.currency)}</dd><dt>Notes</dt><dd style="font-weight:500;color:var(--fg-2)">${esc(c.notes)||'—'}</dd></dl>
+      <p class="note" style="margin-top:12px">${ic('info','i i-sm')}Totals count completed sales only, in SGD.</p></div></div>
+    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>Sales History</h3><span class="sub">${list.length} record${list.length===1?'':'s'}</span></div>
+      ${list.length?`<div class="table-wrap"><table><thead><tr><th>Sale Number</th><th>Date</th><th>Status</th><th>Payment Status</th><th class="num">Items</th><th class="num">Units</th><th class="num">Total</th><th class="num">Gross Profit</th></tr></thead><tbody>
+      ${list.map(s=>{const t=saleTotals(s);return `<tr class="click" data-go="sale-${s.id}"><td class="mono strong" style="color:var(--fg)">${esc(s.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(s.date)}</td><td>${badge(s.status)}</td><td>${payBadge(s.payment)}</td><td class="num">${t.items}</td><td class="num">${n0(t.units)}</td><td class="num strong" style="white-space:nowrap">${cur(t.total,s.currency)}</td><td class="num ${s.status==='Completed'?'':'muted'}" style="white-space:nowrap">${t.hasFx?sgd(Math.round(t.gp)):'—'}${s.status==='Completed'?'':' <span class="muted">·</span>'}</td></tr>`}).join('')}
+      </tbody></table></div>`:`<div class="empty"><b>No sales to this customer yet</b>${c.status==='Active'?`<button class="link-btn" data-action="saleFor" data-id="${c.id}">Record a sale</button>`:''}</div>`}</div>
+  </div>`;
+};
+function variantSalesTab(v){
+  const rows=DB.sales.flatMap(s=>{const t=saleTotals(s);return t.lines.filter(x=>x.l.variantId===v.id).map(x=>({s,x}))}).sort((a,b)=>(b.s.completedDate||b.s.date).localeCompare(a.s.completedDate||a.s.date)||b.s.no.localeCompare(a.s.no));
+  if(!rows.length) return `<div class="empty"><b>No sales for this SKU yet</b><button class="link-btn" data-action="sale">Record a sale</button></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>Sale Number</th><th>Date</th><th>Customer</th><th>Country</th><th class="num">Quantity</th><th class="num">Selling Price</th><th class="num">Revenue</th><th class="num">Gross Profit</th><th>Status</th></tr></thead><tbody>
+  ${rows.map(({s,x})=>`<tr class="click" data-go="sale-${s.id}"><td class="mono strong" style="color:var(--fg)">${esc(s.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(s.completedDate||s.date)}</td><td style="white-space:nowrap">${esc(customerOf(s).name)}</td><td>${esc(s.country)}</td><td class="num strong">${n0(x.l.qty)}</td><td class="num" style="white-space:nowrap">${cur(x.l.unitPrice,s.currency)}</td><td class="num" style="white-space:nowrap">${cur(x.rev,s.currency)}</td><td class="num strong">${sgd(x.gp,2)}${x.estimated?' <span class="muted">est.</span>':''}</td><td>${badge(s.status)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+/* ----- Reports (live) ----- */
+const RTABS=['Sales','Inventory','Purchases','Product Performance','Customers','Sales by Country','Gross Profit'];
+function reportRange(){
+  const t=todayISO();
+  switch(S.range){
+    case 'This Month': return [monthStart(t),t];
+    case 'Last Month': return [monthStart(t,1),isoAddDays(monthStart(t),-1)];
+    case 'Last 3 Months': return [monthStart(t,2),t];
+    case 'This Year': return [t.slice(0,4)+'-01-01',t];
+    default: {const f=S.rfrom||monthStart(t,2),to=S.rto||t;return f<=to?[f,to]:[to,f]}
+  }
+}
+PAGES.reports = ()=>{const [from,to]=reportRange();return head('Reports','Live figures from completed sales, purchases and stock. Money is in SGD; drafts, cancelled and reversed sales are excluded.',btn('Export','export','download'))+
+  `<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">${filterSeg(['This Month','Last Month','Last 3 Months','This Year','Custom Range'],S.range,'range')}
+   ${S.range==='Custom Range'?`<div style="display:flex;gap:8px;align-items:center"><input type="date" class="input" id="rFrom" style="width:auto;height:38px" value="${from}" aria-label="From"><span class="muted">to</span><input type="date" class="input" id="rTo" style="width:auto;height:38px" value="${to}" aria-label="To"></div>`:`<span class="muted" style="font-size:13px">${fmtDate(from)} – ${fmtDate(to)}</span>`}</div>
+  <div class="tabs" role="tablist">${RTABS.map(t=>`<button role="tab" aria-selected="${S.rtab===t}" data-rtab="${t}">${t}</button>`).join('')}</div>
+  ${reportBody(from,to)}`};
+function reportBody(from,to){
+  const card=(title,sub,body,extra='')=>`<div class="card"><div class="card-head"><div><h3>${title}</h3>${sub?`<span class="sub">${sub}</span>`:''}</div>${extra}</div><div class="card-body">${body}</div></div>`;
+  const list=completedBetween(from,to), st=salesStats(list), b=buckets(from,to), none='<div class="empty" style="padding:24px"><b>No completed sales in this period</b></div>';
+  const money0=x=>sgd(Math.round(x));
+  switch(S.rtab){
+    case 'Sales': return `<div class="grid kpis">${kpi('Sales',money(Math.round(st.total)),`${st.count} completed sales`,'trending-up')}${kpi('Units Sold',n0(st.units),'Across all SKUs','boxes')}${kpi('Average Order',money(Math.round(st.avg)),'Sale total incl. shipping','receipt')}${kpi('Gross Profit',money(Math.round(st.gp)),`${pct(st.margin)} margin`,'percent')}</div>
+      <div class="grid g-2-1">${card('Sales over time','Completed sales, SGD',chartFor(b,[{key:'in',name:'Sales',data:series(b,list,s=>s.completedDate,s=>saleTotals(s).totalBase)}],{fmt:money0,cap:b.keys.length<=13}))}${card('Top Customers','Sales, SGD',list.length?hbars(groupSum(list,s=>customerOf(s).name).slice(0,6),money0):none)}</div>`;
+    case 'Inventory': {const t=totals(), byP=DB.products.map(p=>[p.name,Math.round(totals(variantsOf(p.id)).value)]).filter(r=>r[1]>0).sort((a,c)=>c[1]-a[1]);
+      const mb=buckets(monthStart(todayISO(),5),todayISO()), ends=mb.keys.map((k,i)=>i===mb.keys.length-1?todayISO():isoAddDays(monthStart(k+'-01',-1),-1));
+      const val=ends.map(d=>Math.round(DB.variants.reduce((a,v)=>a+DB.movements.filter(m=>m.variantId===v.id&&m.date<=d).reduce((q,m)=>q+m.change,0)*v.cost,0)));
+      return `<div class="grid kpis">${kpi('Inventory Value',money(Math.round(t.value)),'At cost, today','wallet')}${kpi('At Selling Price',money(Math.round(t.retail)),'If everything sold at selling price','tag')}${kpi('Units in Stock',n0(t.units),`${DB.variants.length} SKUs`,'boxes')}${kpi('Low or Out of Stock',t.low+t.out,`${t.out} out of stock`,'triangle-alert',true)}</div>
+      <div class="grid g-2-1">${card('Inventory Value','Month-end stock × current cost price',lineChart(mb.labels,val,money0))}${card('Value by Product','At cost, today',byP.length?hbars(byP,money0):'<div class="empty">No stock on hand</div>')}</div>`;}
+    case 'Purchases': {const flow=stockFlow(b), rec=DB.purchases.filter(p=>p.status==='Received'&&p.receivedDate>=from&&p.receivedDate<=to);
+      const bySup=Object.entries(rec.reduce((m,p)=>{const n=supplierOf(p).name;m[n]=(m[n]||0)+purchaseTotals(p).units;return m},{})).sort((a,c)=>c[1]-a[1]);
+      return `<div class="grid g-2-1">${card('Stock Purchased vs Sold','Units, net of reversals',chartFor(b,[{key:'in',name:'Purchased',data:flow.inU},{key:'out',name:'Sold',data:flow.outU}]),legend())}${card('Units Received by Supplier',`${rec.length} purchases received`,bySup.length?hbars(bySup,x=>n0(x)+' units'):'<div class="empty" style="padding:24px"><b>No purchases received in this period</b></div>')}</div>`;}
+    case 'Product Performance': {const top=topVariants(list).sort((a,c)=>c.rev-a.rev), cut=isoAddDays(todayISO(),-45);
+      const slow=DB.variants.filter(v=>isLive(v)&&v.qty>0&&!DB.movements.some(m=>m.variantId===v.id&&m.type==='sale'&&m.date>=cut)).slice(0,6);
+      return `<div class="grid g-2-1">${card('Top Products','Product revenue, SGD',top.length?hbars(top.slice(0,8).map(r=>[r.name,r.rev,r.label]),money0):none)}${card('Slow Movers','In stock, no sale in 45 days',slow.length?`<div class="list">${slow.map(v=>`<div class="list-item click" data-go="variant-${v.id}" style="cursor:pointer"><span class="act-icon" style="background:var(--mute-bg);color:var(--mute-fg)">${ic('hourglass','i i-sm')}</span><div><div class="t">${esc(productOf(v).name)} <span class="muted" style="font-weight:500">${esc(variantLabel(v))}</span></div><div class="d">${n0(v.qty)} in stock · ${sgd(Math.round(v.qty*v.cost))} at cost</div></div></div>`).join('')}</div>`:'<div class="empty" style="padding:24px"><b>Every SKU in stock sold in the last 45 days</b></div>')}</div>
+      <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>By SKU</h3><span class="sub">Completed sales in this period</span></div>${top.length?`<div class="table-wrap"><table><thead><tr><th>Product</th><th>SKU</th><th class="num">Units Sold</th><th class="num">Revenue</th><th class="num">COGS</th><th class="num">Gross Profit</th><th class="num">Margin</th></tr></thead><tbody>
+      ${top.map(r=>`<tr class="click" data-go="variant-${r.id}"><td><span class="strong">${esc(r.name)}</span><span class="cell-sub">${esc(r.label)}</span></td><td class="mono">${esc(r.sku)}</td><td class="num">${n0(r.units)}</td><td class="num">${sgd(r.rev,2)}</td><td class="num muted">${sgd(round2(r.rev-r.gp),2)}</td><td class="num strong">${sgd(r.gp,2)}</td><td class="num">${pct(r.rev?r.gp/r.rev:NaN)}</td></tr>`).join('')}</tbody></table></div>`:none}</div>`;}
+    case 'Customers': return `<div class="grid g-1-1">${card('Top Customers','Sales, SGD',list.length?hbars(groupSum(list,s=>customerOf(s).name).slice(0,8).map(([n,v])=>[n,v,(DB.customers.find(c=>c.name===n)||{}).country]),money0):none)}${card('Sales by Customer Type','Sales, SGD',list.length?hbars(groupSum(list,s=>customerOf(s).type),money0):none)}</div>`;
+    case 'Sales by Country': {const rows=groupSum(list,s=>s.country), tot=rows.reduce((a,r)=>a+r[1],0);
+      return `<div class="grid g-2-1">${card('Sales by Country','Completed sales, SGD',rows.length?hbars(rows,money0):none)}${card('Share of Sales','',rows.length?`<div class="list">${rows.map(r=>`<div class="list-item" style="align-items:center"><div class="t" style="flex:1">${esc(r[0])}</div><span class="muted" style="font-size:13px">${money0(r[1])}</span><span class="strong" style="min-width:44px;text-align:right">${pct(r[1]/tot)}</span></div>`).join('')}</div>`:none)}</div>`;}
+    case 'Gross Profit': return `<div class="grid kpis">${kpi('Product Revenue',money(Math.round(st.rev)),'After discounts, excl. shipping','trending-up')}${kpi('Cost of Goods Sold',money(Math.round(st.cogs)),'Cost snapshot at each sale','package')}${kpi('Gross Profit',money(Math.round(st.gp)),'','wallet')}${kpi('Margin',pct(st.margin),'Gross profit ÷ product revenue','percent')}</div>
+      ${card('Gross Profit over time','SGD',chartFor(b,[{key:'in',name:'Gross profit',data:series(b,list,s=>s.completedDate,s=>saleTotals(s).gp)}],{fmt:money0,cap:b.keys.length<=13}))}`;
+  }
+}
 
 /* ----- Purchases ----- */
 function blankPurFilters(){return {q:'',status:'',supplier:'',currency:'',product:'',country:'',from:'',to:''}}
@@ -1069,12 +1426,12 @@ function renderInvTable(){
 function movementTable(list,{showVariant}){
   if(!list.length) return `<div class="empty"><b>No stock movements yet</b>Opening stock, adjustments and received purchases appear here.</div>`;
   return `<div class="table-wrap"><table><thead><tr><th>Date</th>${showVariant?'<th>Product</th>':''}<th>Movement Type</th><th class="num">Quantity</th><th class="num">Previous Stock</th><th class="num">New Stock</th><th>Reason</th><th>Reference</th></tr></thead><tbody>
-  ${list.map(m=>{const v=DB.variants.find(x=>x.id===m.variantId),p=v&&productOf(v),t=MOVEMENT_TYPES[m.type];return `<tr ${showVariant&&v?`class="click" data-variant="${v.id}"`:''}><td class="muted" style="white-space:nowrap">${fmtDate(m.date)}</td>${showVariant?`<td><span class="strong">${esc(p?p.name:'Deleted product')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')} · ${esc(m.sku)}</span></td>`:''}<td>${badge(t.label,t.tone)}</td><td class="num strong ${m.change>0?'chg-in':'chg-out'}">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</td><td class="num muted">${n0(m.prevQty)}</td><td class="num strong">${n0(m.newQty)}</td><td>${esc(m.reason)}${m.notes?`<span class="cell-sub">${esc(m.notes)}</span>`:''}</td><td class="mono">${m.purchaseId&&DB.purchases.some(x=>x.id===m.purchaseId)?`<a class="ref-link" href="#purchase-${m.purchaseId}">${esc(m.reference)}</a>`:esc(m.reference)}</td></tr>`}).join('')}
+  ${list.map(m=>{const v=DB.variants.find(x=>x.id===m.variantId),p=v&&productOf(v),t=MOVEMENT_TYPES[m.type];return `<tr ${showVariant&&v?`class="click" data-variant="${v.id}"`:''}><td class="muted" style="white-space:nowrap">${fmtDate(m.date)}</td>${showVariant?`<td><span class="strong">${esc(p?p.name:'Deleted product')}</span><span class="cell-sub">${esc(v?variantLabel(v):'')} · ${esc(m.sku)}</span></td>`:''}<td>${badge(t.label,t.tone)}</td><td class="num strong ${m.change>0?'chg-in':'chg-out'}">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</td><td class="num muted">${n0(m.prevQty)}</td><td class="num strong">${n0(m.newQty)}</td><td>${esc(m.reason)}${m.notes?`<span class="cell-sub">${esc(m.notes)}</span>`:''}</td><td class="mono">${m.purchaseId&&DB.purchases.some(x=>x.id===m.purchaseId)?`<a class="ref-link" href="#purchase-${m.purchaseId}">${esc(m.reference)}</a>`:m.saleId&&DB.sales.some(x=>x.id===m.saleId)?`<a class="ref-link" href="#sale-${m.saleId}">${esc(m.reference)}</a>`:esc(m.reference)}</td></tr>`}).join('')}
   </tbody></table></div>`;
 }
 function movementHistoryCard(){
   const list=DB.movements.slice().sort((a,b)=>b.date.localeCompare(a.date)||b.seq-a.seq);
-  return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Movement history</h3><span class="sub">Every opening balance, adjustment, purchase receipt and reversal, newest first. Sales join this ledger in a later phase.</span></div></div>${movementTable(list,{showVariant:true})}</div>`;
+  return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Movement history</h3><span class="sub">Every opening balance, adjustment, purchase, sale and reversal, newest first.</span></div></div>${movementTable(list,{showVariant:true})}</div>`;
 }
 
 /* ----- Products ----- */
@@ -1135,7 +1492,7 @@ PAGES.variant = id=>{
     (v.status==='Active'?btn('Deactivate Variant','toggleVariant','circle-pause','ghost',`data-id="${v.id}"`):btn('Reactivate Variant','toggleVariant','circle-play','',`data-id="${v.id}"`))+
     (!mv.length&&!usedInPurchases(v.id)?btn('Delete','deleteVariant','trash-2','ghost danger-btn',`data-id="${v.id}"`):'')+
     btn('Adjust Stock','adjust','sliders-horizontal','primary',`data-id="${v.id}"`);
-  const tabs=['Overview','Stock Movement','Purchases','Sales'], nPur=DB.purchases.filter(p=>p.lines.some(l=>l.variantId===v.id)).length;
+  const tabs=['Overview','Stock Movement','Purchases','Sales'], nPur=DB.purchases.filter(p=>p.lines.some(l=>l.variantId===v.id)).length, nSal=DB.sales.filter(x=>x.lines.some(l=>l.variantId===v.id)).length;
   return head(`${esc(p.name)} ${esc(variantLabel(v).replace(/ \/ /g,' – '))}`,`<span class="mono">${esc(v.sku)}</span> · ${esc(c.name)}`,actions,crumbs(['Products','products'],[p.name,'product-'+p.id],[variantLabel(v)]))+
   (v.status!=='Active'||p.status!=='Active'?`<div class="notice">${ic('circle-pause','i i-sm')}${v.status!=='Active'?'This variant is inactive.':'The parent product is inactive.'} Its stock history is kept, and it won't be offered in new transactions.</div>`:'')+
   `<div class="stat-strip">
@@ -1147,7 +1504,7 @@ PAGES.variant = id=>{
     <div><span>Stock Status</span><b>${badge(st)}</b></div>
   </div>
   <div class="card" style="overflow:hidden">
-    <div class="tabs" role="tablist" style="padding:0 12px">${tabs.map(t=>`<button role="tab" aria-selected="${S.vtab===t}" data-vtab="${t}">${t}${t==='Stock Movement'?` <span class="muted" style="font-weight:500">${mv.length}</span>`:t==='Purchases'?` <span class="muted" style="font-weight:500">${nPur}</span>`:''}</button>`).join('')}</div>
+    <div class="tabs" role="tablist" style="padding:0 12px">${tabs.map(t=>`<button role="tab" aria-selected="${S.vtab===t}" data-vtab="${t}">${t}${t==='Stock Movement'?` <span class="muted" style="font-weight:500">${mv.length}</span>`:t==='Purchases'?` <span class="muted" style="font-weight:500">${nPur}</span>`:t==='Sales'?` <span class="muted" style="font-weight:500">${nSal}</span>`:''}</button>`).join('')}</div>
     ${S.vtab==='Overview'?`<div class="card-body grid g-1-1" style="gap:28px">
       <div><h3 style="font-size:15px;margin-bottom:12px">Details</h3><dl class="spec">
         <dt>Product</dt><dd><a href="#product-${p.id}">${esc(p.name)}</a></dd><dt>SKU</dt><dd>${esc(v.sku)}</dd><dt>Brand</dt><dd>${esc(p.brand)}</dd><dt>Category</dt><dd>${esc(c.name)}</dd>
@@ -1161,6 +1518,7 @@ PAGES.variant = id=>{
         <dt>Last movement</dt><dd>${mv.length?fmtDate(mv[mv.length-1].date)+' · '+MOVEMENT_TYPES[mv[mv.length-1].type].label:'—'}</dd></dl></div></div>`
     :S.vtab==='Stock Movement'?movementTable(mv,{showVariant:false})
     :S.vtab==='Purchases'?variantPurchasesTab(v)
+    :S.vtab==='Sales'?variantSalesTab(v)
     :`<div class="empty"><b>${S.vtab} arrive in a later phase</b>Once ${S.vtab.toLowerCase()} are recorded they will update this SKU's stock and show here.</div>`}
   </div>`;
 };
@@ -1168,89 +1526,6 @@ const notFound = what=>`<div class="card empty"><b>That ${what} doesn't exist</b
 
 /* ----- Mock pages (Phase 1, unchanged until later phases) ----- */
 const filterSeg = (list,cur,attr)=>`<div class="seg" role="group">${list.map(x=>`<button aria-pressed="${x===cur}" data-${attr}="${x}">${x}</button>`).join('')}</div>`;
-PAGES.sales = ()=>{
-  const rows=SALES.filter(s=>S.salesFilter==='All'||s.status===S.salesFilter);
-  return head('Sales','Stock going out to distributors, shops, academies and coaches',sample()+btn('Record Sale','sale','receipt','primary'))+
-  `<div class="grid kpis">
-    ${kpi('Sales This Month',money(MOCK.salesThisMonth),`<span class="delta down">${MOCK.salesDelta}</span> vs September`,'trending-up')}
-    ${kpi('Orders This Month',38,'412 units · average order SGD 364','shopping-bag')}
-    ${kpi('Awaiting Payment',money(5150),'2 invoices · 1 overdue','clock',true)}
-    ${kpi('Gross Margin',`32<small style="margin-left:2px">%</small>`,'This month, after landed cost','percent')}
-  </div>
-  <div class="card" style="overflow:hidden">
-    <div class="toolbar">${filterSeg(['All','Paid','Pending','Overdue','Processing','Draft'],S.salesFilter,'sf')}<div class="field-search" style="margin-left:auto">${ic('search')}<input class="input" placeholder="Search invoice or customer" aria-label="Search sales"></div></div>
-    <div class="table-wrap"><table><thead><tr><th class="sortable sorted">Sale Number${sortIcon()}</th><th class="sortable">Date${sortIcon()}</th><th>Customer</th><th>Country</th><th>Products</th><th class="num">Units</th><th class="num sortable">Sale Amount${sortIcon()}</th><th>Payment Status</th></tr></thead><tbody>
-    ${rows.map(s=>{const c=CM[s.cid];return `<tr class="click" data-customer="${c.id}"><td class="mono strong" style="color:var(--fg)">${s.no}</td><td class="muted" style="white-space:nowrap">${s.date}</td><td><span class="strong">${c.name}</span><span class="cell-sub">${c.type}</span></td><td>${c.country}</td><td style="max-width:280px;color:var(--fg-2);font-size:13.5px">${s.products}</td><td class="num">${s.units}</td><td class="num strong">${sgd(s.amount)}</td><td>${badge(s.status)}</td></tr>`}).join('')}
-    </tbody></table></div>
-    <div class="table-foot"><span>Showing ${rows.length} of 38 sales this month</span><div class="pager"><button class="btn sm" disabled>Previous</button><button class="btn sm">Next</button></div></div>
-  </div>`;
-};
-PAGES.customers = ()=>{
-  const q=S.custQ.toLowerCase();
-  const rows=CUSTOMERS.filter(c=>(S.custType==='All'||c.type===S.custType)&&(!q||(c.name+c.country+c.contact).toLowerCase().includes(q)));
-  const types=['All','Distributor','Retail Shop','Tennis Academy','Tennis Coach','Individual'];
-  return head('Customers',`${CUSTOMERS.length} customers in 6 countries`,sample()+btn('Add Customer','customer','user-plus','primary'))+
-  `<div class="card" style="overflow:hidden">
-    <div class="toolbar">${filterSeg(types,S.custType,'ct')}<div class="field-search" style="margin-left:auto">${ic('search')}<input class="input" id="custQ" placeholder="Search name, contact or country" value="${esc(S.custQ)}" aria-label="Search customers"></div></div>
-    <div class="table-wrap"><table><thead><tr><th class="sortable">Customer Name${sortIcon()}</th><th>Customer Type</th><th>Country</th><th class="num sortable">Orders${sortIcon()}</th><th class="num sortable sorted">Total Sales${sortIcon()}</th><th class="sortable">Last Purchase${sortIcon()}</th></tr></thead><tbody>
-    ${rows.map(c=>`<tr class="click" data-customer="${c.id}"><td><div style="display:flex;gap:12px;align-items:center"><span class="avatar" style="width:32px;height:32px;font-size:12px">${c.name.replace(/^Coach /,'').split(' ').map(w=>w[0]).slice(0,2).join('')}</span><span><span class="strong">${c.name}</span><span class="cell-sub">${c.contact}</span></span></div></td><td><span class="chip">${c.type}</span></td><td>${c.country}</td><td class="num">${c.orders}</td><td class="num strong">${sgd(c.total)}</td><td class="muted">${c.last}</td></tr>`).join('')}
-    </tbody></table></div>
-    ${rows.length?'':'<div class="empty"><b>No customers match</b>Try another name or type.</div>'}
-  </div>`;
-};
-PAGES.customer = ()=>{
-  const c=CM[S.customer], dist=c.type==='Distributor';
-  const orders=SALES.filter(s=>s.cid===c.id&&s.status!=='Draft');
-  const hist=orders.concat([
-    {no:'INV-1071',date:'18 Sep 2026',products:'Focus Hex 1.23 Black Reel, Swift 1.25 Reel',units:dist?42:6,amount:dist?2140:690,status:'Paid'},
-    {no:'INV-1052',date:'21 Aug 2026',products:'Focus Hex Ultra 1.25 Blue Set',units:dist?60:12,amount:dist?780:192,status:'Paid'},
-    {no:'INV-1033',date:'30 Jul 2026',products:'Hepta Twist 1.27 Black Reel, Co-Focus Set',units:dist?36:4,amount:dist?1980:420,status:'Paid'}]);
-  const bought=[['MSV Focus Hex','1.23 / Black / Reel',dist?64:14],['MSV Swift','1.25 / Black / Reel',dist?38:8],['MSV Hepta Twist','1.27 / Black / Reel',dist?24:4],['MSV Focus Hex Ultra','1.25 / Blue / Set',dist?120:12]];
-  return head(c.name,`${c.type} · ${c.city}, ${c.country}`,sample()+btn('Edit','customer','pencil')+btn('Record Sale','sale','receipt','primary'),crumbs(['Customers','customers'],[c.name]))+
-  `<div class="grid kpis">
-    ${kpi('Total Spending',money(c.total),'Since first order, Mar 2025','wallet')}
-    ${kpi('Orders',c.orders,`Average ${sgd(Math.round(c.total/c.orders))} per order`,'shopping-bag')}
-    ${kpi('Last Purchase',c.last,'Usually orders every 3–4 weeks','calendar')}
-    ${kpi('Outstanding',money(orders.filter(o=>o.status==='Pending'||o.status==='Overdue').reduce((a,o)=>a+o.amount,0)),`Payment terms: ${c.terms}`,'clock')}
-  </div>
-  <div class="split">
-    <div class="card"><div class="card-head"><h3>Customer Information</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:110px minmax(0,1fr)">
-      <dt>Contact</dt><dd>${c.contact}</dd><dt>Email</dt><dd style="word-break:break-all">${c.email}</dd><dt>Phone</dt><dd>${c.phone}</dd>
-      <dt>Type</dt><dd>${c.type}</dd><dt>Country</dt><dd>${c.country}</dd><dt>Price list</dt><dd>${dist?'Distributor':'Retail'}</dd><dt>Currency</dt><dd>${{Malaysia:'MYR',Thailand:'THB',Indonesia:'IDR',Vietnam:'VND',Philippines:'PHP'}[c.country]||'SGD'}</dd><dt>Terms</dt><dd>${c.terms}</dd></dl></div></div>
-    <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
-      <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>Order History</h3><span class="sub">${hist.length} most recent</span></div>
-        <div class="table-wrap"><table><thead><tr><th>Sale Number</th><th>Date</th><th>Products</th><th class="num">Units</th><th class="num">Amount</th><th>Payment</th></tr></thead><tbody>
-        ${hist.map(s=>`<tr><td class="mono">${s.no}</td><td class="muted" style="white-space:nowrap">${s.date}</td><td style="color:var(--fg-2);font-size:13.5px">${s.products}</td><td class="num">${s.units}</td><td class="num strong">${sgd(s.amount)}</td><td>${badge(s.status)}</td></tr>`).join('')}</tbody></table></div></div>
-      <div class="card"><div class="card-head"><h3>Products Purchased</h3><span class="sub">Units, last 12 months</span></div><div class="card-body">${hbars(bought.map(b=>[b[0],b[2],b[1]]),n=>n0(n)+' units')}</div></div>
-    </div>
-  </div>`;
-};
-
-const RTABS=['Sales','Inventory','Purchases','Product Performance','Customers','Sales by Country','Gross Profit'];
-PAGES.reports = ()=>head('Reports','Simple views of how the business is doing. Choose a period, then a report.',btn('Export','export','download'))+
-  `<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">${filterSeg(['This Month','Last Month','Last 3 Months','This Year','Custom Range'],S.range,'range')}
-   ${S.range==='Custom Range'?`<div style="display:flex;gap:8px;align-items:center"><input type="date" class="input" style="width:auto;height:38px" value="2026-08-01" aria-label="From"><span class="muted">to</span><input type="date" class="input" style="width:auto;height:38px" value="2026-10-28" aria-label="To"></div>`:`<span class="muted" style="font-size:13px">${{'This Month':'1–28 Oct 2026','Last Month':'1–30 Sep 2026','Last 3 Months':'1 Aug – 28 Oct 2026','This Year':'1 Jan – 28 Oct 2026'}[S.range]}</span>`}</div>
-  <div class="tabs" role="tablist">${RTABS.map(t=>`<button role="tab" aria-selected="${S.rtab===t}" data-rtab="${t}">${t}</button>`).join('')}</div>
-  ${reportBody()}`;
-function reportBody(){
-  const card=(title,sub,body,extra='')=>`<div class="card"><div class="card-head"><div><h3>${title}</h3>${sub?`<span class="sub">${sub}</span>`:''}</div>${extra}</div><div class="card-body">${body}</div></div>`;
-  const M=MOCK, rev=M.salesByMonth.reduce((a,b)=>a+b), cost=M.costByMonth.reduce((a,b)=>a+b);
-  switch(S.rtab){
-    case 'Sales': return `<div class="grid kpis">${kpi('Revenue',money(43770),'<span class="delta up">+18%</span> vs previous period','trending-up')}${kpi('Orders',112,'1,145 units sold','shopping-bag')}${kpi('Average Order',money(391),'<span class="delta up">+6%</span>','receipt')}${kpi('Gross Profit',money(14450),'33% margin','percent')}</div>
-      <div class="grid g-2-1">${card('Monthly Sales','Revenue, SGD',columnChart({labels:M.months,series:[{key:'in',name:'Sales',data:M.salesByMonth}],fmt:sgd,cap:true}),sample())}${card('Top Customers','Revenue',hbars(CUSTOMERS.slice(0,5).map(c=>[c.name,Math.round(c.total*.42)])),sample())}</div>`;
-    case 'Inventory': {const t=totals(); const byP=DB.products.map(p=>[p.name,Math.round(totals(variantsOf(p.id)).value)]).filter(r=>r[1]>0).sort((a,b)=>b[1]-a[1]);
-      const inv=M.invValueByMonth.slice(0,-1).concat([Math.round(t.value)]);
-      return `<div class="grid kpis">${kpi('Inventory Value',money(Math.round(t.value)),'At cost · live','wallet')}${kpi('At Selling Price',money(Math.round(t.retail)),'If everything sold at selling price','tag')}${kpi('Units in Stock',n0(t.units),`${DB.variants.length} SKUs`,'boxes')}${kpi('Low or Out of Stock',t.low+t.out,`${t.out} out of stock`,'triangle-alert',true)}</div>
-      <div class="grid g-2-1">${card('Inventory Value','At cost, end of month · this month is live',lineChart(M.months,inv,sgd),sample())}${card('Value by Product','At cost · live',byP.length?hbars(byP):'<div class="empty">No stock on hand</div>')}</div>`;}
-    case 'Purchases': return `<div class="grid g-2-1">${card('Stock Purchased vs Sold','Units per month',columnChart({labels:M.months,series:[{key:'in',name:'Purchased',data:M.unitsIn},{key:'out',name:'Sold',data:M.unitsOut}]}),legend()+sample())}${card('Spend by Supplier','This period',hbars([['MSV GmbH',41060,'Germany'],['MSV Asia Logistics',2140,'Singapore']]),sample())}</div>`;
-    case 'Product Performance': return `<div class="grid g-2-1">${card('Top Products','Revenue, last 90 days',hbars(M.topProducts.map(t=>[t[0],t[3],t[1]])),sample())}${card('Slow Movers','No sale in 45+ days',`<div class="list">${[['MSV Bussard 1.25','White / Set','last sold 2 Sep'],['MSV Soft Touch 1.25','White / Reel','last sold 28 Aug'],['MSV Focus Hex Ultra 1.30','Blue / Reel','last sold 11 Aug']].map(s=>`<div class="list-item"><span class="act-icon" style="background:var(--mute-bg);color:var(--mute-fg)">${ic('hourglass','i i-sm')}</span><div><div class="t">${s[0]} <span class="muted" style="font-weight:500">${s[1]}</span></div><div class="d">${s[2]}</div></div></div>`).join('')}</div>`,sample())}</div>`;
-    case 'Customers': return `<div class="grid g-1-1">${card('Top Customers','Revenue this period',hbars(CUSTOMERS.slice(0,6).map(c=>[c.name,Math.round(c.total*.42),c.country])),sample())}${card('Revenue by Customer Type','This period',hbars([['Distributor',22650],['Tennis Academy',7210],['Retail Shop',6080],['Tennis Coach',1820],['Individual',260]]),sample())}</div>`;
-    case 'Sales by Country': return `<div class="grid g-2-1">${card('Sales by Country','Revenue this period',hbars(M.country),sample())}${card('Share of Revenue','',`<div class="list">${M.country.map(c=>`<div class="list-item" style="align-items:center"><div class="t" style="flex:1">${c[0]}</div><span class="strong">${Math.round(c[1]/M.country.reduce((a,x)=>a+x[1],0)*100)}%</span></div>`).join('')}</div>`)}</div>`;
-    case 'Gross Profit': return `<div class="grid kpis">${kpi('Revenue',money(rev),'Last 6 months','trending-up')}${kpi('Cost of Goods',money(cost),'Landed cost of units sold','package')}${kpi('Gross Profit',money(rev-cost),'','wallet')}${kpi('Margin',Math.round((rev-cost)/rev*100)+'<small style="margin-left:2px">%</small>','Target 30%','percent')}</div>
-      ${card('Gross Profit by Month','SGD',columnChart({labels:M.months,series:[{key:'in',name:'Gross profit',data:M.salesByMonth.map((s,i)=>s-M.costByMonth[i])}],fmt:sgd,cap:true}),sample())}`;
-  }
-}
-
 PAGES.settings = ()=>{
   const sec=(id,title,desc,body)=>`<section class="card" id="set-${id}"><div class="card-head"><div><h3>${title}</h3><span class="sub">${desc}</span></div></div><div class="card-body">${body}</div></section>`;
   const f=(label,val,type='text')=>`<label class="field"><span class="field-label">${label}</span><input class="input" type="${type}" value="${esc(val)}"></label>`;
@@ -1264,12 +1539,12 @@ PAGES.settings = ()=>{
     <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
       ${sec('categories','Product Categories','Group products. Turn on Gauge for categories that need it, such as strings.',`<div>${cats}</div><form class="sku-row" id="addCatForm" style="margin-top:16px;max-width:460px"><input class="input" name="name" placeholder="New category, e.g. Bags" aria-label="New category name"><button class="btn" type="submit">${ic('plus','i i-sm')}Add Category</button></form><span class="err" id="catErr"></span>`)}
       ${sec('company','Company Information','Shown on invoices and purchase orders',`<div class="form-grid">${f('Company name','MSV Southeast Asia Pte. Ltd.')}${f('UEN','202412345K')}${f('Email','orders@msv-sea.com','email')}${f('Phone','+65 6123 4567')}<label class="field span-2"><span class="field-label">Address</span><input class="input" value="21 Kallang Avenue, #04-160, Singapore 339412"></label></div>`)}
-      ${sec('currency','Currency','Stock is valued in SGD. Purchases can be recorded in any currency below.',`<div class="variants">${DB.currencies.map(c=>{const used=DB.purchases.some(p=>p.currency===c)||DB.suppliers.some(x=>x.currency===c);return `<span class="chip" style="height:32px">${esc(c)}${c===BASE_CURRENCY?' · base':''}${c!==BASE_CURRENCY&&!used?` <button class="link-btn" data-action="removeCurrency" data-code="${esc(c)}" style="font-size:12px">Remove</button>`:''}</span>`}).join('')}</div><form class="sku-row" id="addCurForm" style="margin-top:14px;max-width:360px"><input class="input" name="code" maxlength="3" placeholder="Add a code, e.g. AUD" aria-label="Currency code"><button class="btn" type="submit">${ic('plus','i i-sm')}Add Currency</button></form><span class="err" id="curErr"></span><div class="note" style="margin-top:10px">${ic('info','i i-sm')}Exchange rates and conversion to SGD come in a later phase.</div>`)}
+      ${sec('currency','Currency and exchange rates','Stock, profit and reports are in SGD. Sales and purchases can be in any currency below.',`<div class="table-wrap" style="border:1px solid var(--line);border-radius:12px;max-width:520px"><table><thead><tr><th>Currency</th><th>1 unit = SGD</th><th></th></tr></thead><tbody>${DB.currencies.map(c=>{const used=DB.purchases.some(p=>p.currency===c)||DB.sales.some(x=>x.currency===c)||DB.suppliers.some(x=>x.currency===c)||DB.customers.some(x=>x.currency===c);return `<tr><td class="strong">${esc(c)}${c===BASE_CURRENCY?' <span class="muted" style="font-weight:500">· base</span>':''}</td><td>${c===BASE_CURRENCY?'1':`<input class="input" type="number" step="any" min="0" data-fx="${esc(c)}" value="${DB.fxRates[c]||''}" placeholder="Not set" style="max-width:160px;height:36px" aria-label="SGD per 1 ${esc(c)}">`}</td><td class="num">${c!==BASE_CURRENCY&&!used?`<button class="link-btn" data-action="removeCurrency" data-code="${esc(c)}" style="font-size:12.5px">Remove</button>`:''}</td></tr>`}).join('')}</tbody></table></div><form class="sku-row" id="addCurForm" style="margin-top:14px;max-width:360px"><input class="input" name="code" maxlength="3" placeholder="Add a code, e.g. AUD" aria-label="Currency code"><button class="btn" type="submit">${ic('plus','i i-sm')}Add Currency</button></form><span class="err" id="curErr"></span><div class="note" style="margin-top:10px">${ic('info','i i-sm')}Rates are entered by you, not live. New sales start from these rates; each completed sale keeps the rate it was completed with.</div>`)}
       ${sec('markets','Countries / Markets','Where you sell',`<div class="variants">${['Singapore','Malaysia','Thailand','Indonesia','Vietnam','Philippines'].map(c=>`<span class="chip" style="height:32px">${ic('check','i i-sm')}${c}</span>`).join('')}<button class="btn sm ghost">${ic('plus','i i-sm')}Add market</button></div>`)}
       ${sec('inventory','Inventory Preferences','How stock is tracked',`${pref('Allow negative stock','Off: stock can never go below zero',false)}${pref('Include landed costs in cost price','Arrives with Purchases',false)}`)}
       ${sec('notifications','Notifications','What you get alerted about',`${pref('Low stock alerts','When a variant reaches its reorder level',true)}${pref('Overdue invoices','When a customer passes their payment terms',true)}${pref('Weekly summary email','Every Monday at 8:00',false)}`)}
       ${sec('profile','User Profile','Your account',`<div style="display:flex;gap:16px;align-items:center;margin-bottom:18px"><span class="avatar" style="width:52px;height:52px;font-size:17px">JK</span><div><b>Jasmine Koh</b><div class="muted" style="font-size:13px">Owner · jasmine@msv-sea.com</div></div></div><div class="form-grid">${f('Full name','Jasmine Koh')}${f('Email','jasmine@msv-sea.com','email')}</div>`)}
-      ${sec('data','Data','Products, stock, suppliers and purchases are saved in this browser only',`<div class="pref"><div><b>Restore sample data</b><small>Replace everything with the MSV sample catalogue, suppliers and purchases</small></div><button class="btn sm" data-action="restoreSample">Restore</button></div><div class="pref"><div><b>Start with an empty catalogue</b><small>Remove all products, suppliers, purchases and stock history. Categories and currencies are kept.</small></div><button class="btn sm danger-btn" data-action="clearData">Clear data</button></div>`)}
+      ${sec('data','Data','Products, stock, suppliers, purchases, customers and sales are saved in this browser only',`<div class="pref"><div><b>Restore sample data</b><small>Replace everything with the MSV sample catalogue, suppliers, purchases, customers and sales</small></div><button class="btn sm" data-action="restoreSample">Restore</button></div><div class="pref"><div><b>Start with an empty catalogue</b><small>Remove all products, suppliers, purchases, customers, sales and stock history. Categories and currencies are kept.</small></div><button class="btn sm danger-btn" data-action="clearData">Clear data</button></div>`)}
     </div>
   </div>`;
 };
@@ -1636,12 +1911,12 @@ function openPurchaseForm(id,{supplierId,copyFrom}={}){
         addHistory(p,'Edited','edited'); persist(); render();
         toast('Purchase updated',`${p.no}${d.combined?` · ${d.combined} duplicate line${d.combined>1?'s':''} combined`:''}`); return true;
       }
-      const np=createPurchaseRecord(DB,d);
-      let msg;
-      if(d.status==='Received'){
-        try{const u=receivePurchase(DB,np,{date:d.date,updateCost:d.updateCost});msg=['Purchase received successfully',`${np.no} · ${n0(u)} units added to inventory.`]}
-        catch(err){formAlert(err.message);DB.purchases=DB.purchases.filter(x=>x!==np);return false}
-      } else msg=[d.status==='Ordered'?'Purchase saved as ordered':'Purchase saved as draft',`${np.no} · stock is unchanged until it is received.`];
+      let np, msg;
+      try{transact(()=>{
+        np=createPurchaseRecord(DB,d);
+        if(d.status==='Received'){const u=receivePurchase(DB,np,{date:d.date,updateCost:d.updateCost});msg=['Purchase received successfully',`${np.no} · ${n0(u)} units added to inventory.`]}
+        else msg=[d.status==='Ordered'?'Purchase saved as ordered':'Purchase saved as draft',`${np.no} · stock is unchanged until it is received.`];
+      })}catch(err){formAlert(err.message);return false}
       if(d.combined) msg[1]+=` ${d.combined} duplicate line${d.combined>1?'s were':' was'} combined.`;
       persist(); location.hash='purchase-'+np.id; render(); toast(msg[0],msg[1]); return true;
     }});
@@ -1699,7 +1974,7 @@ function openReceive(id){
       if(!date){fieldError(F(form,'date'),'Choose the date the stock arrived.');return false}
       if(date>todayISO()){fieldError(F(form,'date'),'The date cannot be in the future.');return false}
       if(date<p.date){fieldError(F(form,'date'),`Stock can't arrive before the purchase date (${fmtDate(p.date)}).`);return false}
-      try{const u=receivePurchase(DB,p,{date,updateCost:!!(F(form,'updateCost')&&F(form,'updateCost').checked)});persist();render();toast('Purchase received successfully',`${p.no} · ${n0(u)} units added to inventory.`);return true}
+      try{const uc=!!(F(form,'updateCost')&&F(form,'updateCost').checked);const u=transact(()=>receivePurchase(DB,DB.purchases.find(x=>x.id===id),{date,updateCost:uc}));persist();render();toast('Purchase received successfully',`${p.no} · ${n0(u)} units added to inventory.`);return true}
       catch(err){formAlert(err.message);return false}
     }});
 }
@@ -1718,7 +1993,7 @@ function openReverse(id){
       if(!reason){fieldError(F(form,'reason'),'Choose a reason for the reversal.');ok=false}
       if(!date){fieldError(F(form,'date'),'Choose a date.');ok=false} else if(date>todayISO()){fieldError(F(form,'date'),'The date cannot be in the future.');ok=false} else if(p.receivedDate&&date<p.receivedDate){fieldError(F(form,'date'),`The reversal can't be before the receipt (${fmtDate(p.receivedDate)}).`);ok=false}
       if(!ok){formAlert('Please fix the highlighted fields.');return false}
-      try{const u=reversePurchase(DB,p,{date,reason,notes:F(form,'notes').value.trim()});persist();render();toast('Purchase reversed successfully',`${p.no} · ${n0(u)} units removed from inventory.`);return true}
+      try{const nt=F(form,'notes').value.trim();const u=transact(()=>reversePurchase(DB,DB.purchases.find(x=>x.id===id),{date,reason,notes:nt}));persist();render();toast('Purchase reversed successfully',`${p.no} · ${n0(u)} units removed from inventory.`);return true}
       catch(err){formAlert(err.message);return false}
     }});
   if(short.length){const b=$('.modal-foot [data-action=save]');if(b)b.disabled=true}
@@ -1744,50 +2019,314 @@ function openPurchaseNote(id){
     onSave:form=>{const n=F(form,'note').value.trim();if(!n){fieldError(F(form,'note'),'Write a note first.');return false}addHistory(p,`Note: ${n}`,'note');persist();render();toast('Note added',p.no);return true}});
 }
 
+/* --- Customer form --- */
+function openCustomerForm(id){
+  const c=id?DB.customers.find(x=>x.id===id):null;
+  showModal({title:c?'Edit Customer':'Add Customer',desc:c?esc(c.name):'Country and currency fill in automatically on new sales for this customer.',narrow:true,save:c?'Save Changes':'Save Customer',
+    body:`<div class="form-grid">
+      ${fld('Customer Name',`<input class="input" name="name" value="${esc(c?.name||'')}" placeholder="e.g. Ace Tennis Academy" autocomplete="off">`,{req:1})}
+      ${fld('Customer Type',`<select class="select" name="type">${CUSTOMER_TYPES.map(t=>`<option ${t===(c?.type||'Distributor')?'selected':''}>${t}</option>`).join('')}</select>`)}
+      ${fld('Country',`<input class="input" name="country" list="dl-market" value="${esc(c?.country||'')}" placeholder="e.g. Malaysia" autocomplete="off"><datalist id="dl-market">${uniqSorted([...MARKETS,...DB.customers.map(x=>x.country)]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`,{hint:'Southeast Asia or anywhere else'})}
+      ${fld('Default Currency',currencyField('currency',c?.currency||BASE_CURRENCY))}
+      ${fld('Contact Person',`<input class="input" name="contact" value="${esc(c?.contact||'')}">`)}
+      ${fld('Email',`<input class="input" type="email" name="email" value="${esc(c?.email||'')}">`)}
+      ${fld('Phone',`<input class="input" type="tel" name="phone" value="${esc(c?.phone||'')}">`)}
+      ${fld('Status',`<select class="select" name="status">${['Active','Inactive'].map(x=>`<option ${x===(c?.status||'Active')?'selected':''}>${x}</option>`).join('')}</select>`)}
+      ${fld('Address',`<input class="input" name="address" value="${esc(c?.address||'')}">`,{span:1})}
+      ${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional · payment terms, delivery notes">${esc(c?.notes||'')}</textarea>`,{span:1})}
+    </div>`,
+    onMount:wireCurrency,
+    onSave:form=>{
+      const g=n=>F(form,n).value.trim(), name=g('name'); let ok=true;
+      if(!name){fieldError(F(form,'name'),'Customer name is required.');ok=false}
+      else if(DB.customers.some(x=>x!==c&&x.name.toLowerCase()===name.toLowerCase())){fieldError(F(form,'name'),'A customer with this name already exists.');ok=false}
+      if(g('email')&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(g('email'))){fieldError(F(form,'email'),'Enter a valid email address, or leave it blank.');ok=false}
+      const currency=checkCurrency(form,'currency'); if(!currency) ok=false;
+      if(!ok){formAlert('Please fix the highlighted fields.');return false}
+      const data={name,type:F(form,'type').value,country:g('country'),contact:g('contact'),email:g('email'),phone:g('phone'),address:g('address'),notes:g('notes'),currency,status:F(form,'status').value};
+      if(c){const was=c.status;Object.assign(c,data);persist();render();toast(was!==c.status?(c.status==='Active'?'Customer reactivated':'Customer deactivated'):'Customer updated successfully',name);return true}
+      const nc={id:uid('c'),...data,createdAt:Date.now()}; DB.customers.push(nc);
+      logActivity(DB,{tone:'mute',icon:'user-plus',title:`Customer ${name} added`,sub:[data.type,data.country].filter(Boolean).join(' · '),link:'customer-'+nc.id});
+      persist(); if(modal&&modal.returnTo){const r=modal.returnTo;closeModal();r(nc.id);toast('Customer created successfully',`${name} is selected on the sale.`);return false}
+      location.hash='customer-'+nc.id; render(); toast('Customer created successfully',name); return true;
+    }});
+}
+
+/* --- Sale form --- */
+function sLineHtml(l={},c=BASE_CURRENCY){
+  const v=l.variantId&&variantById(l.variantId);
+  return `<div class="s-line" data-sline>
+    <div class="field combo-cell" style="gap:4px"><div class="combo"><input class="input" data-l="search" value="${v?esc(variantChoiceLabel(v)):''}" placeholder="Search name, SKU, gauge, colour, packaging" autocomplete="off" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-label="Product and variant"><input type="hidden" data-l="variant" value="${v?v.id:''}"><div class="combo-list" role="listbox" hidden></div></div><div class="line-meta" data-l="meta"></div><div class="line-warn" data-l="warn"></div><span class="err"></span></div>
+    <div class="field" style="gap:4px"><input class="input" data-l="qty" type="number" min="1" step="1" inputmode="numeric" value="${l.qty??''}" placeholder="0" aria-label="Quantity"><span class="err"></span></div>
+    <div class="field" style="gap:4px"><div class="input-affix"><span class="pre" data-curpre>${esc(c)}</span><input class="input" data-l="price" type="number" min="0" step="0.01" inputmode="decimal" value="${l.unitPrice??''}" placeholder="0.00" aria-label="Selling price"></div><span class="err"></span></div>
+    <div class="field" style="gap:4px"><div class="input-affix"><span class="pre" data-curpre>${esc(c)}</span><input class="input" data-l="disc" type="number" min="0" step="0.01" inputmode="decimal" value="${+l.discount?l.discount:''}" placeholder="0.00" aria-label="Line discount"></div><span class="err"></span></div>
+    <span class="line-total" data-l="total"></span>
+    <button type="button" class="icon-btn" data-action="removeSLine" aria-label="Remove item" style="width:36px;height:40px">${ic('x','i i-sm')}</button>
+  </div>`;
+}
+const saleMeta = v=>v?`${esc(v.sku)} · <b class="${v.qty<=0?'chg-out':''}">Available: ${n0(v.qty)}</b> · list price ${sgd(v.price,2)}`:'';
+function openSaleForm(id,{customerId,copyFrom}={}){
+  const s=id?DB.sales.find(x=>x.id===id):null, src=s||copyFrom||null;
+  const editing=!!s, locked=editing&&s.status==='Confirmed';
+  const custs=DB.customers.filter(c=>c.status==='Active'||(src&&c.id===src.customerId)).sort((a,b)=>a.name.localeCompare(b.name));
+  const cid=src?src.customerId:customerId||'', c0=DB.customers.find(c=>c.id===cid);
+  const cur0=src?src.currency:(c0?c0.currency:BASE_CURRENCY), country0=src?src.country:(c0?c0.country:'');
+  const fx0=src&&src.fxRate?src.fxRate:fxOf(DB,cur0)||'';
+  const lines=src?src.lines.filter(l=>variantById(l.variantId)):[{}], ch=src?src.charges:emptyCharges();
+  showModal({title:editing?`Edit ${esc(s.no)}`:'Record Sale',wide:true,save:editing?'Save Changes':'Save Sale',
+    desc:editing?(locked?'Confirmed sales keep their customer and currency. Stock changes only when the sale is completed.':'Draft sales can be changed freely. Stock changes only when the sale is completed.'):'Record products sold to a customer. Stock is removed only when the sale is Completed.',
+    body:`<div class="form-section"><h4>Sale information</h4><div class="form-grid cols-3">
+      ${fld('Customer',`<select class="select" name="customerId" ${locked?'disabled':''}><option value="">Choose a customer…</option>${custs.map(c=>`<option value="${c.id}" ${c.id===cid?'selected':''}>${esc(c.name)}${c.country?' · '+esc(c.country):''}</option>`).join('')}</select>`,{req:1,hint:locked?'Locked after confirming':editing?'':'<a href="#customers" data-action="newCustomerInline">Add a new customer</a>'})}
+      ${fld('Sale Date',`<input class="input" type="date" name="date" value="${s?s.date:todayISO()}">`,{req:1})}
+      ${fld('Country',`<input class="input" name="country" list="dl-market2" value="${esc(country0)}" placeholder="e.g. Malaysia" autocomplete="off"><datalist id="dl-market2">${uniqSorted([...MARKETS,...DB.customers.map(x=>x.country)]).map(x=>`<option value="${esc(x)}">`).join('')}</datalist>`,{hint:'Filled from the customer. Used for sales by country.'})}
+      ${fld('Currency',currencyField('currency',cur0,{disabled:locked}),{hint:locked?'Locked after confirming':'Filled from the customer'})}
+      <div data-fxwrap>${fld(`Exchange Rate <span data-fxlabel>(1 ${esc(cur0)} = ? SGD)</span>`,`<input class="input" type="number" step="any" min="0" name="fxRate" value="${fx0}" inputmode="decimal" placeholder="e.g. 0.29">`,{req:1,hint:'Manual rate for SGD revenue and profit. Not a live rate.'})}</div>
+      ${fld('Reference / Customer PO',`<input class="input" name="reference" value="${esc(s?s.reference:'')}" placeholder="Optional">`)}
+      ${editing?fld('Sale Status',`<div style="height:40px;display:flex;align-items:center">${badge(s.status)}</div>`,{hint:'Change status from the sale page'}):fld('Sale Status',`<select class="select" name="status">${['Draft','Confirmed','Completed'].map(x=>`<option ${x==='Draft'?'selected':''}>${x}</option>`).join('')}</select>`)}
+      ${fld('Payment Status',`<select class="select" name="payment">${PAYMENT_STATUSES.filter(p=>p!=='Refunded'||(s&&s.payment==='Refunded')).map(p=>`<option ${p===(s?s.payment:'Unpaid')?'selected':''}>${p}</option>`).join('')}</select>`,{hint:'For your records only'})}
+      ${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional · delivery, courier, special terms">${esc(src?src.notes:'')}</textarea>`,{span:1})}
+      </div>
+      <div id="completeBox" hidden><div class="notice" style="background:var(--ok-bg);color:var(--ok-fg)">${ic('package-check','i i-sm')}Saving as Completed removes these quantities from stock straight away, dated on the sale date, and locks in today's cost prices for profit.</div></div>
+    </div>
+    <div class="form-section"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap"><h4>Items</h4><span class="muted" style="font-size:12.5px">Search by product name, SKU, gauge, colour or packaging</span></div>
+      <div class="s-line line-head"><span>Product / Variant / SKU</span><span>Quantity</span><span>Selling Price</span><span>Discount</span><span style="text-align:right">Line Total</span><span></span></div>
+      <div class="lines" id="sLines">${lines.map(l=>sLineHtml(l,cur0)).join('')}</div>
+      <div><button type="button" class="btn sm" data-action="addSLine">${ic('plus','i i-sm')}Add Item</button></div></div>
+    <div class="form-section"><h4>Order discount and charges</h4><div class="form-grid cols-4">
+      ${fld('Order Discount',`<div class="input-affix"><span class="pre" data-curpre>${esc(cur0)}</span><input class="input" type="number" min="0" step="0.01" inputmode="decimal" name="ch_discount" value="${+ch.discount?ch.discount:''}" placeholder="0.00"></div>`)}
+      ${fld('Shipping Charge',`<div class="input-affix"><span class="pre" data-curpre>${esc(cur0)}</span><input class="input" type="number" min="0" step="0.01" inputmode="decimal" name="ch_shipping" value="${+ch.shipping?ch.shipping:''}" placeholder="0.00"></div>`)}
+      ${fld('Other Charge',`<div class="input-affix"><span class="pre" data-curpre>${esc(cur0)}</span><input class="input" type="number" min="0" step="0.01" inputmode="decimal" name="ch_other" value="${+ch.other?ch.other:''}" placeholder="0.00"></div>`)}
+      ${fld('Other Charge Description',`<input class="input" name="otherDesc" value="${esc(ch.otherDesc||'')}" placeholder="e.g. Express courier">`)}
+    </div></div>
+    <div class="summary" id="sSum"></div>`,
+    onMount:form=>{
+      wireCurrency(form);
+      const curNow=()=>{const c=readCurrency(form,'currency');return /^[A-Z]{3}$/.test(c)?c:'—'};
+      const fxNow=()=>{const c=curNow();if(c===BASE_CURRENCY)return 1;const r=parseFloat(F(form,'fxRate').value);return r>0?r:0};
+      const recalcS=()=>{
+        const c=curNow(), fx=fxNow();
+        form.querySelectorAll('[data-curpre]').forEach(e=>e.textContent=c);
+        form.querySelector('[data-fxwrap]').style.display=c===BASE_CURRENCY?'none':''; form.querySelector('[data-fxlabel]').textContent=`(1 ${c} = ? SGD)`;
+        let gross=0,ldisc=0,units=0,cogs=0; const seen={}, need={};
+        form.querySelectorAll('[data-sline]').forEach((row,i)=>{
+          const q=parseInt0(row.querySelector('[data-l=qty]').value), p=parseMoney(row.querySelector('[data-l=price]').value), d=parseMoney(row.querySelector('[data-l=disc]').value||'0'), vid=row.querySelector('[data-l=variant]').value, v=vid&&variantById(vid);
+          const g=(!isNaN(q)&&!isNaN(p))?round2(q*p):0; gross+=g; ldisc+=isNaN(d)?0:d; units+=isNaN(q)?0:q; if(v&&!isNaN(q)) cogs+=q*v.cost;
+          row.querySelector('[data-l=total]').textContent=(!isNaN(q)&&!isNaN(p))?cur(g-(isNaN(d)?0:d),c):'—';
+          row.querySelector('[data-l=meta]').innerHTML=saleMeta(v);
+          const w=row.querySelector('[data-l=warn]'), msgs=[];
+          if(vid){ if(seen[vid]!==undefined) msgs.push(`Same SKU as item ${seen[vid]+1}. Lines with the same price and discount are combined when you save.`); else seen[vid]=i;
+            need[vid]=(need[vid]||0)+(isNaN(q)?0:q); if(v&&need[vid]>v.qty) msgs.push(v.qty<=0?'This SKU is out of stock.':`Only ${n0(v.qty)} unit${v.qty===1?' is':'s are'} currently available.`); }
+          w.textContent=msgs.join(' '); w.classList.toggle('stock-short',msgs.some(m=>/available|out of stock/.test(m)));
+        });
+        const od=parseMoney(F(form,'ch_discount').value||'0')||0, sh=parseMoney(F(form,'ch_shipping').value||'0')||0, ot=parseMoney(F(form,'ch_other').value||'0')||0;
+        const sub=round2(gross-ldisc), rev=round2(sub-od), total=round2(rev+sh+ot);
+        $('#sSum').innerHTML=`<div><span>Subtotal · ${n0(units)} units</span><span>${cur(gross,c)}</span></div><div><span>Discount</span><span>${ldisc+od?'−':''}${cur(ldisc+od,c)}</span></div><div><span>Shipping and other charges</span><span>${cur(sh+ot,c)}</span></div><div class="total"><span>Final Sale Total</span><span>${cur(total,c)}</span></div>
+          <div class="muted" style="font-size:12.5px"><span>Estimated gross profit (SGD, at today's cost)</span><span>${fx?`${sgd(rev*fx-cogs,2)}${rev>0?' · '+pct((rev*fx-cogs)/(rev*fx)):''}`:'Enter an exchange rate'}</span></div>`;
+        const st=F(form,'status'); $('#completeBox').hidden=!(st&&st.value==='Completed');
+      };
+      const closeLists=except=>form.querySelectorAll('.combo-list').forEach(l=>{if(l!==except){l.hidden=true;l.parentElement.querySelector('[data-l=search]').setAttribute('aria-expanded','false')}});
+      const openList=inp=>{
+        const box=inp.closest('.combo'), list=box.querySelector('.combo-list'), cur0=box.querySelector('[data-l=variant]').value;
+        const q=cur0&&inp.value===variantChoiceLabel(variantById(cur0))?'':inp.value;
+        const items=DB.variants.filter(v=>isLive(v)||v.id===cur0).filter(v=>!q||matches(searchText(v),q)).sort((a,b)=>variantChoiceLabel(a).localeCompare(variantChoiceLabel(b),undefined,{numeric:true})).slice(0,10);
+        list.innerHTML=items.length?items.map((v,i)=>`<button type="button" class="combo-opt" role="option" data-opt="${v.id}" aria-selected="${i===0}"><span><b>${esc(variantChoiceLabel(v))}</b><small>${esc(v.sku)}</small></span><small style="white-space:nowrap" class="${v.qty<=0?'chg-out':''}">${v.qty<=0?'Out of stock':n0(v.qty)+' available'}</small></button>`).join(''):'<div class="combo-empty">No active SKU matches. Add it on the Products page first.</div>';
+        closeLists(list); list.hidden=false; inp.setAttribute('aria-expanded','true');
+      };
+      const pick=(row,vid)=>{
+        const v=variantById(vid), fx=fxNow();
+        row.querySelector('[data-l=variant]').value=vid; row.querySelector('[data-l=search]').value=variantChoiceLabel(v);
+        const pr=row.querySelector('[data-l=price]'); if(!pr.value&&fx>0) pr.value=round2(v.price/fx);
+        row.querySelector('[data-l=search]').classList.remove('invalid'); row.querySelector('.combo-cell .err').textContent='';
+        closeLists(); recalcS(); const q=row.querySelector('[data-l=qty]'); if(!q.value) q.focus();
+      };
+      form.addEventListener('input',e=>{
+        if(e.target.dataset.l==='search'){const row=e.target.closest('[data-sline]');row.querySelector('[data-l=variant]').value='';openList(e.target)}
+        recalcS();
+      });
+      form.addEventListener('change',e=>{
+        if(e.target.name==='customerId'&&!locked){const c=DB.customers.find(x=>x.id===e.target.value);if(c){
+          F(form,'country').value=c.country||'';
+          const sel=F(form,'currency'),known=DB.currencies.includes(c.currency);sel.value=known?c.currency:'__other';F(form,'currencyOther').value=known?'':c.currency;F(form,'currencyOther').style.display=known?'none':'';
+          F(form,'fxRate').value=fxOf(DB,c.currency)||'';}}
+        if(e.target.name==='currency'||e.target.name==='currencyOther'){const r=fxOf(DB,curNow());if(r)F(form,'fxRate').value=r}
+        recalcS();
+      });
+      form.addEventListener('focusin',e=>{if(e.target.dataset.l==='search') openList(e.target)});
+      form.addEventListener('focusout',()=>setTimeout(()=>{if(!form.contains(document.activeElement)||!document.activeElement.closest('.combo'))closeLists()},120));
+      form.addEventListener('mousedown',e=>{if(e.target.closest('[data-opt]'))e.preventDefault()});
+      form.addEventListener('click',e=>{
+        const o=e.target.closest('[data-opt]'); if(o){pick(o.closest('[data-sline]'),o.dataset.opt);return}
+        if(e.target.closest('[data-action=addSLine]')){$('#sLines').insertAdjacentHTML('beforeend',sLineHtml({},curNow()));refreshIcons();$('#sLines').lastElementChild.querySelector('[data-l=search]').focus();return}
+        const rm=e.target.closest('[data-action=removeSLine]'); if(rm){rm.closest('[data-sline]').remove();if(!$('#sLines').children.length)$('#sLines').insertAdjacentHTML('beforeend',sLineHtml({},curNow()));refreshIcons();recalcS();return}
+        if(e.target.closest('[data-action=newCustomerInline]')){e.preventDefault();const snap=snapshotSaleForm(form);openCustomerForm();modal.returnTo=newId=>{const nc=DB.customers.find(x=>x.id===newId)||{};openSaleForm(null,{copyFrom:{...snap,customerId:newId,country:nc.country||snap.country,currency:nc.currency||snap.currency,fxRate:fxOf(DB,nc.currency)||snap.fxRate}})}}
+      });
+      form.addEventListener('keydown',e=>{
+        if(e.target.dataset.l!=='search') return;
+        const list=e.target.closest('.combo').querySelector('.combo-list'), opts=[...list.querySelectorAll('[data-opt]')], i=opts.findIndex(o=>o.getAttribute('aria-selected')==='true');
+        if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(list.hidden){openList(e.target);return}const n=opts.length?(i+(e.key==='ArrowDown'?1:-1)+opts.length)%opts.length:-1;opts.forEach((o,k)=>o.setAttribute('aria-selected',k===n));opts[n]&&opts[n].scrollIntoView({block:'nearest'})}
+        else if(e.key==='Enter'&&!list.hidden){e.preventDefault();if(opts[i])pick(e.target.closest('[data-sline]'),opts[i].dataset.opt)}
+        else if(e.key==='Escape'&&!list.hidden){e.preventDefault();e.stopPropagation();closeLists()}
+      });
+      recalcS();
+    },
+    onSave:form=>{
+      const d=readSaleForm(form,{editing,locked}); if(!d) return false;
+      if(d.currency!==BASE_CURRENCY) DB.fxRates[d.currency]=d.fxRate;
+      if(editing){
+        Object.assign(s,{customerId:locked?s.customerId:d.customerId,currency:locked?s.currency:d.currency,fxRate:d.fxRate,date:d.date,country:d.country,reference:d.reference,notes:d.notes,charges:d.charges,payment:d.payment,
+          lines:d.lines.map(l=>({id:uid('sl'),variantId:l.variantId,qty:l.qty,unitPrice:l.unitPrice,discount:l.discount}))});
+        addHistory(s,'Edited','edited'); persist(); render();
+        toast('Sale updated',`${s.no}${d.combined?` · ${d.combined} duplicate line${d.combined>1?'s':''} combined`:''}`); return true;
+      }
+      let ns, msg;
+      try{
+        transact(()=>{
+          ns=createSaleRecord(DB,d);
+          if(d.status==='Completed'){const u=completeSale(DB,ns,{date:d.date});msg=['Sale completed successfully',`${ns.no} · ${n0(u)} units removed from inventory.`]}
+          else msg=[d.status==='Confirmed'?'Sale confirmed':'Sale saved as draft',`${ns.no} · stock is unchanged until the sale is completed.`];
+        });
+      }catch(err){formAlert(err.message);return false}
+      if(d.combined) msg[1]+=` ${d.combined} duplicate line${d.combined>1?'s were':' was'} combined.`;
+      persist(); location.hash='sale-'+ns.id; render(); toast(msg[0],msg[1]); return true;
+    }});
+}
+function snapshotSaleForm(form){
+  const lines=[...form.querySelectorAll('[data-sline]')].map(r=>({variantId:r.querySelector('[data-l=variant]').value,qty:parseInt0(r.querySelector('[data-l=qty]').value)||'',unitPrice:r.querySelector('[data-l=price]').value,discount:r.querySelector('[data-l=disc]').value})).filter(l=>l.variantId);
+  return {customerId:F(form,'customerId').value,country:F(form,'country').value,currency:readCurrency(form,'currency'),fxRate:F(form,'fxRate').value,notes:F(form,'notes').value,lines:lines.length?lines:[{}],
+    charges:{discount:parseMoney(F(form,'ch_discount').value)||0,shipping:parseMoney(F(form,'ch_shipping').value)||0,other:parseMoney(F(form,'ch_other').value)||0,otherDesc:F(form,'otherDesc').value}};
+}
+function readSaleForm(form,{editing,locked}){
+  let ok=true; const bad=(el,m)=>{fieldError(el,m);ok=false};
+  const customerId=F(form,'customerId').value, date=F(form,'date').value, status=editing?null:F(form,'status').value;
+  if(!customerId) bad(F(form,'customerId'),'Choose a customer.');
+  if(!date) bad(F(form,'date'),'Sale date is required.');
+  else if(status==='Completed'&&date>todayISO()) bad(F(form,'date'),'A completed sale cannot be dated in the future.');
+  const currency=locked?readCurrency(form,'currency'):checkCurrency(form,'currency'); if(!currency) ok=false;
+  let fxRate=1;
+  if(currency&&currency!==BASE_CURRENCY){fxRate=parseFloat(F(form,'fxRate').value);if(!(fxRate>0))bad(F(form,'fxRate'),`Enter how many SGD 1 ${currency} is worth, e.g. 0.29.`)}
+  const charges=emptyCharges();
+  [['discount','ch_discount'],['shipping','ch_shipping'],['other','ch_other']].forEach(([k,n])=>{const el=F(form,n),raw=el.value.trim();if(!raw)return;const v=parseMoney(raw);if(isNaN(v)||v<0)bad(el,'Enter an amount of 0 or more.');else charges[k]=v});
+  charges.otherDesc=F(form,'otherDesc').value.trim();
+  const lines=[];
+  form.querySelectorAll('[data-sline]').forEach(r=>{
+    const sEl=r.querySelector('[data-l=search]'), vid=r.querySelector('[data-l=variant]').value, qEl=r.querySelector('[data-l=qty]'), pEl=r.querySelector('[data-l=price]'), dEl=r.querySelector('[data-l=disc]');
+    if(!vid&&!sEl.value.trim()&&!qEl.value&&!pEl.value&&!dEl.value) return;
+    const q=parseInt0(qEl.value), p=parseMoney(pEl.value), dsc=dEl.value.trim()?parseMoney(dEl.value):0;
+    if(!vid) bad(sEl,'Choose a product and variant from the list.');
+    if(isNaN(q)||q<=0) bad(qEl,'Quantity must be a whole number greater than 0.');
+    if(isNaN(p)) bad(pEl,'Enter a selling price.'); else if(p<0) bad(pEl,'Selling price cannot be negative.');
+    if(isNaN(dsc)||dsc<0) bad(dEl,'Discount cannot be negative.');
+    else if(!isNaN(q)&&!isNaN(p)&&dsc>round2(q*p)) bad(dEl,'Discount cannot be more than the line amount.');
+    lines.push({row:r,variantId:vid,qty:q,unitPrice:p,discount:dsc||0});
+  });
+  if(!lines.length){formAlert('Add at least one product to this sale.');return null}
+  if(!ok){formAlert('Please fix the highlighted fields.');return null}
+  const merged=[]; let combined=0;
+  for(const l of lines){
+    const prev=merged.find(m=>m.variantId===l.variantId);
+    if(!prev){merged.push({...l});continue}
+    if(prev.unitPrice===l.unitPrice){prev.qty+=l.qty;prev.discount=round2(prev.discount+l.discount);combined++;continue}
+    bad(l.row.querySelector('[data-l=search]'),'This SKU is already on the sale at a different price. Use one line per SKU.');
+  }
+  const sub=round2(merged.reduce((a,l)=>a+l.qty*l.unitPrice-l.discount,0));
+  if(charges.discount>sub) bad(F(form,'ch_discount'),'Order discount cannot be more than the subtotal after line discounts.');
+  if(status==='Completed') merged.forEach(l=>{const v=variantById(l.variantId);if(v&&l.qty>v.qty)bad(l.row.querySelector('[data-l=qty]'),v.qty<=0?'This SKU is out of stock.':`Only ${n0(v.qty)} units are currently available.`)});
+  if(!ok){formAlert(status==='Completed'&&merged.some(l=>l.qty>(variantById(l.variantId)||{qty:0}).qty)?'Not enough stock to complete this sale. Save it as Draft or Confirmed, or reduce the quantities.':'Please fix the highlighted fields.');return null}
+  return {customerId,date,country:F(form,'country').value.trim(),currency,fxRate,status,payment:F(form,'payment').value,reference:F(form,'reference').value.trim(),notes:F(form,'notes').value.trim(),charges,lines:merged.map(({row,...l})=>l),combined};
+}
+
+/* --- Sale status actions --- */
+function openCompleteSale(id){
+  const s=DB.sales.find(x=>x.id===id), t=saleTotals(s);
+  if(!['Draft','Confirmed'].includes(s.status)){toast('Already completed',`${s.no} is ${s.status.toLowerCase()}. Stock is only removed once.`,'error');return}
+  const short=saleShortfalls(DB,s), needFx=s.currency!==BASE_CURRENCY;
+  showModal({title:`Complete ${esc(s.no)}`,desc:`Removes ${n0(t.units)} units from inventory for ${esc(customerOf(s).name)} and locks in today's cost prices for gross profit. This happens once and can only be undone with Reverse Sale.`,save:'Complete Sale',saveIcon:'package-check',
+    body:`${short.length?`<div class="notice" style="background:var(--bad-bg);color:var(--bad-fg)">${ic('circle-alert','i i-sm')}Not enough stock to complete this sale. Receive a purchase, adjust stock, or edit the quantities first.</div>`:''}
+      <div class="form-grid">${fld('Completion Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1,hint:'The date the goods were handed over or shipped'})}
+      ${needFx?fld(`Exchange Rate (1 ${esc(s.currency)} = ? SGD)`,`<input class="input" type="number" step="any" min="0" name="fxRate" value="${s.fxRate||fxOf(DB,s.currency)||''}">`,{req:1,hint:'Locked in with the sale for revenue and profit'}):'<div></div>'}</div>
+      <div class="table-wrap" style="border:1px solid var(--line);border-radius:12px"><table><thead><tr><th>Item</th><th class="num">Removing</th><th class="num">Available</th><th class="num">After</th><th class="num">Unit cost</th></tr></thead><tbody>
+      ${s.lines.map(l=>{const L=purchaseLineLabel(l),after=L.v?L.v.qty-l.qty:-1;return `<tr><td><span class="strong">${esc(L.name)}</span><span class="cell-sub">${esc(L.variant)} · ${esc(L.sku)}</span></td><td class="num strong chg-out">−${n0(l.qty)}</td><td class="num muted">${L.v?n0(L.v.qty):'—'}</td><td class="num strong ${after<0?'chg-out':''}">${after<0?`Only ${L.v?n0(L.v.qty):0} available`:n0(after)}</td><td class="num">${L.v?sgd(L.v.cost,2):'—'}</td></tr>`}).join('')}
+      </tbody></table></div>`,
+    onSave:form=>{
+      const date=F(form,'date').value; let ok=true;
+      if(!date){fieldError(F(form,'date'),'Choose the date the goods left.');ok=false}
+      else if(date>todayISO()){fieldError(F(form,'date'),'The date cannot be in the future.');ok=false}
+      else if(date<s.date){fieldError(F(form,'date'),`Completion can't be before the sale date (${fmtDate(s.date)}).`);ok=false}
+      let fx=1; if(needFx){fx=parseFloat(F(form,'fxRate').value);if(!(fx>0)){fieldError(F(form,'fxRate'),'Enter the exchange rate to SGD.');ok=false}}
+      if(!ok){formAlert('Please fix the highlighted fields.');return false}
+      try{const u=transact(()=>{const live=DB.sales.find(x=>x.id===id);if(needFx){live.fxRate=fx;DB.fxRates[live.currency]=fx}return completeSale(DB,live,{date})});persist();render();toast('Sale completed successfully',`${s.no} · ${n0(u)} units removed from inventory.`);return true}
+      catch(err){formAlert(err.message);return false}
+    }});
+  if(short.length){const b=$('.modal-foot [data-action=save]');if(b)b.disabled=true}
+}
+function openReverseSale(id){
+  const s=DB.sales.find(x=>x.id===id), t=saleTotals(s);
+  const REASONS=['Recorded in error','Wrong customer','Wrong items or quantities','Duplicate entry','Order cancelled after shipping','Other'];
+  showModal({title:`Reverse ${esc(s.no)}`,desc:`Returns the ${n0(t.units)} units this sale removed and stops it counting as revenue. The original sale stays visible and new reversal movements are recorded.`,save:'Reverse Sale',saveIcon:'undo-2',danger:true,
+    body:`<div class="table-wrap" style="border:1px solid var(--line);border-radius:12px"><table><thead><tr><th>Item</th><th class="num">Returning</th><th class="num">Stock now</th><th class="num">After</th></tr></thead><tbody>
+      ${s.lines.map(l=>{const L=purchaseLineLabel(l);return `<tr><td><span class="strong">${esc(L.name)}</span><span class="cell-sub">${esc(L.variant)} · ${esc(L.sku)}</span></td><td class="num strong chg-in">+${n0(l.qty)}</td><td class="num muted">${L.v?n0(L.v.qty):'—'}</td><td class="num strong">${L.v?n0(L.v.qty+l.qty):'—'}</td></tr>`}).join('')}
+      </tbody></table></div>
+      <div class="form-grid">${fld('Reason',`<select class="select" name="reason"><option value="">Choose a reason…</option>${REASONS.map(r=>`<option>${r}</option>`).join('')}</select>`,{req:1})}${fld('Date',`<input class="input" type="date" name="date" value="${todayISO()}" max="${todayISO()}">`,{req:1})}
+      ${fld('Payment Status',`<select class="select" name="payment">${PAYMENT_STATUSES.map(p=>`<option ${p===(s.payment==='Paid'||s.payment==='Partially Paid'?'Refunded':s.payment)?'selected':''}>${p}</option>`).join('')}</select>`,{hint:'Refunds themselves are handled outside the system for now'})}
+      ${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional · what went wrong"></textarea>`,{span:1})}</div>
+      <p class="note">${ic('info','i i-sm')}For a partial return of goods, use Adjust Stock for now. Customer returns come in a later phase.</p>`,
+    onSave:form=>{
+      const reason=F(form,'reason').value, date=F(form,'date').value; let ok=true;
+      if(!reason){fieldError(F(form,'reason'),'Choose a reason for the reversal.');ok=false}
+      if(!date){fieldError(F(form,'date'),'Choose a date.');ok=false} else if(date>todayISO()){fieldError(F(form,'date'),'The date cannot be in the future.');ok=false} else if(s.completedDate&&date<s.completedDate){fieldError(F(form,'date'),`The reversal can't be before the sale was completed (${fmtDate(s.completedDate)}).`);ok=false}
+      if(!ok){formAlert('Please fix the highlighted fields.');return false}
+      try{const u=transact(()=>{const live=DB.sales.find(x=>x.id===id),pay=F(form,'payment').value;const n=reverseSale(DB,live,{date,reason,notes:F(form,'notes').value.trim()});if(pay!==live.payment){live.payment=pay;addHistory(live,`Payment status set to ${pay}`,'payment')}return n});
+        persist();render();toast('Sale reversed successfully',`${s.no} · ${n0(u)} units returned to inventory.`);return true}
+      catch(err){formAlert(err.message);return false}
+    }});
+}
+function openCancelSale(id){
+  const s=DB.sales.find(x=>x.id===id);
+  showModal({title:`Cancel ${esc(s.no)}?`,desc:'The sale stays on record as Cancelled. No stock is affected because nothing was shipped.',narrow:true,save:'Cancel Sale',saveIcon:'circle-x',danger:true,
+    body:`<div class="form-grid">${fld('Reason',`<select class="select" name="reason"><option value="">Choose a reason…</option>${['Customer cancelled','Out of stock','Entered by mistake','Replaced by another sale','Other'].map(r=>`<option>${r}</option>`).join('')}</select>`,{req:1,span:1})}${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional"></textarea>`,{span:1})}</div>`,
+    onSave:form=>{
+      const reason=F(form,'reason').value; if(!reason){fieldError(F(form,'reason'),'Choose a reason.');return false}
+      if(s.status!=='Confirmed'){formAlert('Only confirmed sales can be cancelled. Delete drafts instead; reverse completed sales.');return false}
+      const notes=F(form,'notes').value.trim();
+      Object.assign(s,{status:'Cancelled',cancelledDate:todayISO(),cancelReason:reason});
+      addHistory(s,`Cancelled · ${reason}${notes?' · '+notes:''}`,'cancelled');
+      logActivity(DB,{tone:'bad',icon:'circle-x',title:`Sale ${s.no} cancelled`,sub:`${customerOf(s).name} · ${reason}`,link:'sale-'+s.id});
+      persist();render();toast('Sale cancelled',`${s.no} · no stock was affected.`);return true;
+    }});
+}
+function openPayment(id){
+  const s=DB.sales.find(x=>x.id===id);
+  showModal({title:'Update Payment',desc:`${esc(s.no)} · ${esc(customerOf(s).name)}. Payment status is for your records; it doesn't affect stock or revenue.`,narrow:true,save:'Save',
+    body:`<div class="form-grid">${fld('Payment Status',`<select class="select" name="payment">${PAYMENT_STATUSES.map(p=>`<option ${p===s.payment?'selected':''}>${p}</option>`).join('')}</select>`,{span:1})}${fld('Note',`<input class="input" name="note" placeholder="Optional · e.g. bank transfer received 12 Oct">`,{span:1})}</div>`,
+    onSave:form=>{
+      const p=F(form,'payment').value, note=F(form,'note').value.trim();
+      if(p===s.payment&&!note){formAlert('Nothing changed.');return false}
+      const was=s.payment; s.payment=p;
+      addHistory(s,`Payment ${was===p?'note':`changed from ${was} to ${p}`}${note?' · '+note:''}`,'payment');
+      if(was!==p) logActivity(DB,{tone:p==='Paid'?'ok':'warn',icon:'wallet',title:`Payment marked as ${p}`,sub:`${s.no} · ${customerOf(s).name}`,link:'sale-'+s.id});
+      persist();render();toast('Payment status updated',`${s.no} · ${p}`);return true;
+    }});
+}
+function openSaleNote(id){
+  const s=DB.sales.find(x=>x.id===id);
+  showModal({title:'Add Note',desc:`Added to the activity log of ${esc(s.no)}. Notes don't change items, stock or revenue.`,narrow:true,save:'Add Note',
+    body:fld('Note',`<textarea class="input" name="note" placeholder="e.g. Courier tracking number"></textarea>`,{req:1,span:1}),
+    onSave:form=>{const n=F(form,'note').value.trim();if(!n){fieldError(F(form,'note'),'Write a note first.');return false}addHistory(s,`Note: ${n}`,'note');persist();render();toast('Note added',s.no);return true}});
+}
+
 /* --- Confirm --- */
 function confirmDialog({title,body,confirm,onConfirm}){
   showModal({title,desc:body,narrow:true,save:confirm,saveIcon:'trash-2',danger:true,body:'',onSave:()=>{onConfirm();return true}});
 }
 
-/* --- Phase 1 demo forms (Purchases, Sales, Customers, Export) --- */
-const variantOptions = sel=>`<option value="">Search or choose a variant…</option>`+DB.products.filter(p=>p.status==='Active').map(p=>{const vs=variantsOf(p.id).filter(v=>v.status==='Active');return vs.length?`<optgroup label="${esc(p.name)}">${vs.map(v=>`<option value="${v.id}" ${v.id===sel?'selected':''}>${esc(p.name)} ${esc(variantLabel(v))} · ${v.qty} in stock</option>`).join('')}</optgroup>`:''}).join('');
-function lineRow(kind,i,vid,qty,price){
-  return `<div class="line-row" data-line="${i}"><select class="select" data-l="sku" aria-label="Product">${variantOptions(vid)}</select><input class="input" data-l="qty" type="number" min="0" value="${qty}" aria-label="Quantity"><div class="input-affix"><span class="pre">SGD</span><input class="input" data-l="price" type="number" step="0.01" min="0" value="${price}" aria-label="${kind==='sale'?'Selling price':'Unit cost'}"></div><span class="line-total"></span><button type="button" class="icon-btn line-x" data-action="removeLine" aria-label="Remove line" style="width:36px;height:36px">${ic('x','i i-sm')}</button></div>`;
-}
-const firstVid = n=>DB.variants.filter(isLive)[n]?.id||'';
+/* --- Preview-only forms (export arrives in a later phase) --- */
 const DEMO = {
-  sale:()=>({title:'Record Sale',desc:'Sales will reduce stock automatically in the Sales phase. For now this form is a preview and nothing is saved.',body:`
-    <div class="form-section"><h4>Sale details</h4><div class="form-grid">
-      <label class="field"><span class="field-label">Date</span><input class="input" type="date" value="${todayISO()}"></label>
-      <label class="field"><span class="field-label">Customer</span><select class="select">${CUSTOMERS.map(c=>`<option value="${c.id}">${c.name} · ${c.type}</option>`).join('')}</select></label>
-      <label class="field"><span class="field-label">Country</span><select class="select">${['Malaysia','Singapore','Thailand','Indonesia','Vietnam','Philippines'].map(c=>`<option>${c}</option>`).join('')}</select></label>
-      <label class="field"><span class="field-label">Currency</span><select class="select"><option>SGD – Singapore Dollar</option><option>MYR – Malaysian Ringgit</option><option>THB – Thai Baht</option><option>USD – US Dollar</option></select></label></div></div>
-    <div class="form-section"><h4>Products</h4><div class="lines" data-kind="sale">
-      <div class="line-row line-head"><span>Product</span><span>Quantity</span><span>Selling Price</span><span style="text-align:right">Subtotal</span><span></span></div>
-      ${lineRow('sale',0,firstVid(1),6,98)}</div>
-      <div><button type="button" class="btn sm ghost" data-action="addLine">${ic('plus','i i-sm')}Add product</button></div></div>
-    <div class="form-section"><div class="form-grid">
-      <label class="field"><span class="field-label">Payment Status</span><select class="select"><option>Pending</option><option>Paid</option><option>Partially Paid</option><option>Overdue</option></select></label>
-      <label class="field"><span class="field-label">Payment Due</span><input class="input" type="date"></label>
-      <label class="field span-2"><span class="field-label">Notes</span><textarea class="input" placeholder="Optional"></textarea></label></div></div><div class="summary" id="sum"></div>`,save:'Save Sale'}),
-  customer:()=>({title:'Add Customer',desc:'Customer records arrive in a later phase. Nothing is saved yet.',narrow:true,body:`<div class="form-grid">
-      <label class="field span-2"><span class="field-label">Customer Name</span><input class="input" placeholder="e.g. Cebu Racquet Centre"></label>
-      <label class="field"><span class="field-label">Customer Type</span><select class="select"><option>Distributor</option><option>Retail Shop</option><option>Tennis Academy</option><option>Tennis Coach</option><option>Individual</option></select></label>
-      <label class="field"><span class="field-label">Country</span><select class="select">${['Singapore','Malaysia','Thailand','Indonesia','Vietnam','Philippines'].map(c=>`<option>${c}</option>`).join('')}</select></label></div>`,save:'Save Customer'}),
   export:()=>({title:'Export Report',desc:'Exports arrive in a later phase.',narrow:true,body:`<div class="form-grid"><label class="field"><span class="field-label">Format</span><select class="select"><option>Excel (.xlsx)</option><option>PDF</option><option>CSV</option></select></label></div>`,save:'Export'}),
 };
 function openDemo(kind){
   const m=DEMO[kind]();
-  showModal({...m,kind:'demo',onMount:()=>recalc(),onSave:()=>{toast({sale:'Sale not saved',customer:'Customer not saved',export:'Export not available yet'}[kind],'This form is a preview. It becomes live in a later phase.','info');return true}});
+  showModal({...m,kind:'demo',onSave:()=>{toast({export:'Export not available yet'}[kind],'This form is a preview. It becomes live in a later phase.','info');return true}});
 }
-function recalc(){
-  const sum=$('#sum'); if(!sum) return;
-  let sub=0, units=0;
-  document.querySelectorAll('#mForm .line-row[data-line]').forEach(r=>{const q=+r.querySelector('[data-l=qty]').value||0, p=+r.querySelector('[data-l=price]').value||0; sub+=q*p; units+=q; r.querySelector('.line-total').textContent=sgd(q*p,2)});
-  const extra=[...document.querySelectorAll('#mForm [data-x]')].reduce((a,i)=>a+(+i.value||0),0);
-  sum.innerHTML=document.querySelector('#mForm [data-x]')?`<div><span>Subtotal · ${units} units</span><span>${sgd(sub,2)}</span></div><div><span>Additional Costs</span><span>${sgd(extra,2)}</span></div><div class="total"><span>Total Purchase Cost</span><span>${sgd(sub+extra,2)}</span></div>`:`<div><span>Units</span><span>${units}</span></div><div class="total"><span>Subtotal</span><span>${sgd(sub,2)}</span></div>`;
-}
-
 function toast(title,msg,tone){
   $('#toastRoot').innerHTML=`<div class="toast ${tone==='error'?'error':''}" role="status">${ic(tone==='error'?'circle-alert':tone==='info'?'info':'circle-check','i')}<div><b>${esc(title)}</b><span>${esc(msg||'')}</span></div></div>`; refreshIcons();
   clearTimeout(toast.t); toast.t=setTimeout(()=>$('#toastRoot').innerHTML='',4500);
@@ -1795,14 +2334,15 @@ function toast(title,msg,tone){
 
 /* ---------- Router & render ---------- */
 const NAV=[['dashboard','Dashboard','layout-dashboard'],['inventory','Inventory','boxes'],['products','Products','package'],['purchases','Purchases','truck'],['suppliers','Suppliers','factory'],['sales','Sales','receipt'],['customers','Customers','users'],['reports','Reports','chart-column'],['settings','Settings','settings']];
-const PARENT={product:'products',variant:'products',customer:'customers',purchase:'purchases',supplier:'suppliers'};
-function route(){ const h=location.hash.slice(1); const m=h.match(/^(product|variant|purchase|supplier)-(.+)$/); if(m) return [m[1],m[2]]; return [PAGES[h]?h:'dashboard',null]; }
+const PARENT={product:'products',variant:'products',customer:'customers',purchase:'purchases',supplier:'suppliers',sale:'sales'};
+function route(){ const h=location.hash.slice(1); const m=h.match(/^(product|variant|purchase|supplier|sale|customer)-(.+)$/); if(m) return [m[1],m[2]]; return [PAGES[h]?h:'dashboard',null]; }
 function render(){
   const [r,id]=route(), active=PARENT[r]||r, att=attention().length;
   $('#nav').innerHTML=NAV.map(([k,label,icon])=>`<a href="#${k}" ${k===active?'aria-current="page"':''}>${ic(icon)}<span>${label}</span>${k==='inventory'&&att?`<span class="count" title="Low or out of stock">${att}</span>`:''}</a>`).join('');
   $('#app').innerHTML=(Store.available?'':`<div class="notice">${ic('triangle-alert','i i-sm')}This browser is blocking storage. You can try things out, but changes will be lost when you close the page.</div>`)+PAGES[r](id);
   if(r==='inventory') renderInvTable();
   if(r==='purchases') renderPurTable();
+  if(r==='sales') renderSalTable();
   renderNotifications();
   refreshIcons(); $('#shell').classList.remove('open');
 }
@@ -1813,6 +2353,23 @@ window.addEventListener('hashchange',()=>{const r=route()[0];if(r==='variant'&&l
 
 /* ---------- Events ---------- */
 const ACTIONS={
+  sale:()=>openSaleForm(),
+  saleFor:d=>openSaleForm(null,{customerId:d.id}),
+  editSale:d=>openSaleForm(d.id),
+  copySale:d=>openSaleForm(null,{copyFrom:DB.sales.find(x=>x.id===d.id)}),
+  completeSale:d=>openCompleteSale(d.id),
+  reverseSale:d=>openReverseSale(d.id),
+  cancelSale:d=>openCancelSale(d.id),
+  paySale:d=>openPayment(d.id),
+  noteSale:d=>openSaleNote(d.id),
+  confirmSale:d=>{const s=DB.sales.find(x=>x.id===d.id);if(!s||s.status!=='Draft')return;s.status='Confirmed';addHistory(s,'Confirmed','confirmed');logActivity(DB,{tone:'info',icon:'clipboard-check',title:`Sale ${s.no} confirmed`,sub:customerOf(s).name,link:'sale-'+s.id});persist();render();toast('Sale confirmed',`${s.no} · stock is removed when the sale is completed.`)},
+  deleteSale:d=>{const s=DB.sales.find(x=>x.id===d.id);confirmDialog({title:`Delete ${esc(s.no)}?`,body:'Only drafts can be deleted, because they never affected stock. The sale number will not be reused.',confirm:'Delete Draft',onConfirm:()=>{if(s.status!=='Draft'){toast('Sale not deleted','Only draft sales can be deleted.','error');return}DB.sales=DB.sales.filter(x=>x!==s);logActivity(DB,{tone:'mute',icon:'trash-2',title:`Draft ${s.no} deleted`,sub:customerOf(s).name});persist();go('sales');toast('Draft sale deleted',s.no)}})},
+  addCustomer:()=>openCustomerForm(),
+  editCustomer:d=>openCustomerForm(d.id),
+  toggleCustomer:d=>{const c=DB.customers.find(x=>x.id===d.id);c.status=c.status==='Active'?'Inactive':'Active';persist();render();toast(c.status==='Active'?'Customer reactivated':'Customer deactivated',c.status==='Active'?`${c.name} can be used on new sales.`:`${c.name} is hidden from new sales. Their history is kept.`)},
+  deleteCustomer:d=>{const c=DB.customers.find(x=>x.id===d.id);confirmDialog({title:'Delete customer?',body:`${esc(c.name)} has no sales, so they can be deleted. This can't be undone.`,confirm:'Delete Customer',onConfirm:()=>{if(DB.sales.some(x=>x.customerId===c.id)){toast('Customer not deleted','They have sales. Deactivate them instead.','error');return}DB.customers=DB.customers.filter(x=>x!==c);persist();go('customers');toast('Customer deleted',c.name)}})},
+  gocustomers:()=>go('customers'),
+  resetSal:()=>{Object.assign(S.sal,blankSalFilters());render()},
   purchase:()=>openPurchaseForm(),
   purchaseFor:d=>openPurchaseForm(null,{supplierId:d.id}),
   editPurchase:d=>openPurchaseForm(d.id),
@@ -1838,36 +2395,36 @@ const ACTIONS={
   adjust:d=>openAdjust(d.id),
   toggleProduct:d=>{const p=DB.products.find(x=>x.id===d.id);p.status=p.status==='Active'?'Inactive':'Active';persist();render();toast(p.status==='Active'?'Product reactivated':'Product deactivated',p.status==='Active'?`${p.name} is available again.`:`${p.name} is hidden from new transactions. Its history is kept.`)},
   toggleVariant:d=>{const v=DB.variants.find(x=>x.id===d.id);v.status=v.status==='Active'?'Inactive':'Active';persist();render();toast(v.status==='Active'?'Variant reactivated':'Variant deactivated',`${v.sku} · ${variantLabel(v)}`)},
-  deleteProduct:d=>{const p=DB.products.find(x=>x.id===d.id);confirmDialog({title:'Delete product?',body:`${esc(p.name)} and its ${variantsOf(p.id).length} variant(s) have no stock or purchase history, so they can be deleted. This can't be undone.`,confirm:'Delete Product',onConfirm:()=>{if(variantsOf(p.id).some(v=>movementsOf(v.id).length||usedInPurchases(v.id))){toast('Product not deleted','It has stock or purchase history. Deactivate it instead.','error');return}DB.variants=DB.variants.filter(v=>v.productId!==p.id);DB.products=DB.products.filter(x=>x.id!==p.id);persist();go('products');toast('Product deleted',p.name)}})},
-  deleteVariant:d=>{const v=DB.variants.find(x=>x.id===d.id);confirmDialog({title:'Delete variant?',body:`${esc(v.sku)} has no stock or purchase history, so it can be deleted. This can't be undone.`,confirm:'Delete Variant',onConfirm:()=>{if(movementsOf(v.id).length||usedInPurchases(v.id)){toast('Variant not deleted','It has stock or purchase history. Deactivate it instead.','error');return}DB.variants=DB.variants.filter(x=>x.id!==v.id);persist();go('product-'+v.productId);toast('Variant deleted',v.sku)}})},
+  deleteProduct:d=>{const p=DB.products.find(x=>x.id===d.id);confirmDialog({title:'Delete product?',body:`${esc(p.name)} and its ${variantsOf(p.id).length} variant(s) have no stock, purchase or sales history, so they can be deleted. This can't be undone.`,confirm:'Delete Product',onConfirm:()=>{if(variantsOf(p.id).some(v=>movementsOf(v.id).length||usedInPurchases(v.id))){toast('Product not deleted','It has stock, purchase or sales history. Deactivate it instead.','error');return}DB.variants=DB.variants.filter(v=>v.productId!==p.id);DB.products=DB.products.filter(x=>x.id!==p.id);persist();go('products');toast('Product deleted',p.name)}})},
+  deleteVariant:d=>{const v=DB.variants.find(x=>x.id===d.id);confirmDialog({title:'Delete variant?',body:`${esc(v.sku)} has no stock, purchase or sales history, so it can be deleted. This can't be undone.`,confirm:'Delete Variant',onConfirm:()=>{if(movementsOf(v.id).length||usedInPurchases(v.id)){toast('Variant not deleted','It has stock, purchase or sales history. Deactivate it instead.','error');return}DB.variants=DB.variants.filter(x=>x.id!==v.id);persist();go('product-'+v.productId);toast('Variant deleted',v.sku)}})},
   resetInv:()=>{Object.assign(S.inv,blankInvFilters());render()},
   renameCat:d=>{const c=DB.categories.find(x=>x.id===d.id);showModal({title:'Rename category',narrow:true,save:'Save',body:fld('Category name',`<input class="input" name="name" value="${esc(c.name)}">`,{req:1}),onSave:form=>{const n=F(form,'name').value.trim();if(!n){fieldError(F(form,'name'),'Name cannot be blank.');return false}if(DB.categories.some(x=>x.id!==c.id&&x.name.toLowerCase()===n.toLowerCase())){fieldError(F(form,'name'),'That category already exists.');return false}c.name=n;persist();render();toast('Category updated',n);return true}})},
   deleteCat:d=>{const c=DB.categories.find(x=>x.id===d.id);confirmDialog({title:'Delete category?',body:`${esc(c.name)} has no products.`,confirm:'Delete Category',onConfirm:()=>{DB.categories=DB.categories.filter(x=>x.id!==c.id);persist();render();toast('Category deleted',c.name)}})},
-  restoreSample:()=>confirmDialog({title:'Restore sample data?',body:'This replaces all products, suppliers, purchases and stock movements in this browser with the MSV sample data.',confirm:'Restore Sample Data',onConfirm:()=>{DB=seedDb();persist();render();toast('Sample data restored','')}}),
-  clearData:()=>confirmDialog({title:'Clear all data?',body:'This removes every product, supplier, purchase and stock movement saved in this browser. Categories and currencies are kept. This can\'t be undone.',confirm:'Clear Data',onConfirm:()=>{DB=emptyDb();persist();go('products');toast('Data cleared','Add your first product to get started.')}}),
-  addLine:(d,el)=>{const box=el.closest('.form-section').querySelector('.lines');const i=box.querySelectorAll('[data-line]').length;box.insertAdjacentHTML('beforeend',lineRow(box.dataset.kind,i,'',1,''));refreshIcons();recalc()},
-  removeLine:(d,el)=>{el.closest('.line-row').remove();recalc()},
-  sale:()=>openDemo('sale'), customer:()=>openDemo('customer'), export:()=>openDemo('export'),
+  restoreSample:()=>confirmDialog({title:'Restore sample data?',body:'This replaces all products, suppliers, purchases, customers, sales and stock movements in this browser with the MSV sample data.',confirm:'Restore Sample Data',onConfirm:()=>{DB=seedDb();persist();render();toast('Sample data restored','')}}),
+  clearData:()=>confirmDialog({title:'Clear all data?',body:'This removes every product, supplier, purchase, customer, sale and stock movement saved in this browser. Categories and currencies are kept. This can\'t be undone.',confirm:'Clear Data',onConfirm:()=>{DB=emptyDb();persist();go('products');toast('Data cleared','Add your first product to get started.')}}),
+  export:()=>openDemo('export'),
 };
 document.addEventListener('click',e=>{
   if(e.target.closest('a[href^="#"]:not([data-action])')&&!e.target.closest('#mForm')) return;
-  const el=e.target.closest('[data-action],[data-go],[data-variant],[data-product],[data-customer],[data-vtab],[data-rtab],[data-range],[data-sf],[data-pf],[data-ct],[data-sort],[data-scroll],[data-pstatus],[data-invview],[data-setstatus],[data-psort],[data-sstatus]');
+  const el=e.target.closest('[data-action],[data-go],[data-variant],[data-product],[data-vtab],[data-rtab],[data-range],[data-sort],[data-scroll],[data-pstatus],[data-invview],[data-setstatus],[data-psort],[data-sstatus],[data-ssort],[data-drange],[data-dtop],[data-ctype],[data-cstatus],[data-rtabgo]');
   if(!el) return;
   const d=el.dataset;
-  if(d.action){ if(['suggestSku','addVariantCard','removeVariantCard','addPLine','removePLine','newSupplierInline'].includes(d.action)) return; const fn=ACTIONS[d.action]; if(fn){ if(el.tagName==='A'&&d.action==='close'){closeModal();return} e.preventDefault(); fn(d,el);} return; }
+  if(d.action){ if(['suggestSku','addVariantCard','removeVariantCard','addPLine','removePLine','newSupplierInline','addSLine','removeSLine','newCustomerInline'].includes(d.action)) return; const fn=ACTIONS[d.action]; if(fn){ if(el.tagName==='A'&&d.action==='close'){closeModal();return} e.preventDefault(); fn(d,el);} return; }
   if(d.go){ if(d.status!==undefined) Object.assign(S.inv,blankInvFilters(),{status:d.status,view:'levels'}); if(d.view) S.inv.view=d.view; return go(d.go); }
   if(d.variant) return go('variant-'+d.variant);
   if(d.product) return go('product-'+d.product);
-  if(d.customer){S.customer=d.customer;return go('customer');}
   if(d.vtab){S.vtab=d.vtab;return render();}
   if(d.rtab){S.rtab=d.rtab;return render();}
   if(d.range){S.range=d.range;return render();}
-  if(d.sf){S.salesFilter=d.sf;return render();}
-  if(d.pf){S.purchFilter=d.pf;return render();}
-  if(d.ct){S.custType=d.ct;return render();}
   if(d.pstatus){S.prod.status=d.pstatus;return render();}
   if(d.invview){S.inv.view=d.invview;return render();}
   if(d.setstatus){Object.assign(S.inv,{status:d.setstatus,view:'levels'});return render();}
+  if(d.ssort){const f=S.sal;f.dir=f.sort===d.ssort?-f.dir:1;f.sort=d.ssort;return renderSalTable();}
+  if(d.drange){S.dash.range=d.drange;return render();}
+  if(d.dtop){S.dash.top=d.dtop;return render();}
+  if(d.ctype){S.cus.type=d.ctype;return render();}
+  if(d.cstatus){S.cus.status=d.cstatus;return render();}
+  if(d.rtabgo){S.rtab=d.rtabgo;return go('reports');}
   if(d.psort){const f=S.pur;f.dir=f.sort===d.psort?-f.dir:1;f.sort=d.psort;return renderPurTable();}
   if(d.sstatus){S.sup.status=d.sstatus;return render();}
   if(d.sort){const f=S.inv;f.dir=f.sort===d.sort?-f.dir:1;f.sort=d.sort;return renderInvTable();}
@@ -1877,20 +2434,22 @@ function rerenderKeepFocus(id){const el=$('#'+id),pos=el?el.selectionStart:0;ren
 document.addEventListener('change',e=>{
   const t=e.target;
   if(t.dataset.filter){S.inv[t.dataset.filter]=t.value;rerenderKeepFocus('invQ');return}
+  if(t.dataset.sfilter){S.sal[t.dataset.sfilter]=t.value;rerenderKeepFocus('salQ');return}
+  if(t.id==='rFrom'||t.id==='rTo'){S[t.id==='rFrom'?'rfrom':'rto']=t.value;render();return}
+  if(t.dataset.fx){const r=parseFloat(t.value);if(r>0){DB.fxRates[t.dataset.fx]=r;persist();toast('Exchange rate updated',`1 ${t.dataset.fx} = ${r} SGD. Completed sales keep their own rate.`)}else toast('Rate not saved','Enter a number greater than 0.','error');return}
   if(t.dataset.pfilter){S.pur[t.dataset.pfilter]=t.value;rerenderKeepFocus('purQ');return}
   if(t.id==='showInactive'){S.inv.showInactive=t.checked;render();return}
   if(t.id==='prodCat'){S.prod.cat=t.value;render();return}
   if(t.dataset.catgauge){const c=DB.categories.find(x=>x.id===t.dataset.catgauge);c.usesGauge=t.checked;persist();render();toast('Category updated',`${c.name} ${c.usesGauge?'now shows':'no longer shows'} the gauge field.`);return}
-  if(t.closest('#mForm')&&modal&&modal.kind==='demo') recalc();
 });
 document.addEventListener('input',e=>{
   const t=e.target;
   if(t.id==='invQ'){S.inv.q=t.value;renderInvTable();const rb=document.querySelector('[data-action=resetInv]');if(rb)rb.disabled=!filtersActive();return}
+  if(t.id==='salQ'){S.sal.q=t.value;renderSalTable();const rb=document.querySelector('[data-action=resetSal]');if(rb)rb.disabled=!salFiltersActive();return}
+  if(t.id==='cusQ'){S.cus.q=t.value;rerenderKeepFocus('cusQ');return}
   if(t.id==='purQ'){S.pur.q=t.value;renderPurTable();const rb=document.querySelector('[data-action=resetPur]');if(rb)rb.disabled=!purFiltersActive();return}
   if(t.id==='supQ'){S.sup.q=t.value;rerenderKeepFocus('supQ');return}
   if(t.id==='prodQ'){S.prod.q=t.value;rerenderKeepFocus('prodQ');return}
-  if(t.id==='custQ'){S.custQ=t.value;rerenderKeepFocus('custQ');return}
-  if(t.closest('#mForm')&&modal&&modal.kind==='demo') recalc();
 });
 document.addEventListener('submit',e=>{
   if(e.target.id==='mForm'){e.preventDefault();submitModal();return}
@@ -1917,7 +2476,8 @@ function renderNotifications(){
   $('#notifPop').innerHTML=`<div class="pop-head">Notifications</div>
   ${att.length?`<button class="pop-item" data-go="inventory" data-status="attention"><span class="act-icon" style="background:var(--warn-bg);color:var(--warn-fg)">${ic('triangle-alert','i i-sm')}</span><span><b style="font-size:13.5px">${att.length} SKU${att.length===1?' needs':'s need'} reordering</b><small>${out} out of stock</small></span></button>`:`<div class="pop-item" style="cursor:default"><span class="act-icon" style="background:var(--ok-bg);color:var(--ok-fg)">${ic('circle-check','i i-sm')}</span><span><b style="font-size:13.5px">Stock levels look good</b><small>No SKU is at its reorder level</small></span></div>`}
   ${DB.purchases.some(p=>p.status==='Ordered')?`<button class="pop-item" data-go="purchases"><span class="act-icon" style="background:var(--info-bg);color:var(--info-fg)">${ic('ship','i i-sm')}</span><span><b style="font-size:13.5px">${DB.purchases.filter(p=>p.status==='Ordered').length} purchase${DB.purchases.filter(p=>p.status==='Ordered').length===1?'':'s'} on order</b><small>Mark as Received when the stock arrives</small></span></button>`:''}
-  <button class="pop-item" data-go="sales"><span class="act-icon" style="background:var(--bad-bg);color:var(--bad-fg)">${ic('clock','i i-sm')}</span><span><b style="font-size:13.5px">INV-1087 is overdue</b><small>Sample data · Jakarta Tennis Supply</small></span></button>`;
+  ${(()=>{const u=DB.sales.filter(x=>x.status==='Completed'&&(x.payment==='Unpaid'||x.payment==='Partially Paid'));return u.length?`<button class="pop-item" data-go="sales"><span class="act-icon" style="background:var(--bad-bg);color:var(--bad-fg)">${ic('clock','i i-sm')}</span><span><b style="font-size:13.5px">${u.length} completed sale${u.length===1?'':'s'} awaiting payment</b><small>${sgd(Math.round(u.reduce((a,x)=>a+saleTotals(x).totalBase,0)))} outstanding</small></span></button>`:''})()}
+  ${DB.sales.some(x=>x.status==='Confirmed')?`<button class="pop-item" data-go="sales"><span class="act-icon" style="background:var(--info-bg);color:var(--info-fg)">${ic('clipboard-check','i i-sm')}</span><span><b style="font-size:13.5px">${DB.sales.filter(x=>x.status==='Confirmed').length} confirmed sale${DB.sales.filter(x=>x.status==='Confirmed').length===1?'':'s'} to ship</b><small>Complete them when the goods leave</small></span></button>`:''}`;
 }
 $('#profilePop').innerHTML=`<div class="pop-head" style="flex-direction:column;align-items:flex-start;gap:0">Jasmine Koh<small class="muted" style="font-weight:500;font-size:12px">jasmine@msv-sea.com</small></div><div class="pop-sep"></div>
   <button class="pop-item" data-go="settings">${ic('user','i i-sm')}My profile</button><button class="pop-item" data-go="settings">${ic('settings','i i-sm')}Settings</button>`;
