@@ -320,8 +320,8 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     ok(t.includes(`Purchase ${purNo} reversed`), 'reversal in activity');
     const live = await page.evaluate(() => ({ v: Math.round(totals().value), u: totals().units, a: attention().length }));
     const k = await page.$$eval('.kpi .kpi-value', e => e.map(x => x.innerText.replace(/\s+/g, '')));
-    eq(k[2], 'SGD' + live.v.toLocaleString('en-SG')); eq(k[3], live.u.toLocaleString('en-SG'));
-    const strip = await page.$$eval('.stat-strip > div b', e => e.map(x => +x.innerText.replace(/\D/g, ''))); eq(strip[0] + strip[1], live.a, 'low + out of stock');
+    eq(k[2], 'SGD' + live.v.toLocaleString('en-SG'));
+    const strip = await page.$$eval('.stat-strip > div b', e => e.map(x => +x.innerText.replace(/\D/g, ''))); eq(strip[0] + strip[1], live.a, 'low + out of stock'); eq(strip[5], live.u, 'units in stock');
   });
   await check('every stock quantity equals the sum of its movements', async () => {
     const bad = await page.evaluate(() => DB.variants.filter(v => DB.movements.filter(m => m.variantId === v.id).reduce((a, m) => a + m.change, 0) !== v.qty).map(v => v.sku));

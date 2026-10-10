@@ -13,7 +13,7 @@ async function check(name, fn) {
 }
 function eq(a, b, msg) { if (a !== b) throw new Error(`${msg || 'expected'}: got ${JSON.stringify(a)}, want ${JSON.stringify(b)}`); }
 function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
-const near = (a, b, msg, tol = 0.02) => { if (Math.abs(a - b) > tol) throw new Error(`${msg || 'expected'}: got ${a}, want ${b}`); };
+const near = (a, b, msg, tol = 0.02) => { if (!(Math.abs(a - b) <= tol)) throw new Error(`${msg || 'expected'}: got ${a}, want ${b}`); };
 const num = s => +String(s).replace(/[^0-9.\-−]/g, '').replace('−', '-');
 function parseCSV(csv) {
   return csv.replace(/^﻿/, '').trim().split('\r\n').map(line => [...line.matchAll(/"((?:[^"]|"")*)"/g)].map(m => m[1].replace(/""/g, '"')));
@@ -33,7 +33,7 @@ const RAW = `(from,to)=>{
   let rv=0,rc=0,ru=0;
   rets.forEach(r=>{const s=DB.sales.find(x=>x.id===r.saleId);r.lines.forEach(l=>{const v=l.qty*l.unitRevenueBase,c=l.restock?l.qty*l.unitCost:0;rv+=v;rc+=c;ru+=l.qty;
     [[byC,r.customerId],[byK,(s&&s.country)||'Not set'],[byV,l.variantId]].forEach(([m,k])=>add(m,k,x=>{x.returns+=v;x.rev-=v;x.cogs-=c;if(m===byV)x.returned=(x.returned||0)+l.qty}))})});
-  return {count:sales.length,gross,returns:rv,net:gross-rv,rev:prod-rv,cogs:cogs-rc,gp:prod-rv-(cogs-rc),units,ru,byV,byC,byK};
+  return {count:sales.length,gross,returns:rv,net:gross-rv,rev:prod-rv,cogs:cogs-rc,gp:gross-rv-(cogs-rc),units,ru,byV,byC,byK};
 }`;
 
 (async () => {
@@ -81,11 +81,11 @@ const RAW = `(from,to)=>{
   await check('gross profit is accurate', async () => {
     const r = await range(), x = await raw(r.from, r.to), k = await kpis();
     near(k[1], Math.round(x.gp), 'gross profit', 0.5);
-    ok((await page.textContent('.kpi:nth-child(2) .kpi-note')).includes((x.gp / x.rev * 100).toFixed(1) + '% margin'), 'margin');
+    ok((await page.textContent('.kpi:nth-child(2) .kpi-note')).includes((x.gp / x.net * 100).toFixed(1) + '% margin'), 'margin');
   });
   await check('inventory value and units in stock are accurate', async () => {
     const t = await page.evaluate(() => ({ v: DB.variants.reduce((a, v) => a + v.qty * v.cost, 0), u: DB.variants.reduce((a, v) => a + v.qty, 0) })), k = await kpis();
-    eq(k[2], Math.round(t.v)); eq(k[3], t.u);
+    eq(k[2], Math.round(t.v)); eq((await page.$$eval('.stat-strip > div b', e => e.map(x => num(x.innerText))))[5], t.u, 'units in stock');
     await page.goto(FILE + '#inventory'); eq((await kpis())[0], Math.round(t.v), 'matches the Inventory page');
     await page.goto(FILE + '#dashboard');
   });
@@ -165,9 +165,9 @@ const RAW = `(from,to)=>{
   await check('gross profit and gross margin are accurate', async () => {
     await page.goto(FILE + '#reports'); await tab('Sales');
     const x = await raw(yr.from, yr.to), bridge = await page.$$eval('.summary div', e => Object.fromEntries(e.map(d => [d.children[0]?.innerText.trim(), d.children[1]?.innerText.trim()])));
-    near(num(bridge['Net sales']), x.net, 'net', 0.5); near(num(bridge['Product revenue']), x.rev, 'product revenue', 0.5);
+    near(num(bridge['Net sales']), x.net, 'net', 0.5);
     near(num(bridge['Cost of goods sold']), -x.cogs, 'cogs', 0.5); near(num(bridge['Gross profit']), x.gp, 'gp', 0.5);
-    eq(bridge['Gross margin'], (x.gp / x.rev * 100).toFixed(1) + '%');
+    eq(bridge['Gross margin'], (x.gp / x.net * 100).toFixed(1) + '%');
   });
   await check('reversed sales do not inflate reports', async () => {
     const before = await raw(yr.from, yr.to);
@@ -184,7 +184,7 @@ const RAW = `(from,to)=>{
     for (const r of rows.slice(1)) {
       const v = await page.evaluate(sku => { const v = DB.variants.find(x => x.sku === sku); return { id: v.id, qty: v.qty }; }, r[ix('SKU')]), e = x.byV[v.id];
       eq(+r[ix('Units Sold')], e.units, r[2] + ' units'); eq(+r[ix('Returned')], e.returned || 0, r[2] + ' returned');
-      near(+r[ix('Revenue (SGD)')], e.rev, r[2] + ' revenue', 0.05); near(+r[ix('Gross Profit (SGD)')], e.rev - e.cogs, r[2] + ' gp', 0.05);
+      near(+r[ix('Net Sales (SGD)')], e.rev, r[2] + ' net sales', 0.05); near(+r[ix('Gross Profit (SGD)')], e.rev - e.cogs, r[2] + ' gp', 0.05);
       eq(+r[ix('Current Stock')], v.qty, 'stock'); checked++;
     }
     eq(checked, Object.keys(x.byV).length, 'every SKU sold');
