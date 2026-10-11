@@ -1,5 +1,5 @@
-<title>MSV Inventory Prototype</title>
-<meta name="description" content="MSV Southeast Asia inventory system. Phase 2: live products, variants, SKUs, stock levels, adjustments and movement history.">
+<title>Evolve Tennis System</title>
+<meta name="description" content="Evolve Tennis System: stock, purchasing, sales, reporting and financials for Evolve Tennis.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap">
@@ -16,7 +16,7 @@
   --ok-bg:#E4F2E9; --ok-fg:#1C6A45; --warn-bg:#FBF0D8; --warn-fg:#86590A;
   --bad-bg:#F9E4E0; --bad-fg:#A3382C; --info-bg:#E5EDF8; --info-fg:#2D5A9B;
   --mute-bg:#EEF1EF; --mute-fg:#59655F;
-  --c-in:#1A7A55; --c-out:#B8862E; --grid:#E8ECE9;
+  --c-in:#1A7A55; --c-out:#B8862E; --c-3:#2F5FB8; --grid:#E8ECE9;
   --shadow:0 1px 2px rgba(18,26,22,.05); --shadow-2:0 2px 4px rgba(18,26,22,.05),0 8px 24px -8px rgba(18,26,22,.14);
   --overlay:rgba(10,28,20,.38);
   --font:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -31,7 +31,7 @@
   --side:#0A1A13; --side-2:#11261C; --side-fg:#9DBBAB; --side-dim:#5F8673; --side-active:#1A3D2D;
   --ok-bg:#16301F; --ok-fg:#7FCB9E; --warn-bg:#33270F; --warn-fg:#E2B866; --bad-bg:#3A1C18; --bad-fg:#F0968A;
   --info-bg:#172840; --info-fg:#94B8EC; --mute-bg:#222B27; --mute-fg:#A2AEA8;
-  --c-in:#36A577; --c-out:#A9802F; --grid:#232D28;
+  --c-in:#36A577; --c-out:#A9802F; --c-3:#5B84E3; --grid:#232D28;
   --shadow:0 1px 2px rgba(0,0,0,.3); --shadow-2:0 2px 4px rgba(0,0,0,.3),0 10px 28px -8px rgba(0,0,0,.5);
   --overlay:rgba(0,0,0,.55); color-scheme:dark}}
 :root[data-theme="dark"]{
@@ -43,7 +43,7 @@
   --side:#0A1A13; --side-2:#11261C; --side-fg:#9DBBAB; --side-dim:#5F8673; --side-active:#1A3D2D;
   --ok-bg:#16301F; --ok-fg:#7FCB9E; --warn-bg:#33270F; --warn-fg:#E2B866; --bad-bg:#3A1C18; --bad-fg:#F0968A;
   --info-bg:#172840; --info-fg:#94B8EC; --mute-bg:#222B27; --mute-fg:#A2AEA8;
-  --c-in:#36A577; --c-out:#A9802F; --grid:#232D28;
+  --c-in:#36A577; --c-out:#A9802F; --c-3:#5B84E3; --grid:#232D28;
   --shadow:0 1px 2px rgba(0,0,0,.3); --shadow-2:0 2px 4px rgba(0,0,0,.3),0 10px 28px -8px rgba(0,0,0,.5);
   --overlay:rgba(0,0,0,.55); color-scheme:dark}
 
@@ -313,6 +313,18 @@ label.field{display:flex;flex-direction:column;gap:7px;min-width:0}
 .info-i .i{width:13px;height:13px}
 .info-i:hover,.info-i:focus{color:var(--fg-2);outline:none}
 .nowrap{white-space:nowrap}
+.wf{display:flex;flex-direction:column;gap:2px}
+.wf-row{display:grid;grid-template-columns:minmax(150px,1.4fr) minmax(40px,.8fr) auto;gap:12px;align-items:center;padding:8px 0;font-size:14px}
+.wf-row.sub,.wf-row.total{border-top:1px solid var(--line);font-weight:700}
+.wf-row.total{font-size:15.5px}
+.wf-label{color:var(--fg-2)}.wf-row.sub .wf-label,.wf-row.total .wf-label{color:var(--fg)}
+.wf-bar{height:8px;background:var(--surface-2);border-radius:999px;overflow:hidden}.wf-bar i{display:block;height:100%;border-radius:999px}
+.wf-val{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.wf-val small{display:block;font-weight:500;color:var(--fg-3);font-size:12px}
+.seg-radio{display:inline-flex;position:relative}
+.seg-radio input{position:absolute;opacity:0;pointer-events:none}
+.seg-radio span{height:32px;padding:0 13px;display:inline-flex;align-items:center;border-radius:7px;font-weight:600;font-size:13px;color:var(--fg-2);cursor:pointer}
+.seg-radio input:checked+span{background:var(--surface);color:var(--fg);box-shadow:0 1px 2px rgba(18,26,22,.1),0 0 0 1px var(--line)}
+.seg-radio input:focus-visible+span{outline:2px solid var(--c-in);outline-offset:1px}
 .summary div>span:last-child{white-space:nowrap;text-align:right}
 .kpi-btn{font:inherit;text-align:left;cursor:pointer;color:inherit;width:100%}
 .kpi-btn[aria-pressed="true"]{box-shadow:0 0 0 2px var(--accent-ring,var(--c-in))}
@@ -449,11 +461,11 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
 <div class="shell" id="shell">
   <aside class="side" id="side" aria-label="Main navigation">
     <div class="brand">
-      <div class="mark" aria-hidden="true">MSV</div>
-      <div><b>MSV Southeast Asia</b><span>Inventory Management</span></div>
+      <div class="mark" aria-hidden="true">ET</div>
+      <div><b>EVOLVE TENNIS</b><span>Management System</span></div>
     </div>
     <nav class="nav" id="nav"></nav>
-    <div class="side-foot"><strong>Phase 6</strong>Dashboard and business reports are live</div>
+    <div class="side-foot"><strong>Evolve Tennis System</strong>Phase 7 · financials are live</div>
   </aside>
   <div class="backdrop" id="backdrop"></div>
   <div class="main">
@@ -465,7 +477,7 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
         <span class="kbd">/</span>
       </form>
       <div class="top-right">
-        <span class="proto-tag">Phase 6 · saved in this browser</span>
+        <span class="proto-tag">Phase 7 · saved in this browser</span>
         <div style="position:relative">
           <button class="icon-btn" id="notifBtn" aria-label="Notifications" aria-haspopup="true"><i data-lucide="bell" class="i"></i><span class="dot" id="notifDot"></span></button>
           <div class="pop" id="notifPop" hidden></div>
@@ -485,7 +497,7 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
 
 <script>
 /* =====================================================================
-   MSV Southeast Asia · Inventory Management · Phase 2
+   Evolve Tennis System · Phase 7
    Live: product catalogue, variants/SKUs, stock levels, valuation,
    reorder levels, manual adjustments, stock movement ledger.
    Live: suppliers, purchases (stock in), customers, sales (stock out),
@@ -559,7 +571,7 @@ const MARKETS=['Singapore','Malaysia','Thailand','Indonesia','Philippines','Viet
 const COST_FIELDS=[['shipping','Shipping / Freight'],['duties','Import Duties'],['customs','Customs Fees'],['handling','Handling Fees'],['other','Other Costs']];
 const emptyCosts = ()=>({shipping:0,duties:0,customs:0,handling:0,other:0,otherDesc:''});
 const emptyCharges = ()=>({discount:0,shipping:0,other:0,otherDesc:''});
-const ENTITY_OF={purchase:'Purchase',sale:'Sale',return:'Customer Return',sreturn:'Supplier Return',supplier:'Supplier',customer:'Customer',variant:'Variant',product:'Product',movement:'Stock Movement',stockcount:'Stock Count'};
+const ENTITY_OF={expense:'Expense',income:'Other Income',purchase:'Purchase',sale:'Sale',return:'Customer Return',sreturn:'Supplier Return',supplier:'Supplier',customer:'Customer',variant:'Variant',product:'Product',movement:'Stock Movement',stockcount:'Stock Count'};
 function isoAddDays(iso,n){const d=new Date(iso+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10)}
 function seedRng(a){return ()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
 
@@ -585,9 +597,152 @@ function seedCustomers(t0){
   return C.map(([id,name,type,country,contact,email,phone,address,currency,notes],i)=>({id,name,type,country,contact,email,phone,address,currency,notes,status:'Active',createdAt:t0+i}));
 }
 
+/* ===== Phase 7 · Financials =====
+   Five things are kept apart and never added together twice:
+   - Inventory purchases: become stock. They are not an expense.
+   - COGS: the cost snapshot stored on each sale line when the sale completes.
+   - Operating expenses: running costs (packaging, software, fees...). Reduce Net Operating Profit.
+   - Capital equipment: machines, computers, shelving. Excluded from Net Operating Profit; reduce Net Cash Result.
+   - Other income: money that isn't from product sales. Adds to Net Operating Profit.
+   None of these records change stock. Amounts keep their own currency plus the SGD rate at the time. */
+const EXPENSE_CATEGORIES=['Shipping & Freight','Packaging','Marketing','Software & Subscriptions','Transport','Office Supplies','Repairs & Maintenance','Professional Fees','Bank / Payment Fees','Marketplace Fees','Utilities','Miscellaneous'];
+const INCOME_CATEGORIES=['Service Income','Commission','Rebate','Supplier Credit','Sponsorship','Refund','Miscellaneous'];
+const EXPENSE_TYPES=['Operating Expense','Capital Equipment'];
+const EXPENSE_STATUSES=['Paid','Pending','Cancelled'];
+const INCOME_STATUSES=['Received','Pending','Cancelled'];
+const PAYMENT_METHODS=['Bank Transfer','PayNow','Credit Card','Debit Card','Cash','PayPal','Other'];
+function finDefaults(){return {expenses:[],incomes:[],expenseCategories:EXPENSE_CATEGORIES.slice(),incomeCategories:INCOME_CATEGORIES.slice()}}
+function fmtAmt(n,c,d=2){return `${c} ${(+n||0).toLocaleString('en-SG',{minimumFractionDigits:d,maximumFractionDigits:d})}`}
+const recFx = (db,r)=>r.currency===BASE_CURRENCY?1:(+r.fxRate||fxOf(db,r.currency));
+const baseAmt = r=>round2(r.amount*recFx(DB,r));
+const counted = r=>r.status!=='Cancelled';
+
+function checkFinRecord(db,d,kind){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d.date||'')) throw new Error('Choose a date.');
+  if(!d.category) throw new Error('Choose a category.');
+  if(!String(d.description||'').trim()) throw new Error('Add a short description.');
+  if(!(+d.amount>0)) throw new Error('Enter an amount greater than 0.');
+  if(!/^[A-Z]{3}$/.test(d.currency||'')) throw new Error('Choose a currency.');
+  if(d.currency!==BASE_CURRENCY&&!(+d.fxRate>0)) throw new Error(`Enter the SGD rate for ${d.currency}.`);
+  if(kind==='expense'&&!EXPENSE_TYPES.includes(d.type)) throw new Error('Choose Operating Expense or Capital Equipment.');
+  if(!(kind==='expense'?EXPENSE_STATUSES:INCOME_STATUSES).includes(d.status)) throw new Error('Choose a status.');
+}
+const FIN_FIELDS={expense:['date','type','category','description','payee','amount','currency','fxRate','method','reference','notes','status','attachment'],income:['date','category','description','source','amount','currency','fxRate','reference','notes','status','attachment']};
+function finRecord(db,kind,d){
+  const o={}; FIN_FIELDS[kind].forEach(k=>o[k]=d[k]??'');
+  o.amount=round2(+d.amount); o.fxRate=d.currency===BASE_CURRENCY?1:+d.fxRate; return o;
+}
+function createExpense(db,d,{at=Date.now()}={}){
+  checkFinRecord(db,d,'expense');
+  const e={id:uid('ex'),no:nextNo(db,'EXP',d.date.slice(0,4)),...finRecord(db,'expense',d),createdAt:at,history:[]};
+  db.expenses.push(e); addHistory(e,`Recorded as ${e.status}`,'created',at);
+  audit(db,{action:e.type==='Capital Equipment'?'Capital equipment added':'Expense created',entity:'Expense',ref:e.no,link:'expense-'+e.id,desc:`${e.category} · ${e.description} · ${fmtAmt(e.amount,e.currency)}`,at});
+  return e;
+}
+function diffText(a,b,keys){return keys.filter(k=>String(a[k]??'')!==String(b[k]??'')).map(k=>`${k==='fxRate'?'rate':k} ${k==='amount'?fmtAmt(a[k],a.currency):a[k]||'—'} → ${k==='amount'?fmtAmt(b[k],b.currency):b[k]||'—'}`).join('; ')}
+function updateFin(db,kind,r,d,{at=Date.now()}={}){
+  if(r.status==='Cancelled') throw new Error(`This ${kind==='expense'?'expense':'income record'} is cancelled and can no longer be edited.`);
+  checkFinRecord(db,d,kind);
+  const next=finRecord(db,kind,d), changes=diffText(r,next,FIN_FIELDS[kind]);
+  if(!changes) return false;
+  if(next.status==='Cancelled') throw new Error('Use Cancel to cancel a record, so the reason is kept.');
+  Object.assign(r,next); addHistory(r,`Edited · ${changes}`,'edited',at);
+  const label=kind==='expense'?'Expense':'Other income';
+  audit(db,{action:`${label} edited`,entity:kind==='expense'?'Expense':'Other Income',ref:r.no,link:`${kind}-${r.id}`,desc:changes,at});
+  return true;
+}
+function cancelFin(db,kind,r,{reason,at=Date.now()}){
+  if(r.status==='Cancelled') throw new Error('This record is already cancelled.');
+  if(!String(reason||'').trim()) throw new Error('Give a reason for cancelling.');
+  r.status='Cancelled'; Object.assign(r,{cancelledAt:at,cancelReason:reason}); addHistory(r,`Cancelled · ${reason}`,'cancelled',at);
+  audit(db,{action:kind==='expense'?'Expense cancelled':'Other income cancelled',entity:kind==='expense'?'Expense':'Other Income',ref:r.no,link:`${kind}-${r.id}`,desc:reason,at});
+}
+function createIncome(db,d,{at=Date.now()}={}){
+  checkFinRecord(db,d,'income');
+  const r={id:uid('in'),no:nextNo(db,'INC',d.date.slice(0,4)),...finRecord(db,'income',d),createdAt:at,history:[]};
+  db.incomes.push(r); addHistory(r,`Recorded as ${r.status}`,'created',at);
+  audit(db,{action:'Other income created',entity:'Other Income',ref:r.no,link:'income-'+r.id,desc:`${r.category} · ${r.description} · ${fmtAmt(r.amount,r.currency)}`,at});
+  return r;
+}
+
+/* ----- Period figures ----- */
+const expensesBetween = (from,to,type)=>DB.expenses.filter(e=>counted(e)&&e.date>=from&&e.date<=to&&(!type||e.type===type));
+const incomesBetween = (from,to)=>DB.incomes.filter(r=>counted(r)&&r.date>=from&&r.date<=to);
+const sumBase = list=>round2(list.reduce((a,x)=>a+baseAmt(x),0));
+function finStats(from,to){return memo('fin|'+from+'|'+to,()=>{
+  const st=periodSales(from,to).st, op=expensesBetween(from,to,'Operating Expense'), cap=expensesBetween(from,to,'Capital Equipment'), inc=incomesBetween(from,to);
+  const opex=sumBase(op), capex=sumBase(cap), income=sumBase(inc), nop=round2(st.gp-opex+income);
+  return {st,net:st.total,cogs:st.cogs,gp:st.gp,margin:st.margin,opex,capex,income,nop,ncr:round2(nop-capex),op,cap,inc,
+    opPending:sumBase(op.filter(e=>e.status==='Pending')),capPending:sumBase(cap.filter(e=>e.status==='Pending')),incPending:sumBase(inc.filter(r=>r.status==='Pending')),purchases:purchaseStats(from,to).spend};
+})}
+function byCategory(list){const m={};list.forEach(r=>{const x=m[r.category]||(m[r.category]={cat:r.category,amount:0,n:0});x.amount+=baseAmt(r);x.n++});const tot=list.reduce((a,r)=>a+baseAmt(r),0);return Object.values(m).map(x=>({...x,amount:round2(x.amount),share:tot?x.amount/tot:NaN})).sort((a,b)=>b.amount-a.amount)}
+
+/* ----- Landed cost -----
+   Spreads a purchase's additional costs (freight, duties, customs, handling, other) over its lines,
+   by quantity or by line value. The last line takes any rounding remainder, so allocations always
+   add up exactly to the purchase's additional costs. Applying it never touches completed sales:
+   they keep the cost stored when they completed. */
+function landedPreview(p,method){
+  const base=p.lines.map(l=>method==='value'?lineTotal(l):l.qty), tot=base.reduce((a,x)=>a+x,0);
+  const rows=p.lines.map((l,i)=>({l,share:tot?base[i]/tot:1/p.lines.length,alloc:{}}));
+  COST_FIELDS.forEach(([k])=>{const c=round2(+(p.costs||{})[k]||0);let left=c;rows.forEach((r,i)=>{const a=i===rows.length-1?round2(left):round2(c*r.share);r.alloc[k]=a;left=round2(left-a)})});
+  rows.forEach(r=>{r.cost=lineTotal(r.l);r.extra=round2(COST_FIELDS.reduce((a,[k])=>a+r.alloc[k],0));r.landed=round2(r.cost+r.extra);r.unit=r.l.qty?Math.round(r.landed/r.l.qty*10000)/10000:0});
+  const t=purchaseTotals(p);
+  return {method,rows,sub:t.sub,add:t.add,total:t.total,allocated:round2(rows.reduce((a,r)=>a+r.extra,0)),landedTotal:round2(rows.reduce((a,r)=>a+r.landed,0)),fx:purFx(p)};
+}
+function landedUpdates(db,p){return p.lines.map(l=>{const v=db.variants.find(x=>x.id===l.variantId);return {l,v,latest:!!v&&v.lastPurchaseId===p.id}})}
+function applyLandedCost(db,p,{method,updateCost=true,at=Date.now()}){
+  if(p.status!=='Received') throw new Error('Landed cost can only be applied to a received purchase.');
+  if(!['quantity','value'].includes(method)) throw new Error('Choose how to allocate the costs.');
+  const pv=landedPreview(p,method), again=!!p.landed, fx=pv.fx, updated=[];
+  if(round2(pv.allocated)!==round2(pv.add)) throw new Error('Allocation does not add up to the additional costs.');
+  p.landed={method,appliedAt:at,fx,updateCost:!!updateCost,add:pv.add,lines:pv.rows.map(r=>({lineId:r.l.id,variantId:r.l.variantId,qty:r.l.qty,cost:r.cost,alloc:{...r.alloc},extra:r.extra,landed:r.landed,unit:r.unit,unitBase:Math.round(r.unit*fx*10000)/10000}))};
+  p.landed.lines.forEach(x=>{const v=db.variants.find(y=>y.id===x.variantId);if(!v)return;
+    if(v.lastPurchaseId===p.id){v.landedUnitCost=x.unitBase;v.landedCostPurchaseId=p.id;
+      if(updateCost&&v.cost!==x.unitBase){updated.push(`${v.sku} ${sgd(v.cost,2)} → ${sgd(x.unitBase,2)}`);v.cost=x.unitBase}}});
+  const how=method==='value'?'by purchase value':'by quantity';
+  addHistory(p,`Landed cost ${again?'recalculated':'applied'} ${how} · ${fmtAmt(pv.add,p.currency)} spread over ${p.lines.length} line${p.lines.length===1?'':'s'}${updated.length?` · cost price updated for ${updated.length} SKU${updated.length===1?'':'s'}`:''}`,'landed',at);
+  audit(db,{action:again?'Landed cost recalculated':'Landed cost applied',entity:'Purchase',ref:p.no,link:'purchase-'+p.id,desc:`Allocated ${how}: ${fmtAmt(pv.add,p.currency)} additional costs, landed total ${fmtAmt(pv.landedTotal,p.currency)}${updated.length?` · cost basis ${updated.join('; ')}`:' · cost basis unchanged'}`,at});
+  return {pv,updated};
+}
+
+/* ----- Sample financial records (fresh sample data only) ----- */
+function seedFinance(db){
+  db.expenseCategories.push('Equipment');
+  const E=[], I=[], m=['04','05','06','07','08','09','10'];
+  m.forEach((mm,i)=>{const d=x=>`2026-${mm}-${String(x).padStart(2,'0')}`, last=mm==='10';
+    E.push(['Operating Expense','Software & Subscriptions','Online store and accounting software','Shopify / Xero',39,'USD',1.29,'Credit Card',d(3)]);
+    E.push(['Operating Expense','Packaging','Mailer boxes and string sleeves','PackRight Supplies',[186,212,240,198,226,254,0][i]||0,'SGD',1,'PayNow',d(8)]);
+    if(!last) E.push(['Operating Expense','Shipping & Freight','Courier charges for customer orders','Ninja Van',[312,365,428,401,446,380][i],'SGD',1,'Bank Transfer',d(28)]);
+    if(!last) E.push(['Operating Expense','Marketplace Fees','Lazada and Shopee commission','Shopee Singapore',[64,82,96,88,102,74][i],'SGD',1,'Bank Transfer',d(27)]);
+    E.push(['Operating Expense','Bank / Payment Fees','Card and transfer fees','DBS Bank',[38,44,52,47,55,49,21][i],'SGD',1,'Bank Transfer',d(last?5:25)]);
+    if(!last) E.push(['Operating Expense','Transport','Deliveries to academies','Grab',[72,85,94,80,110,96][i],'SGD',1,'Credit Card',d(20)]);
+    I.push(['Service Income','Racquet stringing service','Walk-in customers',[260,310,385,342,410,368,95][i],'SGD',1,d(last?6:29)]);
+  });
+  E.push(['Capital Equipment','Equipment','Shelving for the stock room','IKEA Tampines',640,'SGD',1,'Debit Card','2026-04-20']);
+  E.push(['Operating Expense','Marketing','Instagram ads · new season strings','Meta',420,'SGD',1,'Credit Card','2026-06-04']);
+  E.push(['Capital Equipment','Equipment','Electronic stringing machine','Racquet Tech SG',3800,'SGD',1,'Bank Transfer','2026-06-12']);
+  E.push(['Operating Expense','Professional Fees','Accountant · half-year bookkeeping','Tan & Co Accountants',650,'SGD',1,'Bank Transfer','2026-07-15']);
+  E.push(['Operating Expense','Marketing','Junior tournament booth','Singapore Tennis Association',350,'SGD',1,'PayNow','2026-08-09']);
+  E.push(['Operating Expense','Office Supplies','Labels, printer ink and paper','Popular Bookstore',68.4,'SGD',1,'Cash','2026-08-18']);
+  E.push(['Capital Equipment','Equipment','Barcode scanner','Lazada',189,'SGD',1,'Credit Card','2026-09-03']);
+  E.push(['Operating Expense','Utilities','Stock room electricity','SP Group',58.2,'SGD',1,'Bank Transfer','2026-09-12']);
+  E.push(['Operating Expense','Marketplace Fees','Lazada and Shopee commission','Shopee Singapore',58,'SGD',1,'Bank Transfer','2026-10-07','Pending']);
+  E.push(['Operating Expense','Office Supplies','Labels, printer ink and paper (entered twice)','Popular Bookstore',68.4,'SGD',1,'Cash','2026-08-18','Cancelled']);
+  I.push(['Rebate','Volume rebate on Q3 orders','MSV GmbH',150,'EUR',1.45,'2026-09-30']);
+  I.push(['Commission','Racquet demo referrals','Kallang Tennis Hub',120,'SGD',1,'2026-07-31']);
+  I.push(['Sponsorship','Club tournament sponsorship','Tanglin Tennis Academy',300,'SGD',1,'2026-08-22']);
+  I.push(['Service Income','Stringing for coaching clinic','Coach Daniel Lim',180,'SGD',1,'2026-10-08','Pending']);
+  E.filter(x=>x[4]>0).sort((a,b)=>a[8].localeCompare(b[8])).forEach(([type,category,description,payee,amount,currency,fxRate,method,date,status])=>{
+    const e=createExpense(db,{date,type,category,description,payee,amount,currency,fxRate,method,reference:'',notes:'',status:status==='Cancelled'?'Paid':status||'Paid',attachment:''},{at:Date.parse(date+'T15:00:00Z')});
+    if(status==='Cancelled') cancelFin(db,'expense',e,{reason:'Duplicate entry',at:Date.parse(date+'T15:30:00Z')});
+  });
+  I.sort((a,b)=>a[6].localeCompare(b[6])).forEach(([category,description,source,amount,currency,fxRate,date,status])=>createIncome(db,{date,category,description,source,amount,currency,fxRate,reference:'',notes:'',status:status||'Received',attachment:''},{at:Date.parse(date+'T16:00:00Z')}));
+}
+
 function seedDb(){
   const t0=Date.UTC(2026,3,1), day=86400000;
-  const db={version:6,reportSettings:slowDefaults(),user:'Jasmine Koh',categories:[],products:[],variants:[],movements:[],seq:0,suppliers:seedSuppliers(t0),purchases:[],customers:seedCustomers(t0),sales:[],returns:[],supplierReturns:[],counts:[],activity:[],audit:[],counters:{},currencies:DEFAULT_CURRENCIES.slice(),fxRates:{...DEFAULT_FX}};
+  const db={version:7,...finDefaults(),reportSettings:slowDefaults(),user:'Jasmine Koh',categories:[],products:[],variants:[],movements:[],seq:0,suppliers:seedSuppliers(t0),purchases:[],customers:seedCustomers(t0),sales:[],returns:[],supplierReturns:[],counts:[],activity:[],audit:[],counters:{},currencies:DEFAULT_CURRENCIES.slice(),fxRates:{...DEFAULT_FX}};
   const cat=(id,name,usesGauge)=>db.categories.push({id,name,usesGauge});
   cat('cat-strings','Tennis Strings',true);cat('cat-grips','Grips',false);cat('cat-acc','Accessories',false);cat('cat-equip','Equipment',false);cat('cat-other','Other',false);
   const P=[
@@ -697,9 +852,10 @@ function seedDb(){
     const r=createSupplierReturn(db,{purchaseId:pu.id,date:'2026-09-24',reason:'Damaged on Arrival',notes:'Carton crushed in transit; MSV agreed to credit',lines:[{purchaseLineId:pl.id,qty:6}]},{at:Date.parse('2026-09-24T09:00:00Z'),year:2026});
     completeSupplierReturn(db,r,{date:'2026-09-24',at:Date.parse('2026-09-24T09:05:00Z')});}});
   ev.sort((a,b)=>a.date.localeCompare(b.date)||a.o-b.o).forEach(e=>e.fn());
+  seedFinance(db);
   return db;
 }
-function emptyDb(){const s=seedDb();return {version:6,reportSettings:DB&&DB.reportSettings?{...DB.reportSettings}:slowDefaults(),user:DB&&DB.user||'Jasmine Koh',categories:s.categories,products:[],variants:[],movements:[],seq:0,suppliers:[],purchases:[],customers:[],sales:[],returns:[],supplierReturns:[],counts:[],activity:[],audit:[],counters:DB&&DB.counters?{...DB.counters}:{},currencies:DB&&DB.currencies?DB.currencies.slice():DEFAULT_CURRENCIES.slice(),fxRates:DB&&DB.fxRates?{...DB.fxRates}:{...DEFAULT_FX}}}
+function emptyDb(){const s=seedDb();return {version:7,...finDefaults(),expenseCategories:DB&&DB.expenseCategories?DB.expenseCategories.slice():EXPENSE_CATEGORIES.slice(),incomeCategories:DB&&DB.incomeCategories?DB.incomeCategories.slice():INCOME_CATEGORIES.slice(),reportSettings:DB&&DB.reportSettings?{...DB.reportSettings}:slowDefaults(),user:DB&&DB.user||'Jasmine Koh',categories:s.categories,products:[],variants:[],movements:[],seq:0,suppliers:[],purchases:[],customers:[],sales:[],returns:[],supplierReturns:[],counts:[],activity:[],audit:[],counters:DB&&DB.counters?{...DB.counters}:{},currencies:DB&&DB.currencies?DB.currencies.slice():DEFAULT_CURRENCIES.slice(),fxRates:DB&&DB.fxRates?{...DB.fxRates}:{...DEFAULT_FX}}}
 function slowDefaults(){return {slowDays:60,staleDays:120}}
 function migrate(db){
   if(!db) return seedDb();
@@ -720,7 +876,10 @@ function migrate(db){
     db.purchases.forEach(p=>{if((p.status==='Received'||p.status==='Reversed')&&!p.fxRate)p.fxRate=fxOf(db,p.currency)});
     Object.assign(db,{version:6,reportSettings:slowDefaults()});
   }
-  return db.version===6?db:seedDb();
+  if(db.version===6){ // Phase 7: expenses, capital equipment and other income. Existing records are kept as they are.
+    Object.assign(db,{version:7,...finDefaults()});
+  }
+  return db.version===7?db:seedDb();
 }
 let DB=freezeLedger(migrate(Store.load()));
 let storageWarned=false;
@@ -992,7 +1151,7 @@ function saleTotals(s,db=DB){
   });
   const cogs=round2(lines.reduce((a,x)=>a+x.cogs,0)), revBase=round2(productRevenue*fx), gp=round2(revBase-cogs);
   return {lines,items:s.lines.length,units:s.lines.reduce((a,l)=>a+l.qty,0),gross,lineDisc,sub,orderDisc,discount:round2(lineDisc+orderDisc),ship,other,charges:round2(ship+other),
-    productRevenue,total,fx,totalBase:round2(total*fx),revBase,cogs,gp,margin:revBase?gp/revBase:0,estimated:!snap,hasFx:fx>0};
+    productRevenue,total,fx,totalBase:round2(total*fx),revBase,cogs,gp,gpSale:round2(round2(total*fx)-cogs),chargesBase:round2(round2(total*fx)-revBase),margin:revBase?gp/revBase:0,estimated:!snap,hasFx:fx>0};
 }
 function createSaleRecord(db,d,{at=Date.now(),year=new Date().getFullYear()}={}){
   const c=db.customers.find(x=>x.id===d.customerId);
@@ -1178,10 +1337,10 @@ const DEF={
   gross:'Gross sales: completed sales in the period, including shipping and other charges, in SGD at each sale\'s own exchange rate.',
   returns:'Customer returns: completed customer returns in the period, valued at the price on the original sale.',
   net:'Net sales: gross sales minus customer returns.',
-  rev:'Product revenue: net sales without shipping and other charges. Gross profit is worked out on this.',
+  rev:'Product revenue: sales of products after discounts, without shipping and other charges.',
   cogs:'Cost of goods sold: the unit cost stored on each sale line when the sale was completed, less the cost of restocked returns. Editing today\'s cost never changes it.',
-  gp:'Gross profit: product revenue (net sales excluding shipping and other charges) minus cost of goods sold.',
-  margin:'Gross margin: gross profit ÷ product revenue × 100.',
+  gp:'Gross profit: net sales minus cost of goods sold.',
+  margin:'Gross margin: gross profit ÷ net sales × 100. Shown as — when there are no net sales.',
   inv:'Inventory value: current stock × current cost price (cost basis), across every SKU.',
   units:'Units in stock: current quantity on hand across every SKU.',
   spend:'Purchase spend: received purchases in the period, including additional costs, in SGD at the rate stored when each purchase was received. Reversed purchases are excluded.',
@@ -1254,7 +1413,7 @@ const FLOW_LINES=[['Purchases',['purchase','purchase_reversal']],['Sales',['sale
 
 /* ---------- View state ---------- */
 const blankInvFilters = ()=>({q:'',cat:'',prod:'',gauge:'',colour:'',pack:'',status:'',showInactive:false});
-const S = {mov:blankMovFilters(), movLimit:150, vmov:blankVmovFilters(), vmovFor:'', cnt:{q:'',prod:'',counts:{}}, ret:{tab:'Customer Returns',q:'',status:''}, aud:{q:'',entity:''}, audLimit:200, sal:{...blankSalFilters(),sort:'no',dir:-1}, cus:{q:'',type:'All',status:'Active'}, dash:{top:'Units'}, period:loadPeriod(), rep:blankRep(), pur:{...blankPurFilters(),sort:'no',dir:-1}, sup:{q:'',status:'Active'}, inv:{...blankInvFilters(),sort:'product',dir:1,view:'levels'}, prod:{q:'',cat:'',status:'Active'}, vtab:'Overview', rtab:'Overview'};
+const S = {mov:blankMovFilters(), movLimit:150, vmov:blankVmovFilters(), vmovFor:'', cnt:{q:'',prod:'',counts:{}}, ret:{tab:'Customer Returns',q:'',status:''}, aud:{q:'',entity:''}, audLimit:200, sal:{...blankSalFilters(),sort:'no',dir:-1}, cus:{q:'',type:'All',status:'Active'}, dash:{top:'Units'}, period:loadPeriod(), rep:blankRep(), pur:{...blankPurFilters(),sort:'no',dir:-1}, sup:{q:'',status:'Active'}, inv:{...blankInvFilters(),sort:'product',dir:1,view:'levels'}, prod:{q:'',cat:'',status:'Active'}, vtab:'Overview', rtab:'Overview', fin:blankFin()};
 
 /* ---------- Pages ---------- */
 const PAGES = {};
@@ -1543,8 +1702,8 @@ function salesStats(list,rets=[]){
   let gross=0,rev=0,cogs=0,units=0, rRev=0,rCogs=0,rUnits=0;
   list.forEach(s=>{const t=saleTotals(s);gross+=t.totalBase;rev+=t.revBase;cogs+=t.cogs;units+=t.units});
   rets.forEach(r=>{const t=returnTotals(r);rRev+=t.revBase;rCogs+=t.cogs;rUnits+=t.units});
-  const nRev=round2(rev-rRev), nCogs=round2(cogs-rCogs), gp=round2(nRev-nCogs);
-  return {count:list.length,gross:round2(gross),returns:round2(rRev),returnCount:rets.length,total:round2(gross-rRev),rev:nRev,cogs:nCogs,gp,units:units-rUnits,unitsSold:units,unitsReturned:rUnits,charges:round2(gross-rev),margin:nRev?gp/nRev:NaN,avg:list.length?round2(gross/list.length):0};
+  const nRev=round2(rev-rRev), nCogs=round2(cogs-rCogs), net=round2(gross-rRev), gp=round2(net-nCogs);
+  return {count:list.length,gross:round2(gross),returns:round2(rRev),returnCount:rets.length,total:round2(gross-rRev),rev:nRev,cogs:nCogs,gp,units:units-rUnits,unitsSold:units,unitsReturned:rUnits,charges:round2(gross-rev),prodGp:round2(nRev-nCogs),margin:net?gp/net:NaN,avg:list.length?round2(gross/list.length):0};
 }
 function netGroup(list,rets,keyOf){const m={};list.forEach(s=>{const k=keyOf(s)||'Not set';m[k]=(m[k]||0)+saleTotals(s).totalBase});rets.forEach(r=>{const s=DB.sales.find(x=>x.id===r.saleId);if(!s)return;const k=keyOf(s)||'Not set';m[k]=(m[k]||0)-returnTotals(r).revBase});return Object.entries(m).map(([k,v])=>[k,round2(v)]).filter(r=>r[1]>0).sort((a,b)=>b[1]-a[1])}
 const returnSeries = (b,rets)=>series(b,rets,r=>r.completedDate,r=>returnTotals(r).revBase);
@@ -1647,7 +1806,7 @@ PAGES.sale = id=>{
     <div><span>Discount</span><b>${t.discount?'−'+amt(t.discount):amt(0)}</b></div>
     <div><span>Shipping / Other</span><b>${amt(t.charges)}</b></div>
     <div><span>Final Sale Total</span><b>${amt(t.total)}</b></div>
-    <div><span>Gross Profit${t.estimated?' (est.)':''}</span><b class="${t.gp<0?'chg-out':''}">${t.hasFx?sgd(t.gp,2):'—'}</b></div>
+    <div><span>Gross Profit${t.estimated?' (est.)':''}</span><b class="${t.gpSale<0?'chg-out':''}">${t.hasFx?sgd(t.gpSale,2):'—'}</b></div>
   </div>
   <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Items</h3><span class="sub">${t.estimated?'Unit cost is today\'s cost price; it is locked in when the sale is completed.':'Unit cost was locked in when the sale was completed.'} Revenue and profit in SGD${cy!==BASE_CURRENCY?` at 1 ${esc(cy)} = ${t.fx} SGD`:''}.</span></div></div>
     <div class="table-wrap"><table><thead><tr><th>Product</th><th>Variant</th><th>SKU</th><th class="num">Quantity</th><th class="num">Unit Selling Price</th>${t.lineDisc?'<th class="num">Discount</th>':''}<th class="num">Line Revenue</th><th class="num">Unit Cost</th><th class="num">Gross Profit</th>${mv.length?'<th>Stock</th>':''}</tr></thead><tbody>
@@ -1666,7 +1825,7 @@ PAGES.sale = id=>{
         <div><span>Shipping charge</span><span class="${t.ship?'':'muted'}">${amt(t.ship)}</span></div>
         <div><span>${s.charges.otherDesc?'Other: '+esc(s.charges.otherDesc):'Other charge'}</span><span class="${t.other?'':'muted'}">${amt(t.other)}</span></div>
         <div class="total"><span>Final Sale Total</span><span>${amt(t.total)}</span></div></div>
-      <div class="summary"><div><span>Product revenue (SGD)</span><span>${t.hasFx?sgd(t.revBase,2):'—'}</span></div><div><span>Cost of goods sold</span><span>−${sgd(t.cogs,2)}</span></div><div class="total"><span>Gross profit${t.estimated?' (est.)':''}</span><span>${t.hasFx?`${sgd(t.gp,2)} · ${pct(t.margin)}`:'—'}</span></div></div>
+      <div class="summary"><div><span>Product revenue (SGD)</span><span>${t.hasFx?sgd(t.revBase,2):'—'}</span></div><div><span>Shipping and other charges (SGD)</span><span>${t.hasFx?sgd(t.chargesBase,2):'—'}</span></div><div><span>Cost of goods sold</span><span>−${sgd(t.cogs,2)}</span></div><div class="total"><span>Gross profit${t.estimated?' (est.)':''}</span><span>${t.hasFx?`${sgd(t.gpSale,2)} · ${pct(t.totalBase?t.gpSale/t.totalBase:NaN)}`:'—'}</span></div></div>
       <div><div class="field-label" style="margin-bottom:4px">Notes</div><p class="desc">${s.notes?esc(s.notes):'<span class="muted">No notes</span>'}</p></div></div></div>
     <div class="card"><div class="card-head"><h3>Activity</h3></div><div class="card-body"><div class="timeline">${s.history.slice().reverse().map(h=>`<div class="tl-item"><span class="tl-dot" style="background:var(--${{completed:'ok-fg',reversed:'bad-fg',cancelled:'bad-fg',confirmed:'info-fg',payment:'warn-fg',note:'warn-fg'}[h.kind]||'fg-3'})"></span><span>${esc(h.text)}</span><span class="muted" style="white-space:nowrap;font-size:12.5px">${fmtStamp(h.at)}</span></div>`).join('')}</div></div></div>
   </div>`;
@@ -1712,7 +1871,7 @@ PAGES.customer = id=>{
       <p class="note" style="margin-top:12px">${ic('info','i i-sm')}Totals count completed sales only, in SGD.</p></div></div>
     <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><h3>Sales History</h3><span class="sub">${list.length} record${list.length===1?'':'s'}</span></div>
       ${list.length?`<div class="table-wrap"><table><thead><tr><th>Sale Number</th><th>Date</th><th>Status</th><th>Payment Status</th><th class="num">Items</th><th class="num">Units</th><th class="num">Total</th><th class="num">Gross Profit</th></tr></thead><tbody>
-      ${list.map(s=>{const t=saleTotals(s);return `<tr class="click" data-go="sale-${s.id}"><td class="mono strong" style="color:var(--fg)">${esc(s.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(s.date)}</td><td>${badge(s.status)}</td><td>${payBadge(s.payment)}</td><td class="num">${t.items}</td><td class="num">${n0(t.units)}</td><td class="num strong" style="white-space:nowrap">${cur(t.total,s.currency)}</td><td class="num ${s.status==='Completed'?'':'muted'}" style="white-space:nowrap">${t.hasFx?sgd(Math.round(t.gp)):'—'}${s.status==='Completed'?'':' <span class="muted">·</span>'}</td></tr>`}).join('')}
+      ${list.map(s=>{const t=saleTotals(s);return `<tr class="click" data-go="sale-${s.id}"><td class="mono strong" style="color:var(--fg)">${esc(s.no)}</td><td class="muted" style="white-space:nowrap">${fmtDate(s.date)}</td><td>${badge(s.status)}</td><td>${payBadge(s.payment)}</td><td class="num">${t.items}</td><td class="num">${n0(t.units)}</td><td class="num strong" style="white-space:nowrap">${cur(t.total,s.currency)}</td><td class="num ${s.status==='Completed'?'':'muted'}" style="white-space:nowrap">${t.hasFx?sgd(Math.round(t.gpSale)):'—'}${s.status==='Completed'?'':' <span class="muted">·</span>'}</td></tr>`}).join('')}
       </tbody></table></div>`:`<div class="empty"><b>No sales to this customer yet</b>${c.status==='Active'?`<button class="link-btn" data-action="saleFor" data-id="${c.id}">Record a sale</button>`:''}</div>`}</div>
   </div>${returnsCard(DB.returns.filter(r=>r.customerId===c.id).sort((a,b)=>(b.completedDate||b.date).localeCompare(a.completedDate||a.date)),'customer','Returns')}`;
 };
@@ -1762,14 +1921,14 @@ const DATASETS={
     cols:[{k:'no',label:'Sale',v:r=>r.s.no,h:r=>`<span class="mono strong">${esc(r.s.no)}</span>`},C.date('date','Completed',r=>r.s.completedDate),
       {k:'customer',label:'Customer',v:r=>r.c.name,cls:'nowrap'},{k:'country',label:'Country',v:r=>r.s.country||''},C.int('units','Units',r=>r.t.units),
       {k:'currency',label:'Currency',v:r=>r.s.currency},{k:'total',label:'Sale Total',csvLabel:'Sale Total (sale currency)',num:1,v:r=>r.t.total,h:r=>`<span class="nowrap">${cur(r.t.total,r.s.currency)}</span>`,csv:r=>r.t.total.toFixed(2)},
-      C.money('totalBase','Total',r=>r.t.totalBase),C.money('rev','Product Revenue',r=>r.t.revBase),C.money('cogs','COGS',r=>r.t.cogs),C.money('gp','Gross Profit',r=>r.t.gp),
-      {k:'margin',label:'Margin',num:1,v:r=>r.t.revBase?r.t.gp/r.t.revBase:NaN,h:r=>pctCell(r.t.revBase?r.t.gp/r.t.revBase:NaN),csvLabel:'Margin %',csv:r=>pctCsv(r.t.revBase?r.t.gp/r.t.revBase:NaN)},
+      C.money('totalBase','Total',r=>r.t.totalBase),C.money('rev','Product Revenue',r=>r.t.revBase),C.money('cogs','COGS',r=>r.t.cogs),C.money('gp','Gross Profit',r=>r.t.gpSale),
+      {k:'margin',label:'Margin',num:1,v:r=>r.t.totalBase?r.t.gpSale/r.t.totalBase:NaN,h:r=>pctCell(r.t.totalBase?r.t.gpSale/r.t.totalBase:NaN),csvLabel:'Margin %',csv:r=>pctCsv(r.t.totalBase?r.t.gpSale/r.t.totalBase:NaN)},
       {k:'returned',label:'Returned',nosort:0,num:1,v:r=>r.rets.reduce((a,x)=>a+returnTotals(x).units,0),h:r=>{const u=r.rets.reduce((a,x)=>a+returnTotals(x).units,0);return u?n0(u):'<span class="muted">—</span>'},csvLabel:'Units Returned (all time)'}]}),
   products:(from,to)=>{const vp=variantPerf(from,to);
     return {title:'Product performance',file:'product-performance',empty:'No products sold in this period.',click:r=>r.v?'variant-'+r.v.id:'',
       rows:DB.variants.map(v=>({v,...(vp[v.id]||NOPERF)})).filter(r=>S.rep.prodAll?true:(r.sold||r.returned)),
-      cols:[C.product,C.variant,C.sku,C.int('sold','Units Sold',r=>r.sold),C.int('returned','Returned',r=>r.returned),C.money('rev','Revenue',r=>r.rev,'Product revenue after discounts, net of customer returns, in SGD.'),C.money('cogs','COGS',r=>r.cogs,DEF.cogs),C.money('gp','Gross Profit',r=>r.gp),
-        {k:'margin',label:'Gross Margin',num:1,v:r=>r.margin,h:r=>pctCell(r.margin),csvLabel:'Gross Margin %',csv:r=>pctCsv(r.margin)},C.int('stock','Current Stock',r=>r.v.qty)]}},
+      cols:[C.product,C.variant,C.sku,C.int('sold','Units Sold',r=>r.sold),C.int('returned','Returned',r=>r.returned),C.money('rev','Net Sales',r=>r.rev,'Product sales after discounts and customer returns, in SGD. Order shipping and other charges are not split across products.'),C.money('cogs','COGS',r=>r.cogs,DEF.cogs),C.money('gp','Gross Profit',r=>r.gp,'Net sales − COGS, using the cost stored on each sale.'),
+        {k:'margin',label:'Gross Margin',num:1,v:r=>r.margin,h:r=>pctCell(r.margin),csvLabel:'Gross Margin %',csv:r=>pctCsv(r.margin)},C.int('stock','Current Stock',r=>r.v.qty),C.money('invval','Inventory Value',r=>round2(r.v.qty*r.v.cost),DEF.inv)]}},
   inventory:()=>({title:'Inventory value',file:'inventory-value',empty:'No SKUs yet.',click:r=>'variant-'+r.v.id,
     rows:DB.variants.map(v=>({v})),
     cols:[C.sku,C.product,C.variant,C.int('qty','Current Quantity',r=>r.v.qty),C.money('cost','Cost Basis',r=>r.v.cost,'Current cost price per unit, in SGD.'),C.money('value','Inventory Value',r=>round2(r.v.qty*r.v.cost),DEF.inv),
@@ -1796,14 +1955,14 @@ const DATASETS={
     return {title:'Customer performance',file:'customers',empty:'No customer sales in this period.',click:r=>r.c.id?'customer-'+r.c.id:'',
       rows:groupSales(from,to,s=>s.customerId).map(g=>({c:DB.customers.find(c=>c.id===g.key)||{id:'',name:'Unknown customer',type:'',country:''},st:g.st,last:last[g.key]||''})),
       cols:[{k:'name',label:'Customer',v:r=>r.c.name,h:r=>`<span class="strong nowrap">${esc(r.c.name)}</span>`},{k:'type',label:'Customer Type',v:r=>r.c.type,h:r=>r.c.type?`<span class="chip">${esc(r.c.type)}</span>`:'—'},{k:'country',label:'Country',v:r=>r.c.country||''},
-        C.int('orders','Orders',r=>r.st.count),C.int('units','Units Purchased',r=>r.st.unitsSold),C.money('gross','Gross Sales',r=>r.st.gross,DEF.gross),C.money('returns','Returns',r=>r.st.returns),C.money('net','Net Sales',r=>r.st.total,DEF.net),C.money('gp','Gross Profit',r=>r.st.gp,DEF.gp),
-        C.money('aov','Avg Order Value',r=>r.st.avg,'Gross sales ÷ orders.'),C.date('last','Last Purchase',r=>r.last)]}},
+        C.int('orders','Orders',r=>r.st.count),C.int('units','Units Purchased',r=>r.st.unitsSold),C.money('gross','Gross Sales',r=>r.st.gross,DEF.gross),C.money('returns','Returns',r=>r.st.returns),C.money('net','Net Sales',r=>r.st.total,DEF.net),C.money('cogs','COGS',r=>r.st.cogs,DEF.cogs),C.money('gp','Gross Profit',r=>r.st.gp,DEF.gp),
+        {k:'margin',label:'Gross Margin',num:1,v:r=>r.st.margin,h:r=>pctCell(r.st.margin),csvLabel:'Gross Margin %',csv:r=>pctCsv(r.st.margin)},C.money('aov','Avg Order Value',r=>r.st.avg,'Gross sales ÷ orders.'),C.date('last','Last Purchase',r=>r.last)]}},
   countries:(from,to)=>{const g=groupSales(from,to,s=>s.country), tot=g.reduce((a,x)=>a+x.st.total,0);
     return {title:'Sales by country',file:'sales-by-country',empty:'No sales found for this period.',
       rows:g.map(x=>({...x,share:tot?x.st.total/tot:NaN})),
       cols:[{k:'country',label:'Country',v:r=>r.key,h:r=>`<button class="link-btn strong" data-country="${esc(r.key)}">${esc(r.key)}</button>`},C.int('orders','Orders',r=>r.st.count),C.int('units','Units Sold',r=>r.st.unitsSold),
-        C.money('gross','Gross Sales',r=>r.st.gross,DEF.gross),C.money('returns','Returns',r=>r.st.returns),C.money('net','Net Sales',r=>r.st.total,DEF.net),C.money('gp','Gross Profit',r=>r.st.gp,DEF.gp),
-        {k:'share',label:'Share of Sales'+tipI('Share of net sales across all countries in the period.'),csvLabel:'Share of Net Sales %',num:1,v:r=>r.share,h:r=>pctCell(r.share),csv:r=>pctCsv(r.share)}]}},
+        C.money('gross','Gross Sales',r=>r.st.gross,DEF.gross),C.money('returns','Returns',r=>r.st.returns),C.money('net','Net Sales',r=>r.st.total,DEF.net),C.money('cogs','COGS',r=>r.st.cogs,DEF.cogs),C.money('gp','Gross Profit',r=>r.st.gp,DEF.gp),
+        {k:'margin',label:'Gross Margin',num:1,v:r=>r.st.margin,h:r=>pctCell(r.st.margin),csvLabel:'Gross Margin %',csv:r=>pctCsv(r.st.margin)},{k:'share',label:'Share of Sales'+tipI('Share of net sales across all countries in the period.'),csvLabel:'Share of Net Sales %',num:1,v:r=>r.share,h:r=>pctCell(r.share),csv:r=>pctCsv(r.share)}]}},
   purchases:(from,to)=>({title:'Received purchases',file:'purchases',empty:'No purchases received in this period.',click:r=>'purchase-'+r.p.id,
     rows:receivedBetween(from,to).map(p=>({p,t:purchaseBase(p),s:supplierOf(p)})),
     cols:[{k:'no',label:'Purchase',v:r=>r.p.no,h:r=>`<span class="mono strong">${esc(r.p.no)}</span>`},C.date('date','Received',r=>r.p.receivedDate),{k:'supplier',label:'Supplier',v:r=>r.s.name,cls:'nowrap'},
@@ -1849,11 +2008,13 @@ function downloadCSV(file,lines,note){
 }
 function reportDataset(){
   const sub={Inventory:{'Inventory Value':'inventory','Low Stock':'lowstock','Slow-Moving':'slow','Never Sold':'never'}[S.rep.inv],Returns:S.rep.ret==='Supplier Returns'?'sreturns':'creturns'};
+  if(location.hash==='#financials'){const f=S.fin;return {Overview:'fin',Expenses:f.expView==='Capital Equipment'?'capex':'expenses','Other Income':'incomes',Profitability:{Products:'products',Customers:'customers',Countries:'countries'}[f.prof],'Landed Cost':'landed'}[f.tab]}
+  if(S.rtab==='Financial') return {Profitability:'fin','Operating Expenses':'expenses','Capital Equipment':'capex','Other Income':'incomes','Landed Cost':'landed','Product Profitability':'products','Customer Profitability':'customers','Country Profitability':'countries'}[S.rep.fin];
   return sub[S.rtab]||{Overview:'overview',Sales:'sales',Products:'products',Customers:'customers',Markets:'countries',Purchases:'purchases',Suppliers:'suppliers','Stock Movements':'flow'}[S.rtab];
 }
 function exportReport(name=reportDataset()){
   const {from,to}=periodRange(), d=DS(name,from,to);
-  const lines=[d.cols.map(c=>c.csvLabel||stripTags(c.label)),...d.rows.map(r=>d.cols.map(c=>c.csv?c.csv(r):c.v(r)))];
+  const cols=d.cols.filter(c=>!c.noCsv), lines=[cols.map(c=>c.csvLabel||stripTags(c.label)),...d.rows.map(r=>cols.map(c=>c.csv?c.csv(r):c.v(r)))];
   return downloadCSV(`${d.file}-${from}-to-${to}.csv`,lines,`${d.title}: ${n0(d.rows.length)} row${d.rows.length===1?'':'s'}, ${fmtDate(from)} – ${fmtDate(to)}.`);
 }
 
@@ -1864,7 +2025,7 @@ const TREND_METRICS=['Revenue','Units Sold','Gross Profit'];
 function trendSeries(b,from,to,metric){
   const {sales,rets}=periodSales(from,to), at=s=>s.completedDate;
   if(metric==='Units Sold'){const a=series(b,sales,at,s=>saleTotals(s).units),r=series(b,rets,at,x=>returnTotals(x).units);return a.map((x,i)=>x-r[i])}
-  if(metric==='Gross Profit'){const a=series(b,sales,at,s=>saleTotals(s).gp),r=series(b,rets,at,x=>returnTotals(x).gpImpact);return a.map((x,i)=>round2(x+r[i]))}
+  if(metric==='Gross Profit'){const a=series(b,sales,at,s=>saleTotals(s).gpSale),r=series(b,rets,at,x=>returnTotals(x).gpImpact);return a.map((x,i)=>round2(x+r[i]))}
   const a=series(b,sales,at,s=>saleTotals(s).totalBase),r=returnSeries(b,rets);return a.map((x,i)=>round2(x-r[i]));
 }
 function trendChart(from,to,metric,height=240){
@@ -1878,7 +2039,7 @@ function rankList(rows,valFn,goFn,labelFn,subFn){
   return `<div class="list">${rows.map((r,i)=>`<div class="list-item click" data-go="${goFn(r)}" style="align-items:center;cursor:pointer"><span class="rank">${i+1}</span><div style="min-width:0"><div class="t">${labelFn(r)}</div><div class="d">${subFn(r)}</div></div><span class="when strong" style="color:var(--fg);font-size:13px;white-space:nowrap">${valFn(r)}</span></div>`).join('')}</div>`;
 }
 const bestList = (rows,by)=>rankList(rows,r=>bestVal(r,by),r=>'variant-'+r.id,r=>`${esc(productOf(r.v).name)} <span class="muted" style="font-weight:500">${esc(variantLabel(r.v))}</span>`,r=>esc(r.v.sku));
-const CUS_RANK={'Net Sales':['net',r=>r.st.total,r=>sgd(Math.round(r.st.total))],'Gross Profit':['gp',r=>r.st.gp,r=>sgd(Math.round(r.st.gp))],Orders:['orders',r=>r.st.count,r=>n0(r.st.count)+' orders'],Units:['units',r=>r.st.unitsSold,r=>n0(r.st.unitsSold)+' units']};
+const CUS_RANK={'Net Sales':['net',r=>r.st.total,r=>sgd(Math.round(r.st.total))],'Gross Profit':['gp',r=>r.st.gp,r=>sgd(Math.round(r.st.gp))],'Gross Margin':['margin',r=>isFinite(r.st.margin)?r.st.margin:-Infinity,r=>pctCell(r.st.margin)],Orders:['orders',r=>r.st.count,r=>n0(r.st.count)+' orders'],Units:['units',r=>r.st.unitsSold,r=>n0(r.st.unitsSold)+' units']};
 function topCustomers(from,to,by,n=10){const d=DATASETS.customers(from,to),f=CUS_RANK[by][1];return d.rows.slice().sort((a,b)=>f(b)-f(a)||b.st.total-a.st.total).slice(0,n)}
 const customerList = (rows,by)=>rankList(rows,CUS_RANK[by][2],r=>r.c.id?'customer-'+r.c.id:'customers',r=>esc(r.c.name),r=>`${esc(r.c.type||'—')} · ${esc(r.c.country||'—')} · ${r.st.count} order${r.st.count===1?'':'s'}`);
 const MKT_METRICS={Revenue:[r=>r.st.total,x=>sgd(Math.round(x)),'Net sales, SGD'],'Units Sold':[r=>r.st.unitsSold,x=>n0(x)+' units','Units sold'],'Gross Profit':[r=>r.st.gp,x=>sgd(Math.round(x)),'Gross profit, SGD']};
@@ -1890,17 +2051,18 @@ function countryBars(from,to,metric,n){
 function profitBridge(st,extra=''){
   const row=(l,v,cls='',tip='')=>`<div class="${cls}"><span>${l}${tip?tipI(tip):''}</span><span>${v}</span></div>`;
   return `<div class="summary">${row('Gross sales',sgd(st.gross,2),'',DEF.gross)}${row('Customer returns',st.returns?'−'+sgd(st.returns,2):sgd(0,2),'',DEF.returns)}${row('Net sales',sgd(st.total,2),'total',DEF.net)}</div>
-    <div class="summary" style="margin-top:14px">${row('Less shipping and other charges',st.charges?'−'+sgd(st.charges,2):sgd(0,2))}${row('Product revenue',sgd(st.rev,2),'',DEF.rev)}${row('Cost of goods sold',st.cogs?'−'+sgd(st.cogs,2):sgd(0,2),'',DEF.cogs)}${row('Gross profit',sgd(st.gp,2),'total',DEF.gp)}${row('Gross margin',pctCell(st.margin),'',DEF.margin)}</div>${extra}`;
+    <div class="summary" style="margin-top:14px">${row('Net sales',sgd(st.total,2))}${row('Cost of goods sold',st.cogs?'−'+sgd(st.cogs,2):sgd(0,2),'',DEF.cogs)}${row('Gross profit',sgd(st.gp,2),'total',DEF.gp)}${row('Gross margin',pctCell(st.margin),'',DEF.margin)}</div>
+    <p class="note" style="margin-top:10px">${ic('info','i i-sm')}Net sales include ${sgd(st.charges,2)} of shipping and other charges.</p>${extra}`;
 }
 
 /* ----- Reports ----- */
-const RTABS=['Overview','Sales','Products','Inventory','Customers','Markets','Purchases','Suppliers','Returns','Stock Movements'];
+const RTABS=['Overview','Sales','Products','Inventory','Customers','Markets','Purchases','Suppliers','Returns','Stock Movements','Financial'];
 const RTAB_ALIAS={'Gross Profit':'Sales','Sales by Country':'Markets','Product Performance':'Products','Inventory Movements':'Stock Movements'};
 const INV_VIEWS=['Inventory Value','Low Stock','Slow-Moving','Never Sold'];
 const PROD_RANK={'Units Sold':'sold',Revenue:'rev','Gross Profit':'gp','Gross Margin %':'margin','Return Quantity':'returned','Current Stock':'stock'};
 const SUP_RANK={'Total Spend':'spend','Purchase Count':'count','Units Purchased':'units'};
-function blankRep(){return {metric:'Revenue',best:'Units',prodAll:false,inv:'Inventory Value',slow:'All',crank:'Net Sales',mmetric:'Revenue',country:'',pmetric:'Spend',ret:'Customer Returns',mv:{product:'',variant:'',type:'',supplier:'',customer:''},limit:{},
-  sort:{sales:{k:'date',dir:-1},countrySales:{k:'date',dir:-1},products:{k:'rev',dir:-1},inventory:{k:'value',dir:-1},lowstock:{k:'sug',dir:-1},slow:{k:'days',dir:-1},never:{k:'value',dir:-1},customers:{k:'net',dir:-1},countries:{k:'net',dir:-1},purchases:{k:'date',dir:-1},suppliers:{k:'spend',dir:-1},creturns:{k:'date',dir:-1},sreturns:{k:'date',dir:-1}}}}
+function blankRep(){return {fin:'Profitability',metric:'Revenue',best:'Units',prodAll:false,inv:'Inventory Value',slow:'All',crank:'Net Sales',mmetric:'Revenue',country:'',pmetric:'Spend',ret:'Customer Returns',mv:{product:'',variant:'',type:'',supplier:'',customer:''},limit:{},
+  sort:{sales:{k:'date',dir:-1},countrySales:{k:'date',dir:-1},products:{k:'rev',dir:-1},inventory:{k:'value',dir:-1},lowstock:{k:'sug',dir:-1},slow:{k:'days',dir:-1},never:{k:'value',dir:-1},customers:{k:'net',dir:-1},countries:{k:'net',dir:-1},purchases:{k:'date',dir:-1},suppliers:{k:'spend',dir:-1},creturns:{k:'date',dir:-1},sreturns:{k:'date',dir:-1},expenses:{k:'date',dir:-1},capex:{k:'date',dir:-1},incomes:{k:'date',dir:-1},landed:{k:'date',dir:-1}}}}
 PAGES.reports = ()=>{
   const {from,to}=periodRange(); if(RTAB_ALIAS[S.rtab]) S.rtab=RTAB_ALIAS[S.rtab];
   return head('Reports','Live figures from completed sales, received purchases, completed returns and current stock. Money is in SGD. Draft, cancelled and reversed records are left out.',btn('Export CSV','exportReport','download'))+
@@ -1913,6 +2075,7 @@ function reportBody(from,to){
   const more=(tab,label='View all',sub='')=>`<button class="btn sm ghost" data-rtab="${tab}" ${sub?`data-rsub="${sub}"`:''}>${label} ${ic('arrow-right','i i-sm')}</button>`;
   const noSales=emptyCard('No sales found for this period.'), plural=(n,w)=>`${n0(n)} ${w}${n===1?'':'s'}`;
   switch(S.rtab){
+    case 'Financial': return reportsFinancial(from,to);
     case 'Overview': {const best=bestSellers(from,to,'Units',5), tc=topCustomers(from,to,'Net Sales',5);
       return `<div class="grid kpis">
         ${kpi('Net Sales'+tipI(DEF.net),money(Math.round(st.total)),delta(st.total,prev.total,r.vs),'trending-up')}
@@ -1958,7 +2121,7 @@ function reportBody(from,to){
       return `<div class="grid g-2-1">${card('Top Customers',`Top ${tc.length||10} by ${by.toLowerCase()}`,tc.length?customerList(tc,by):noSales,filterSeg(Object.keys(CUS_RANK),by,'crank'))}${card('Sales by customer type','Net sales, SGD',types.length?hbars(types,sg0):noSales)}</div>
       ${tbl('customers','Customers with completed sales or returns in the period. Last purchase is their latest completed sale overall.')}`;}
     case 'Markets': {const m=S.rep.mmetric, d=DS('countries',from,to), tot=k=>d.rows.reduce((a,x)=>a+k(x),0);
-      const foot=d.rows.length?`<tr style="border-top:1.5px solid var(--fg-2)"><td class="strong">Total</td><td class="num strong">${n0(tot(x=>x.st.count))}</td><td class="num strong">${n0(tot(x=>x.st.unitsSold))}</td><td class="num strong">${sgd(round2(tot(x=>x.st.gross)),2)}</td><td class="num strong">${sgd(round2(tot(x=>x.st.returns)),2)}</td><td class="num strong">${sgd(round2(tot(x=>x.st.total)),2)}</td><td class="num strong">${sgd(round2(tot(x=>x.st.gp)),2)}</td><td class="num strong">100.0%</td></tr>`:'';
+      const foot=d.rows.length?`<tr style="border-top:1.5px solid var(--fg-2)"><td class="strong">Total</td><td class="num strong">${n0(tot(x=>x.st.count))}</td><td class="num strong">${n0(tot(x=>x.st.unitsSold))}</td><td class="num strong">${sgd(round2(tot(x=>x.st.gross)),2)}</td><td class="num strong">${sgd(round2(tot(x=>x.st.returns)),2)}</td><td class="num strong">${sgd(round2(tot(x=>x.st.total)),2)}</td><td class="num strong">${sgd(round2(tot(x=>x.st.cogs)),2)}</td><td class="num strong">${sgd(round2(tot(x=>x.st.gp)),2)}</td><td class="num strong">${pctCell(tot(x=>x.st.total)?tot(x=>x.st.gp)/tot(x=>x.st.total):NaN)}</td><td class="num strong">100.0%</td></tr>`:'';
       let drill='';
       if(S.rep.country){const s=DATASETS.sales(from,to), rows=sortRows('countrySales',s.cols,s.rows.filter(x=>(x.s.country||'Not set')===S.rep.country)), cr=returnsBetween(from,to).filter(x=>{const sl=DB.sales.find(y=>y.id===x.saleId);return sl&&(sl.country||'Not set')===S.rep.country});
         drill=`<div class="card" style="overflow:hidden" id="countryDrill"><div class="card-head" style="padding-bottom:16px;flex-wrap:wrap"><div><h3>Sales in ${esc(S.rep.country)}</h3><span class="sub">${plural(rows.length,'completed sale')}${cr.length?` · ${plural(cr.length,'return')} (${sgd(round2(cr.reduce((a,x)=>a+returnTotals(x).revBase,0)),2)})`:''} · ${fmtDate(from)} – ${fmtDate(to)}</span></div><div style="display:flex;gap:8px"><button class="btn sm" data-action="countryToSales">${ic('external-link','i i-sm')}Open in Sales</button><button class="btn sm ghost" data-country="">${ic('x','i i-sm')}Close</button></div></div>${rtable('countrySales',s.cols.filter(c=>c.k!=='country'),rows,{empty:'No completed sales in this country for the period.',click:s.click})}</div>`;}
@@ -2027,15 +2190,15 @@ PAGES.dashboard = ()=>{
     ${kpi('Net Sales'+tipI(DEF.net),money(Math.round(st.total)),st.count||st.returns?`${delta(st.total,prev.total,r.vs)}`:'No completed sales in this period','trending-up')}
     ${kpi('Gross Profit'+tipI(DEF.gp),money(Math.round(st.gp)),st.count||st.returns?`${pctCell(st.margin)} margin · ${delta(st.gp,prev.gp,r.vs)}`:'No completed sales in this period','percent')}
     ${kpi('Inventory Value'+tipI(DEF.inv),money(Math.round(inv.value)),`At cost, today · ${sgd(Math.round(inv.retail))} at selling price`,'wallet')}
-    ${kpi('Units in Stock'+tipI(DEF.units),n0(inv.units),`Across ${DB.variants.length} SKUs of ${DB.products.length} products`,'boxes')}
+    ${(()=>{const f=finStats(from,to),pf=finStats(r.prevFrom,r.prevTo);return kpi('Net Operating Profit'+tipI(DEF.nop),money(Math.round(f.nop)),`${delta(f.nop,pf.nop,r.vs)} · <button class="link-btn" data-go="financials">Financials</button>`,'landmark')})()}
   </div>
   <div class="stat-strip">
     ${stat('Low Stock SKUs',lowN,'data-rtabgo="Inventory" data-rsub="Low Stock"','Active SKUs that still have stock but are at or below their reorder level.')}
     ${stat('Out of Stock SKUs',att.length-lowN,'data-rtabgo="Inventory" data-rsub="Low Stock"')}
     ${stat('Units Sold',n0(st.unitsSold),'data-rtabgo="Products"','Units on completed sales in the period, before returns.')}
-    ${stat('Orders',n0(st.count),'data-rtabgo="Sales"')}
-    ${stat('Purchases',sg0(ps.spend),'data-rtabgo="Purchases"',DEF.spend)}
+    ${stat('Operating Expenses',sg0(finStats(from,to).opex),'data-ftabgo="Expenses" data-fexpgo="All Expenses"',DEF.opex)}
     ${stat('Returns',sg0(st.returns),'data-rtabgo="Returns"',DEF.returns)}
+    ${stat('Units in Stock',n0(inv.units),'data-rtabgo="Inventory" data-rsub="Inventory Value"',DEF.units)}
   </div>
   <div class="grid g-2-1">
     <div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>Sales Overview</h3><span class="sub">${trendSub(from,to,S.rep.metric)} · ${S.rep.metric==='Units Sold'?n0(st.units)+' units':sgd(Math.round(S.rep.metric==='Gross Profit'?st.gp:st.total))} in this period</span></div>${filterSeg(TREND_METRICS,S.rep.metric,'tmetric')}</div>
@@ -2087,6 +2250,300 @@ function variantReturnsTab(v){
   if(!rows.length) return `<div class="empty"><b>No returns recorded</b>Customer and supplier returns for this SKU will show here.</div>`;
   return `<div class="table-wrap"><table><thead><tr><th>Return</th><th>Type</th><th>Date</th><th>Customer / Supplier</th><th>Original</th><th class="num">Quantity</th><th>Condition / Reason</th><th>Status</th></tr></thead><tbody>
   ${rows.map(x=>`<tr class="click" data-go="${x.go}"><td class="mono strong" style="color:var(--fg)">${esc(x.r.no)}</td><td><span class="chip">${x.kind}</span></td><td class="muted nowrap">${fmtDate(x.r.completedDate||x.r.date)}</td><td class="nowrap">${esc(x.party)}</td><td class="mono">${x.src?esc(x.src.no):'—'}</td><td class="num strong">${n0(x.l.qty)}</td><td>${esc(x.detail)}</td><td>${returnStatusBadge(x.r.status)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+/* ----- Financials: shared pieces ----- */
+Object.assign(DEF,{
+  opex:'Operating expenses: running costs such as packaging, software, fees and freight to customers. Paid and pending count; cancelled do not. Inventory purchases are not expenses; they become cost of goods sold when the stock sells.',
+  capex:'Capital equipment: longer-lasting items such as machines, computers and shelving. Kept out of Net Operating Profit and deducted in Net Cash Result. No depreciation is calculated.',
+  income:'Other income: business income that is not from product sales, such as stringing services, commission and rebates. Received and pending count.',
+  nop:'Net operating profit: gross profit − operating expenses + other income.',
+  ncr:'Net cash result: net operating profit − capital equipment spending.',
+  invp:'Inventory purchases received in the period. They add to stock, not to expenses, so they are not deducted here.',
+  landed:'Landed unit cost: purchase unit cost plus its share of freight, duties, customs, handling and other purchase costs.',
+  basis:'Inventory cost basis: the cost price used to value stock and to snapshot the cost of new sales.',
+  lastp:'Last purchase cost: the unit price on the latest received purchase, before freight and duties.',
+  atsale:'Cost at time of sale: the cost stored on each sale line when it completed. It never changes afterwards.'
+});
+const C3 = 'var(--c-3)';
+function multiLineChart(b,series,fmt,height=250){
+  const W=720,H=height,pl=56,pr=16,pt=16,pb=30, all=series.flatMap(s=>s.data);
+  const max=niceMax(Math.max(0,...all)*1.05), lo=Math.min(0,...all), min=lo<0?-niceMax(-lo*1.05):0, n=b.labels.length;
+  const x=i=>n===1?(pl+W-pr)/2:pl+i*(W-pl-pr)/(n-1), y=v=>pt+(H-pt-pb)*(1-(v-min)/(max-min)), every=n>16?Math.ceil(n/10):1;
+  const sh=v=>(v<0?'−':'')+short(Math.abs(v));
+  const grid=[0,1,2,3,4].map(i=>{const v=min+(max-min)*i/4;return `<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--grid)" stroke-width="${Math.abs(v)<1e-9&&min<0?1.5:1}"/><text x="${pl-10}" y="${y(v)+4}" text-anchor="end" font-size="11.5" fill="var(--fg-3)">${sh(v)}</text>`}).join('');
+  const xl=b.labels.map((l,i)=>i%every===0?`<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="12" fill="var(--fg-3)">${esc(l)}</text>`:'').join('');
+  const lines=series.map(s=>`<polyline points="${s.data.map((v,i)=>`${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>${n<=40?s.data.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="4" fill="${s.color}" stroke="var(--surface)" stroke-width="2"/>`).join(''):''}`).join('');
+  const hw=n>1?(W-pl-pr)/(n-1):W-pl-pr;
+  const hits=b.labels.map((l,i)=>`<rect x="${x(i)-hw/2}" y="${pt}" width="${hw}" height="${H-pt-pb}" fill="transparent" data-tip="${esc(`<b>${esc(b.full[i])}</b>`+series.map(s=>`<div class="row"><i style="background:${s.color}"></i>${s.name}: ${fmt(s.data[i])}</div>`).join(''))}"/>`).join('');
+  return `<div style="display:flex;flex-direction:column;gap:12px"><div class="legend">${series.map(s=>`<span><i style="background:${s.color}"></i>${s.name}</span>`).join('')}</div><div class="line-chart"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(series.map(s=>s.name).join(', '))} over time">${grid}${xl}${lines}${hits}</svg></div></div>`;
+}
+function profitSeries(b,from,to){
+  const {sales,rets}=periodSales(from,to), at=s=>s.completedDate;
+  const net=trendSeries(b,from,to,'Revenue'), gp=trendSeries(b,from,to,'Gross Profit');
+  const op=series(b,expensesBetween(from,to,'Operating Expense'),e=>e.date,baseAmt), inc=series(b,incomesBetween(from,to),r=>r.date,baseAmt);
+  return {net,gp,nop:gp.map((g,i)=>round2(g-op[i]+inc[i])),op,inc};
+}
+function profitTrend(from,to){
+  const f=finStats(from,to); if(!f.st.count&&!f.st.returnCount&&!f.op.length&&!f.inc.length) return emptyCard('No sales, expenses or income in this period.');
+  const b=buckets(from,to), s=profitSeries(b,from,to);
+  return multiLineChart(b,[{name:'Net sales',color:'var(--c-out)',data:s.net},{name:'Gross profit',color:'var(--c-in)',data:s.gp},{name:'Net operating profit',color:C3,data:s.nop}],x=>sgd(Math.round(x)));
+}
+function profitWaterfall(f){
+  const top=Math.max(Math.abs(f.net),Math.abs(f.gp),Math.abs(f.nop),1);
+  const row=(label,v,kind,tip,extra='')=>`<div class="wf-row ${kind}"><span class="wf-label">${label}${tip?tipI(tip):''}</span><span class="wf-bar"><i style="width:${Math.min(100,Math.abs(v)/top*100)}%;background:${kind==='minus'?'var(--c-out)':kind==='plus'?C3:'var(--c-in)'}"></i></span><span class="wf-val">${kind==='minus'?'−':kind==='plus'?'+':v<0?'−':''}${sgd(Math.abs(v),2)}${extra}</span></div>`;
+  return `<div class="wf">${row('Net sales',f.net,'total',DEF.net)}${row('Cost of goods sold',f.cogs,'minus',DEF.cogs)}${row('Gross profit',f.gp,'sub',DEF.gp,`<small>${pctCell(f.margin)} margin</small>`)}
+    ${row('Operating expenses',f.opex,'minus',DEF.opex)}${row('Other income',f.income,'plus',DEF.income)}${row('Net operating profit',f.nop,'sub',DEF.nop)}${row('Capital equipment',f.capex,'minus',DEF.capex)}${row('Net cash result',f.ncr,'total',DEF.ncr)}</div>
+    <p class="note" style="margin-top:12px">${ic('info','i i-sm')}Inventory purchases of ${sgd(Math.round(f.purchases))} in this period went into stock, not expenses. Their cost counts as COGS when the stock sells.</p>`;
+}
+function finAlerts(from,to){
+  const r=periodRange(), c=finStats(from,to), p=finStats(r.prevFrom,r.prevTo), a=[], ch=(x,y)=>(x-y)/Math.abs(y)*100;
+  if(p.opex>0&&Math.abs(ch(c.opex,p.opex))>=10) a.push(`Operating expenses ${c.opex>p.opex?'increased':'decreased'} ${Math.abs(ch(c.opex,p.opex)).toFixed(1)}% vs ${r.vs}`);
+  if(isFinite(c.margin)&&isFinite(p.margin)&&Math.abs(c.margin-p.margin)>=0.02) a.push(`Gross margin ${c.margin>p.margin?'increased':'decreased'} ${Math.abs((c.margin-p.margin)*100).toFixed(1)} points vs ${r.vs} (${pctCell(p.margin)} → ${pctCell(c.margin)})`);
+  const fr=x=>sumBase(x.op.filter(e=>e.category==='Shipping & Freight')), f0=fr(p), f1=fr(c);
+  if(f0>0&&Math.abs(ch(f1,f0))>=15) a.push(`Freight costs ${f1>f0?'increased':'decreased'} ${Math.abs(ch(f1,f0)).toFixed(1)}% vs ${r.vs}`);
+  const sl=slowSummary(), v=sl['No Recent Sales'].value+sl['Never Sold'].value;
+  if(v>0) a.push(`${sgd(Math.round(v))} of inventory has had no sales in ${slowCfg().staleDays}+ days`);
+  return a;
+}
+const finAlertList = list=>list.length?`<div class="card"><div class="card-head"><div><h3>Things to note</h3><span class="sub">Factual changes, compared with the previous period</span></div></div><div class="card-body"><div class="list">${list.map(t=>`<div class="list-item" style="align-items:center"><span class="act-icon" style="background:var(--info-bg);color:var(--info-fg)">${ic('info','i i-sm')}</span><div class="t">${esc(t)}</div></div>`).join('')}</div></div></div>`:'';
+const finStatus = s=>badge(s,{Paid:'ok',Received:'ok',Pending:'warn',Cancelled:'mute'}[s]);
+const typeChip = t=>`<span class="chip">${t==='Capital Equipment'?ic('wrench','i i-sm'):''}${esc(t==='Capital Equipment'?'Capital':'Operating')}</span>`;
+const amtCell = r=>`<span class="nowrap">${cur(r.amount,r.currency)}</span>`;
+function finSearch(r){return [r.no,r.type,r.category,r.description,r.payee,r.source,r.reference,r.notes,r.method,r.status,r.currency].join(' ').toLowerCase()}
+
+/* ----- Financial datasets (same column specs drive tables, sorting and CSV) ----- */
+Object.assign(DATASETS,{
+  expenses:(from,to)=>{const f=S.fin.exp;return {title:'Expenses',file:'expenses',empty:DB.expenses.length?'No expenses match these filters in this period.':'No expenses recorded yet.',click:r=>'expense-'+r.e.id,
+    rows:DB.expenses.filter(e=>e.date>=from&&e.date<=to&&(!f.type||e.type===f.type)&&(!f.cat||e.category===f.cat)&&(!f.status||e.status===f.status)&&(!f.q||matches(finSearch(e),f.q))).map(e=>({e})),
+    cols:[C.date('date','Date',r=>r.e.date),{k:'no',label:'Expense Number',v:r=>r.e.no,h:r=>`<span class="mono strong">${esc(r.e.no)}</span>`},{k:'type',label:'Type',v:r=>r.e.type,h:r=>typeChip(r.e.type)},{k:'cat',label:'Category',v:r=>r.e.category,cls:'nowrap'},
+      {k:'desc',label:'Description',v:r=>r.e.description,h:r=>`<span style="display:block;min-width:200px">${esc(r.e.description)}</span>`},{k:'payee',label:'Payee',v:r=>r.e.payee||'',cls:'nowrap'},{k:'currency',label:'Currency',v:r=>r.e.currency},
+      {k:'amount',label:'Amount',csvLabel:'Amount (own currency)',num:1,v:r=>r.e.amount,h:r=>amtCell(r.e),csv:r=>r.e.amount.toFixed(2)},C.money('base','SGD',r=>baseAmt(r.e),'In SGD at the rate stored on the expense.'),
+      {k:'status',label:'Status',v:r=>r.e.status,h:r=>finStatus(r.e.status)},{k:'method',label:'Payment Method',v:r=>r.e.method||'',hide:1},{k:'ref',label:'Reference',v:r=>r.e.reference||'',hide:1},{k:'notes',label:'Notes',v:r=>r.e.notes||'',hide:1},{k:'att',label:'Attachment',v:r=>r.e.attachment||'',hide:1},
+      {k:'act',label:'Actions',nosort:1,noCsv:1,num:1,h:r=>`<button class="btn sm ghost" data-go="expense-${r.e.id}">View</button>`}]}},
+  capex:(from,to)=>({title:'Capital equipment',file:'capital-equipment',empty:'No capital equipment recorded in this period.',click:r=>'expense-'+r.e.id,
+    rows:expensesBetween(from,to,'Capital Equipment').map(e=>({e})),
+    cols:[C.date('date','Date',r=>r.e.date),{k:'no',label:'Expense Number',v:r=>r.e.no,h:r=>`<span class="mono strong">${esc(r.e.no)}</span>`},{k:'desc',label:'Equipment',v:r=>r.e.description,cls:'strong'},{k:'payee',label:'Supplier',v:r=>r.e.payee||'',cls:'nowrap'},
+      {k:'amount',label:'Amount',csvLabel:'Amount (own currency)',num:1,v:r=>r.e.amount,h:r=>amtCell(r.e),csv:r=>r.e.amount.toFixed(2)},{k:'currency',label:'Currency',v:r=>r.e.currency},C.money('base','SGD',r=>baseAmt(r.e)),
+      {k:'notes',label:'Notes',v:r=>r.e.notes||'',h:r=>r.e.notes?esc(r.e.notes):'<span class="muted">—</span>'},{k:'status',label:'Status',v:r=>r.e.status,h:r=>finStatus(r.e.status)}]}),
+  incomes:(from,to)=>{const f=S.fin.inc;return {title:'Other income',file:'other-income',empty:DB.incomes.length?'No other income matches these filters in this period.':'No other income recorded yet.',click:r=>'income-'+r.i.id,
+    rows:DB.incomes.filter(i=>i.date>=from&&i.date<=to&&(!f.cat||i.category===f.cat)&&(!f.status||i.status===f.status)&&(!f.q||matches(finSearch(i),f.q))).map(i=>({i})),
+    cols:[C.date('date','Date',r=>r.i.date),{k:'no',label:'Income Number',v:r=>r.i.no,h:r=>`<span class="mono strong">${esc(r.i.no)}</span>`},{k:'cat',label:'Category',v:r=>r.i.category,cls:'nowrap'},{k:'source',label:'Source',v:r=>r.i.source||'',cls:'nowrap'},
+      {k:'desc',label:'Description',v:r=>r.i.description,h:r=>`<span style="display:block;min-width:200px">${esc(r.i.description)}</span>`},{k:'amount',label:'Amount',csvLabel:'Amount (own currency)',num:1,v:r=>r.i.amount,h:r=>amtCell(r.i),csv:r=>r.i.amount.toFixed(2)},
+      {k:'currency',label:'Currency',v:r=>r.i.currency},C.money('base','SGD',r=>baseAmt(r.i)),{k:'status',label:'Status',v:r=>r.i.status,h:r=>finStatus(r.i.status)},{k:'ref',label:'Reference',v:r=>r.i.reference||'',hide:1},{k:'notes',label:'Notes',v:r=>r.i.notes||'',hide:1}]}},
+  landed:(from,to)=>{const want=S.fin.lc;
+    const ps=DB.purchases.filter(p=>p.status==='Received'&&p.receivedDate>=from&&p.receivedDate<=to&&(want==='All'||(want==='Applied')===!!p.landed));
+    const rows=ps.flatMap(p=>{const s=supplierOf(p),pv=p.landed?null:landedPreview(p,'quantity');
+      return p.lines.map((l,i)=>{const a=p.landed?p.landed.lines.find(x=>x.lineId===l.id)||{}:pv.rows[i];return {p,s,l,v:variantById(l.variantId),a,applied:!!p.landed,fx:purFx(p),method:p.landed?p.landed.method:'quantity'}})});
+    const m=k=>({k,label:COST_FIELDS.find(c=>c[0]===k)[1].replace(' / Freight','').replace(' Fees','').replace('Import ',''),csvLabel:COST_FIELDS.find(c=>c[0]===k)[1],num:1,v:r=>r.a.alloc?r.a.alloc[k]:0,h:r=>r.a.alloc&&r.a.alloc[k]?cur(r.a.alloc[k],r.p.currency).replace(r.p.currency+' ',''):'<span class="muted">—</span>',csv:r=>(r.a.alloc?r.a.alloc[k]:0).toFixed(2)});
+    return {title:'Landed cost breakdown',file:'landed-cost',empty:'No received purchases in this period.',click:r=>'purchase-'+r.p.id,rows,
+      cols:[{k:'no',label:'Purchase',v:r=>r.p.no,h:r=>`<span class="mono strong">${esc(r.p.no)}</span>`},C.date('date','Received',r=>r.p.receivedDate),C.product,C.variant,C.sku,C.int('qty','Qty',r=>r.l.qty),{k:'currency',label:'Currency',v:r=>r.p.currency},
+        {k:'cost',label:'Purchase Cost',num:1,v:r=>lineTotal(r.l),h:r=>cur(lineTotal(r.l),r.p.currency).replace(r.p.currency+' ',''),csv:r=>lineTotal(r.l).toFixed(2)},...COST_FIELDS.map(([k])=>m(k)),
+        {k:'landedT',label:'Landed Cost',num:1,v:r=>r.a.landed,h:r=>`<b>${cur(r.a.landed,r.p.currency).replace(r.p.currency+' ','')}</b>`,csv:r=>r.a.landed.toFixed(2)},
+        {k:'unit',label:'Landed Unit Cost'+tipI(DEF.landed),csvLabel:'Landed Unit Cost (purchase currency)',num:1,v:r=>r.a.unit,h:r=>cur(r.a.unit,r.p.currency,4).replace(r.p.currency+' ',''),csv:r=>(+r.a.unit).toFixed(4)},
+        {k:'unitBase',label:'Landed Unit (SGD)',csvLabel:'Landed Unit Cost (SGD)',num:1,v:r=>r.a.unit*r.fx,h:r=>sgd(r.a.unit*r.fx,2),csv:r=>(r.a.unit*r.fx).toFixed(4)},
+        {k:'status',label:'Status',v:r=>r.applied?`Applied by ${r.method}`:'Preview by quantity',h:r=>r.applied?badge('Applied','ok'):badge('Not applied','mute')}]};},
+  fin:(from,to)=>{const r=periodRange(),c=finStats(from,to),p=finStats(r.prevFrom,r.prevTo),m=x=>isFinite(x)?round2(x*100):'';
+    const rows=[['Net Sales',c.net,p.net],['Cost of Goods Sold',c.cogs,p.cogs],['Gross Profit',c.gp,p.gp],['Gross Margin %',m(c.margin),m(p.margin)],['Operating Expenses',c.opex,p.opex],['Other Income',c.income,p.income],['Net Operating Profit',c.nop,p.nop],['Capital Equipment',c.capex,p.capex],['Net Cash Result',c.ncr,p.ncr],['Inventory Purchases (not an expense)',c.purchases,p.purchases]].map(([m,a,b])=>({m,a,b}));
+    return {title:'Profitability',file:'profitability',rows,cols:[{k:'m',label:'Metric',nosort:1,v:r=>r.m},{k:'a',label:`${r.from} to ${r.to} (SGD)`,nosort:1,num:1,v:r=>r.a},{k:'b',label:`${r.prevFrom} to ${r.prevTo} (SGD)`,nosort:1,num:1,v:r=>r.b}]}},
+});
+
+/* ----- Financials page ----- */
+const FTABS=['Overview','Expenses','Other Income','Profitability','Landed Cost'];
+const RFIN_VIEWS=['Profitability','Operating Expenses','Capital Equipment','Other Income','Landed Cost','Product Profitability','Customer Profitability','Country Profitability'];
+function blankFin(){return {tab:'Overview',expView:'All Expenses',prof:'Products',lc:'All',exp:{q:'',type:'',cat:'',status:''},inc:{q:'',cat:'',status:''}}}
+PAGES.financials = ()=>{
+  const {from,to}=periodRange();
+  return head('Financials','Profit after running costs. Inventory purchases, cost of goods sold, operating expenses, capital equipment and other income are kept separate. Money is in SGD.',btn('Record Income','recordIncome','hand-coins')+btn('Record Expense','recordExpense','plus','primary'))+
+  periodBar()+`<div class="tabs" role="tablist">${FTABS.map(t=>`<button role="tab" aria-selected="${S.fin.tab===t}" data-ftab="${t}">${t}</button>`).join('')}</div>`+
+  ({Overview:()=>finOverview(from,to),Expenses:()=>`<div>${filterSeg(['All Expenses','Capital Equipment'],S.fin.expView,'fexp')}</div>`+(S.fin.expView==='Capital Equipment'?capexBody(from,to):expensesBody(from,to)),'Other Income':()=>incomeBody(from,to),
+    Profitability:()=>`<div>${filterSeg(['Products','Customers','Countries'],S.fin.prof,'fprof')}</div>`+profitBody(S.fin.prof,from,to),'Landed Cost':()=>landedBody(from,to)}[S.fin.tab]||(()=>''))();
+};
+function finTbl(name,from,to,sub,toolbar=''){const d=DS(name,from,to);return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px;flex-wrap:wrap"><div><h3>${d.title}</h3>${sub?`<span class="sub">${sub}</span>`:''}</div><button class="btn sm" data-action="exportReport" data-set="${name}">${ic('download','i i-sm')}Export CSV</button></div>${toolbar?`<div class="toolbar">${toolbar}</div>`:''}${rtable(name,d.cols.filter(c=>!c.hide),d.rows,{empty:d.empty,click:d.click})}</div>`}
+function finOverview(from,to,compact){
+  const r=periodRange(), f=finStats(from,to), p=finStats(r.prevFrom,r.prevTo), c2=(t,b)=>`<div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>${t}</h3></div></div><div class="card-body">${b}</div></div>`;
+  const cats=byCategory(f.op), b=buckets(from,to);
+  return `${compact?'':finAlertList(finAlerts(from,to))}<div class="grid kpis">
+      ${kpi('Net Sales'+tipI(DEF.net),money(Math.round(f.net)),delta(f.net,p.net,r.vs),'trending-up')}
+      ${kpi('Gross Profit'+tipI(DEF.gp),money(Math.round(f.gp)),`${pctCell(f.margin)} margin · ${delta(f.gp,p.gp,r.vs)}`,'wallet')}
+      ${kpi('Net Operating Profit'+tipI(DEF.nop),money(Math.round(f.nop)),delta(f.nop,p.nop,r.vs),'landmark')}
+      ${kpi('Net Cash Result'+tipI(DEF.ncr),money(Math.round(f.ncr)),delta(f.ncr,p.ncr,r.vs),'banknote')}
+    </div>
+    <div class="stat-strip">
+      <div><span>COGS${tipI(DEF.cogs)}</span><b>${sg0(f.cogs)}</b></div><div><span>Gross Margin${tipI(DEF.margin)}</span><b>${pctCell(f.margin)}</b></div>
+      <div class="click" data-ftabgo="Expenses" data-fexpgo="All Expenses"><span>Operating Expenses${tipI(DEF.opex)}</span><b>${sg0(f.opex)}</b></div><div class="click" data-ftabgo="Other Income"><span>Other Income${tipI(DEF.income)}</span><b>${sg0(f.income)}</b></div>
+      <div class="click" data-ftabgo="Expenses" data-fexpgo="Capital Equipment"><span>Capital Equipment${tipI(DEF.capex)}</span><b>${sg0(f.capex)}</b></div><div><span>Inventory Purchases${tipI(DEF.invp)}</span><b>${sg0(f.purchases)}</b></div>
+    </div>
+    <div class="grid g-2-1">${c2(`Profit trend <span class="sub" style="display:block;font-weight:500">SGD · grouped ${grouping(from,to)}</span>`,profitTrend(from,to))}${c2('Profit breakdown',profitWaterfall(f))}</div>
+    ${compact?'':`<div class="grid g-1-1">${c2(`Operating expenses by category <span class="sub" style="display:block;font-weight:500">Click a category for its expenses</span>`,cats.length?catList(cats,'expcat'):emptyCard('No operating expenses in this period.'))}
+      ${c2(`Operating expenses over time <span class="sub" style="display:block;font-weight:500">SGD · grouped ${grouping(from,to)}</span>`,f.op.length?chartFor(b,[{key:'in',name:'Operating expenses',data:series(b,f.op,e=>e.date,baseAmt)}],{fmt:x=>sgd(Math.round(x)),cap:b.keys.length<=13}):emptyCard('No operating expenses in this period.'))}</div>`}`;
+}
+const catList = (cats,attr)=>`<div class="table-wrap"><table><thead><tr><th>Category</th><th class="num">Amount</th><th class="num">Share</th><th class="num">Transactions</th></tr></thead><tbody>${cats.map(c=>`<tr class="click" data-${attr}="${esc(c.cat)}"><td class="strong">${esc(c.cat)}</td><td class="num strong">${sgd(c.amount,2)}</td><td class="num">${pctCell(c.share)}</td><td class="num">${n0(c.n)}</td></tr>`).join('')}<tr style="border-top:1.5px solid var(--fg-2)"><td class="strong">Total</td><td class="num strong">${sgd(round2(cats.reduce((a,c)=>a+c.amount,0)),2)}</td><td class="num strong">100.0%</td><td class="num strong">${n0(cats.reduce((a,c)=>a+c.n,0))}</td></tr></tbody></table></div>`;
+function expensesBody(from,to){
+  const r=periodRange(), f=finStats(from,to), p=finStats(r.prevFrom,r.prevTo), e=S.fin.exp, b=buckets(from,to), cats=byCategory(f.op), active=Object.values(e).some(Boolean);
+  const toolbar=`<div class="field-search">${ic('search')}<input class="input" id="expQ" placeholder="Search number, description, payee, reference" value="${esc(e.q)}" aria-label="Search expenses"></div>
+    <select class="select" data-ef="type" aria-label="Expense type">${opt(EXPENSE_TYPES,e.type,'All types')}</select>
+    <select class="select" data-ef="cat" aria-label="Category">${opt(uniqSorted([...DB.expenseCategories,...DB.expenses.map(x=>x.category)]),e.cat,'All categories')}</select>
+    <select class="select" data-ef="status" aria-label="Status">${opt(EXPENSE_STATUSES,e.status,'All statuses')}</select>
+    <button class="btn sm ghost" data-action="resetExpF" ${active?'':'disabled'}>${ic('rotate-ccw','i i-sm')}Reset Filters</button>`;
+  return `<div class="grid kpis">${kpi('Operating Expenses'+tipI(DEF.opex),money(Math.round(f.opex)),`${n0(f.op.length)} record${f.op.length===1?'':'s'} · ${delta(f.opex,p.opex,r.vs)}`,'receipt')}
+      ${kpi('Capital Equipment'+tipI(DEF.capex),money(Math.round(f.capex)),`${n0(f.cap.length)} item${f.cap.length===1?'':'s'} · not in operating profit`,'wrench')}
+      ${kpi('Pending',money(Math.round(f.opPending+f.capPending)),'Recorded but not yet paid · counted above','clock',f.opPending+f.capPending>0)}
+      ${kpi('Inventory Purchases'+tipI(DEF.invp),money(Math.round(f.purchases)),'Not an expense · added to stock','package-check')}</div>
+    <div class="grid g-1-1"><div class="card"><div class="card-head"><div><h3>By category</h3><span class="sub">Operating expenses · click to filter</span></div></div><div class="card-body">${cats.length?catList(cats,'expcat'):emptyCard('No operating expenses in this period.')}</div></div>
+      <div class="card"><div class="card-head"><div><h3>Operating expenses over time</h3><span class="sub">SGD · grouped ${grouping(from,to)}</span></div></div><div class="card-body">${f.op.length?chartFor(b,[{key:'in',name:'Operating expenses',data:series(b,f.op,x=>x.date,baseAmt)}],{fmt:x=>sgd(Math.round(x)),cap:b.keys.length<=13}):emptyCard('No operating expenses in this period.')}</div></div></div>
+    ${finTbl('expenses',from,to,`Every expense dated ${fmtDate(from)} – ${fmtDate(to)}, including cancelled ones (they are not counted in totals). Expenses never change stock.`,toolbar)}`;
+}
+function capexBody(from,to){
+  const r=periodRange(), f=finStats(from,to), p=finStats(r.prevFrom,r.prevTo), all=sumBase(DB.expenses.filter(e=>counted(e)&&e.type==='Capital Equipment'));
+  return `<div class="grid kpis">${kpi('Capital Spending'+tipI(DEF.capex),money(Math.round(f.capex)),delta(f.capex,p.capex,r.vs),'wrench')}${kpi('Items',n0(f.cap.length),'Paid and pending in this period','boxes')}${kpi('Pending',money(Math.round(f.capPending)),'Recorded, not yet paid','clock',f.capPending>0)}${kpi('All-time Capital Spending',money(Math.round(all)),'No depreciation is calculated','landmark')}</div>
+    ${finTbl('capex',from,to,'Capital equipment is kept out of Net Operating Profit and deducted in Net Cash Result. Cancelled items are excluded.')}`;
+}
+function incomeBody(from,to){
+  const r=periodRange(), f=finStats(from,to), p=finStats(r.prevFrom,r.prevTo), e=S.fin.inc, cats=byCategory(f.inc), active=Object.values(e).some(Boolean);
+  const toolbar=`<div class="field-search">${ic('search')}<input class="input" id="incQ" placeholder="Search number, description, source, reference" value="${esc(e.q)}" aria-label="Search other income"></div>
+    <select class="select" data-if="cat" aria-label="Category">${opt(uniqSorted([...DB.incomeCategories,...DB.incomes.map(x=>x.category)]),e.cat,'All categories')}</select>
+    <select class="select" data-if="status" aria-label="Status">${opt(INCOME_STATUSES,e.status,'All statuses')}</select>
+    <button class="btn sm ghost" data-action="resetIncF" ${active?'':'disabled'}>${ic('rotate-ccw','i i-sm')}Reset Filters</button>`;
+  return `<div class="grid kpis">${kpi('Other Income'+tipI(DEF.income),money(Math.round(f.income)),`${n0(f.inc.length)} record${f.inc.length===1?'':'s'} · ${delta(f.income,p.income,r.vs)}`,'hand-coins')}
+      ${kpi('Pending',money(Math.round(f.incPending)),'Expected, not yet received · counted','clock',f.incPending>0)}
+      ${kpi('Largest Category',cats.length?esc(cats[0].cat):'—',cats.length?`${sgd(Math.round(cats[0].amount))} · ${pctCell(cats[0].share)}`:'No income in this period','tag')}
+      ${kpi('Net Operating Profit'+tipI(DEF.nop),money(Math.round(f.nop)),'Includes this income','landmark')}</div>
+    ${cats.length?`<div class="card"><div class="card-head"><div><h3>By category</h3><span class="sub">Click to filter</span></div></div><div class="card-body">${catList(cats,'inccat')}</div></div>`:''}
+    ${finTbl('incomes',from,to,`Every income record dated ${fmtDate(from)} – ${fmtDate(to)}, including cancelled ones (not counted). Other income never changes stock.`,toolbar)}`;
+}
+function profitBody(kind,from,to){
+  const f=finStats(from,to), key={Products:'products',Customers:'customers',Countries:'countries'}[kind];
+  const sub={Products:`Product net sales exclude order shipping and other charges (${sgd(Math.round(f.st.charges))} in this period), which are not split across products.`,Customers:'Net sales include shipping and other charges on each customer\'s orders.',Countries:'Country comes from each sale. Returns count against the original sale\'s country.'}[kind];
+  return `<div class="stat-strip"><div><span>Net Sales</span><b>${sg0(f.net)}</b></div><div><span>COGS</span><b>${sg0(f.cogs)}</b></div><div><span>Gross Profit</span><b>${sg0(f.gp)}</b></div><div><span>Gross Margin</span><b>${pctCell(f.margin)}</b></div><div><span>Operating Expenses</span><b>${sg0(f.opex)}</b></div><div><span>Net Operating Profit</span><b>${sg0(f.nop)}</b></div></div>
+    <p class="note">${ic('info','i i-sm')}Gross profit uses the cost stored on each sale when it completed. Operating expenses are not allocated to ${kind.toLowerCase()}.</p>
+    ${finTbl(key,from,to,sub+' Click a column heading to sort.')}`;
+}
+function landedBody(from,to){
+  const ps=DB.purchases.filter(p=>p.status==='Received'&&p.receivedDate>=from&&p.receivedDate<=to);
+  const list=ps.length?`<div class="table-wrap"><table><thead><tr><th>Purchase</th><th>Supplier</th><th>Received</th><th class="num">Units</th><th class="num">Purchase Cost</th><th class="num">Additional Costs</th><th class="num">Landed Total</th><th>Method</th><th>Status</th><th class="num">Action</th></tr></thead><tbody>${ps.map(p=>{const t=purchaseTotals(p);return `<tr class="click" data-go="purchase-${p.id}"><td class="mono strong">${esc(p.no)}</td><td class="nowrap">${esc(supplierOf(p).name)}</td><td class="muted nowrap">${fmtDate(p.receivedDate)}</td><td class="num">${n0(t.units)}</td><td class="num nowrap">${cur(t.sub,p.currency)}</td><td class="num nowrap">${cur(t.add,p.currency)}</td><td class="num strong nowrap">${cur(t.total,p.currency)}</td><td>${p.landed?(p.landed.method==='value'?'By purchase value':'By quantity'):'<span class="muted">—</span>'}</td><td>${p.landed?badge('Applied','ok'):t.add?badge('Not applied','warn'):badge('No extra costs','mute')}</td><td class="num"><button class="btn sm" data-action="applyLanded" data-id="${p.id}">${p.landed?'Recalculate':'Preview'}</button></td></tr>`}).join('')}</tbody></table></div>`:emptyCard('No received purchases in this period.');
+  return `<div class="notice" style="background:var(--info-bg);color:var(--info-fg)">${ic('info','i i-sm')}Landed cost spreads freight, duties, customs, handling and other purchase costs across the items, by quantity or by value. Completed sales keep the cost they were sold at.</div>
+    <div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px"><div><h3>Received purchases</h3><span class="sub">Received ${fmtDate(from)} – ${fmtDate(to)} · amounts in each purchase's currency</span></div></div>${list}</div>
+    ${finTbl('landed',from,to,'Allocations per item. Purchases not yet applied show a preview by quantity.',filterSeg(['All','Applied','Not Applied'],S.fin.lc,'flc'))}`;
+}
+function reportsFinancial(from,to){
+  const v=S.rep.fin;
+  return `<div>${filterSeg(RFIN_VIEWS,v,'rfin')}</div>`+({Profitability:()=>finOverview(from,to,true)+finTbl('fin',from,to,'Selected period against the previous equivalent period, SGD'),'Operating Expenses':()=>expensesBody(from,to),'Capital Equipment':()=>capexBody(from,to),'Other Income':()=>incomeBody(from,to),'Landed Cost':()=>landedBody(from,to),
+    'Product Profitability':()=>profitBody('Products',from,to),'Customer Profitability':()=>profitBody('Customers',from,to),'Country Profitability':()=>profitBody('Countries',from,to)}[v]||(()=>''))();
+}
+
+/* ----- Expense and income records ----- */
+function finDetail(kind,id){
+  const list=kind==='expense'?DB.expenses:DB.incomes, r=list.find(x=>x.id===id); if(!r) return notFound(kind==='expense'?'expense':'income record');
+  const isE=kind==='expense', A=(l,a,i,k='')=>btn(l,a,i,k,`data-id="${r.id}"`), cap=isE?'Expense':'Income';
+  const actions=r.status==='Cancelled'?A('Duplicate',isE?'dupExpense':'dupIncome','copy'):A(isE?'Cancel Expense':'Cancel Income',isE?'cancelExpense':'cancelIncome','circle-x','ghost danger-btn')+A('Duplicate',isE?'dupExpense':'dupIncome','copy')+(r.status==='Pending'?A(isE?'Mark as Paid':'Mark as Received',isE?'payExpense':'receiveIncome','check'):'')+A('Edit',isE?'editExpense':'editIncome','pencil','primary');
+  const au=DB.audit.filter(a=>a.link===`${kind}-${r.id}`).sort((a,b)=>b.at-a.at);
+  const where=isE?(r.type==='Capital Equipment'?'Capital equipment: kept out of Net Operating Profit and deducted in Net Cash Result.':'Operating expense: deducted in Net Operating Profit.'):'Other income: added to Net Operating Profit.';
+  return head(`${esc(r.no)} <span style="vertical-align:5px">${finStatus(r.status)}${isE?' '+typeChip(r.type):''}</span>`,`${esc(r.description)} · ${fmtDate(r.date)}`,actions,crumbs(['Financials','financials'],[isE?(r.type==='Capital Equipment'?'Capital Equipment':'Expenses'):'Other Income','financials'],[r.no]))+
+  (r.status==='Cancelled'?`<div class="notice" style="background:var(--mute-bg);color:var(--mute-fg)">${ic('circle-x','i i-sm')}Cancelled${r.cancelReason?` · ${esc(r.cancelReason)}`:''}. It stays on record but no longer counts in any total.</div>`:`<div class="notice" style="background:var(--info-bg);color:var(--info-fg)">${ic('info','i i-sm')}${where} ${isE?'Expenses':'Income records'} never change stock.</div>`)+
+  `<div class="stat-strip"><div><span>Amount</span><b>${cur(r.amount,r.currency)}</b></div><div><span>In SGD</span><b>${sgd(baseAmt(r),2)}</b></div><div><span>Date</span><b style="font-size:16px">${fmtDate(r.date)}</b></div><div><span>Category</span><b style="font-size:16px">${esc(r.category)}</b></div><div><span>${isE?'Type':'Source'}</span><b style="font-size:16px">${esc(isE?r.type:(r.source||'—'))}</b></div><div><span>Status</span><b>${finStatus(r.status)}</b></div></div>
+  <div class="grid g-1-1">
+    <div class="card"><div class="card-head"><h3>${cap} details</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:150px minmax(0,1fr)">
+      <dt>${cap} number</dt><dd class="mono">${esc(r.no)}</dd><dt>Date</dt><dd>${fmtDate(r.date)}</dd>${isE?`<dt>Expense type</dt><dd>${esc(r.type)}</dd>`:''}<dt>Category</dt><dd>${esc(r.category)}</dd><dt>Description</dt><dd>${esc(r.description)}</dd>
+      <dt>${isE?'Payee':'Source'}</dt><dd>${esc(isE?r.payee:r.source)||'—'}</dd><dt>Amount</dt><dd>${cur(r.amount,r.currency)}</dd><dt>Currency</dt><dd>${esc(r.currency)}${r.currency!==BASE_CURRENCY?` <span class="muted" style="font-weight:500">· 1 = ${r.fxRate} SGD</span>`:''}</dd>
+      ${isE?`<dt>Payment method</dt><dd>${esc(r.method)||'—'}</dd>`:''}<dt>Reference</dt><dd>${esc(r.reference)||'—'}</dd><dt>Attachment</dt><dd style="word-break:break-all">${r.attachment?(/^https?:\/\//.test(r.attachment)?`<a href="${esc(r.attachment)}" target="_blank" rel="noopener">${esc(r.attachment)}</a>`:esc(r.attachment)):'<span class="muted">None</span>'}</dd>
+      <dt>Notes</dt><dd style="font-weight:500">${esc(r.notes)||'—'}</dd><dt>Status</dt><dd>${finStatus(r.status)}</dd><dt>Created at</dt><dd>${fmtStamp(r.createdAt)}</dd></dl></div></div>
+    <div class="card"><div class="card-head"><div><h3>Audit history</h3><span class="sub">${au.length} entr${au.length===1?'y':'ies'} · entries cannot be edited</span></div></div><div class="card-body">${au.length?`<div class="timeline">${au.map(a=>`<div class="tl-item"><span class="tl-dot" style="background:var(--${/cancel/i.test(a.action)?'bad-fg':/edit/i.test(a.action)?'warn-fg':'ok-fg'})"></span><span><b>${esc(a.action)}</b> · ${esc(a.desc)} <span class="muted">· ${esc(a.user)}</span></span><span class="muted" style="white-space:nowrap;font-size:12.5px">${fmtStamp(a.at)}</span></div>`).join('')}</div>`:emptyCard('No audit entries')}</div></div>
+  </div>`;
+}
+PAGES.expense = id=>finDetail('expense',id);
+PAGES.income = id=>finDetail('income',id);
+
+/* ----- Forms ----- */
+function openFinForm(kind,id,{copyFrom}={}){
+  const isE=kind==='expense', list=isE?DB.expenses:DB.incomes, r=id?list.find(x=>x.id===id):null, src=r||copyFrom||{};
+  const cats=uniqSorted([...(isE?DB.expenseCategories:DB.incomeCategories)]), c0=src.currency||BASE_CURRENCY;
+  const v=k=>esc(src[k]??''), today=todayISO();
+  showModal({title:r?`Edit ${r.no}`:isE?'Record Expense':'Record Other Income',desc:r?esc(r.description):isE?'For running costs and equipment. Inventory purchases go in Purchases, so they are not counted twice.':'For business income that isn\'t from product sales.',save:r?'Save Changes':isE?'Save Expense':'Save Income',
+    body:`<div class="form-grid">
+      ${fld('Date',`<input class="input" type="date" name="date" value="${r?r.date:today}">`,{req:1})}
+      ${isE?fld('Expense Type',`<select class="select" name="type">${EXPENSE_TYPES.map(t=>`<option ${t===(src.type||'Operating Expense')?'selected':''}>${t}</option>`).join('')}</select>`,{req:1,hint:'Capital equipment: machines, computers, shelving, furniture'}):''}
+      ${fld('Category',`<div class="sku-row"><select class="select" name="category" data-catsel><option value="">Choose a category</option>${cats.map(c=>`<option ${c===src.category?'selected':''}>${esc(c)}</option>`).join('')}<option value="__new">Add a new category…</option></select><input class="input" name="categoryNew" placeholder="New category" style="display:none" aria-label="New category name"></div>`,{req:1})}
+      ${fld('Status',`<select class="select" name="status">${(isE?EXPENSE_STATUSES:INCOME_STATUSES).filter(s=>s!=='Cancelled').map(s=>`<option ${s===(r?r.status:(isE?'Paid':'Received'))?'selected':''}>${s}</option>`).join('')}</select>`,{hint:'Pending still counts in profit. Use Cancel to remove a record.'})}
+      ${fld('Description',`<input class="input" name="description" value="${v('description')}" placeholder="${isE?'e.g. Mailer boxes for October orders':'e.g. Stringing for coaching clinic'}">`,{req:1,span:1})}
+      ${fld(isE?'Supplier / Payee':'Source',`<input class="input" name="${isE?'payee':'source'}" value="${v(isE?'payee':'source')}" placeholder="${isE?'Who was paid':'Who paid you'}">`)}
+      ${isE?fld('Payment Method',`<select class="select" name="method"><option value="">Not set</option>${PAYMENT_METHODS.map(m=>`<option ${m===src.method?'selected':''}>${m}</option>`).join('')}</select>`):fld('Reference Number',`<input class="input" name="reference" value="${r?v('reference'):''}" placeholder="Invoice or receipt number">`)}
+      ${fld('Amount',`<input class="input" type="number" min="0" step="0.01" inputmode="decimal" name="amount" value="${src.amount??''}" placeholder="0.00">`,{req:1})}
+      ${fld('Currency',currencyField('currency',c0))}
+      <div data-fxbox style="${c0===BASE_CURRENCY?'display:none':''}">${fld('SGD per 1 unit',`<input class="input" type="number" min="0" step="any" name="fxRate" value="${src.fxRate&&c0!==BASE_CURRENCY?src.fxRate:fxOf(DB,c0)||''}">`,{hint:'Stored with the record, so later rate changes don\'t alter it'})}</div>
+      <div data-sgdbox class="field"><span class="field-label">In SGD</span><b data-sgd style="font-size:15px;padding-top:8px">—</b></div>
+      ${isE?fld('Reference Number',`<input class="input" name="reference" value="${r?v('reference'):''}" placeholder="Invoice or receipt number">`):''}
+      ${fld('Attachment',`<input class="input" name="attachment" value="${r?v('attachment'):''}" placeholder="Receipt link or file reference">`,{hint:'Optional · a link or where the receipt is filed',span:isE?0:1})}
+      ${fld('Notes',`<textarea class="input" name="notes" placeholder="Optional">${r?v('notes'):''}</textarea>`,{span:1})}
+    </div>`,
+    onMount:form=>{wireCurrency(form);
+      const upd=()=>{const c=readCurrency(form,'currency'),a=parseMoney(F(form,'amount').value),fx=c===BASE_CURRENCY?1:+F(form,'fxRate').value;form.querySelector('[data-fxbox]').style.display=c===BASE_CURRENCY?'none':'';form.querySelector('[data-sgd]').textContent=a>0&&fx>0?sgd(a*fx,2):'—'};
+      form.addEventListener('change',e=>{if(e.target.name==='currency'){const c=readCurrency(form,'currency');if(c!==BASE_CURRENCY&&fxOf(DB,c))F(form,'fxRate').value=fxOf(DB,c)}if(e.target.matches('[data-catsel]')){const n=F(form,'categoryNew');n.style.display=e.target.value==='__new'?'':'none';if(e.target.value==='__new')n.focus()}upd()});
+      form.addEventListener('input',upd); upd();},
+    onSave:form=>{
+      const g=n=>(F(form,n)?.value||'').trim(); let ok=true;
+      const date=g('date'), amount=parseMoney(g('amount')), currency=checkCurrency(form,'currency');
+      let category=g('category'); if(category==='__new') category=g('categoryNew');
+      if(!date){fieldError(F(form,'date'),'Choose a date.');ok=false}
+      if(!category){fieldError(F(form,g('category')==='__new'?'categoryNew':'category'),'Choose or add a category.');ok=false}
+      if(!g('description')){fieldError(F(form,'description'),'Add a short description.');ok=false}
+      if(!(amount>0)){fieldError(F(form,'amount'),'Enter an amount greater than 0.');ok=false}
+      if(!currency) ok=false;
+      const fxRate=currency===BASE_CURRENCY?1:+g('fxRate'); if(currency&&currency!==BASE_CURRENCY&&!(fxRate>0)){fieldError(F(form,'fxRate'),`Enter the SGD rate for ${currency}.`);ok=false}
+      if(!ok){formAlert('Please fix the highlighted fields.');return false}
+      const cl=isE?DB.expenseCategories:DB.incomeCategories, found=cl.find(c=>c.toLowerCase()===category.toLowerCase()); if(found) category=found; else cl.push(category);
+      const d={date,category,description:g('description'),amount,currency,fxRate,reference:g('reference'),notes:g('notes'),status:g('status'),attachment:g('attachment'),...(isE?{type:g('type'),payee:g('payee'),method:g('method')}:{source:g('source')})};
+      try{
+        if(r){const changed=transact(()=>updateFin(DB,kind,r,d));persist();render();toast(changed?`${r.no} updated`:'No changes to save',r.description);return true}
+        const n=transact(()=>isE?createExpense(DB,d):createIncome(DB,d)); persist(); location.hash=`${kind}-${n.id}`; render();
+        toast(isE?(n.type==='Capital Equipment'?'Capital equipment recorded':'Expense recorded'):'Other income recorded',`${n.no} · ${cur(n.amount,n.currency)}`); return true;
+      }catch(err){formAlert(err.message);return false}
+    }});
+}
+function openCancelFin(kind,id){
+  const r=(kind==='expense'?DB.expenses:DB.incomes).find(x=>x.id===id); if(!r) return;
+  showModal({title:`Cancel ${r.no}?`,desc:`${esc(r.description)} · ${cur(r.amount,r.currency)}`,narrow:true,danger:true,save:'Cancel Record',saveIcon:'circle-x',
+    body:`<p class="desc" style="margin-bottom:14px">The record stays in the history and audit trail, but no longer counts in any total. This can't be undone; record it again if needed.</p>${fld('Reason',`<input class="input" name="reason" placeholder="e.g. Entered twice">`,{req:1})}`,
+    onSave:form=>{const reason=F(form,'reason').value.trim();if(!reason){fieldError(F(form,'reason'),'Give a reason for cancelling.');return false}
+      try{transact(()=>cancelFin(DB,kind,r,{reason}))}catch(e){formAlert(e.message);return false} persist();render();toast(`${r.no} cancelled`,reason);return true}});
+}
+function markFin(kind,id){
+  const r=(kind==='expense'?DB.expenses:DB.incomes).find(x=>x.id===id); if(!r) return;
+  try{transact(()=>updateFin(DB,kind,r,{...r,status:kind==='expense'?'Paid':'Received'}))}catch(e){return toast('Not updated',e.message,'error')}
+  persist();render();toast(`${r.no} marked as ${r.status.toLowerCase()}`,cur(r.amount,r.currency));
+}
+const LC_SHORT={shipping:'Freight',duties:'Duties',customs:'Customs',handling:'Handling',other:'Other'};
+function openLandedCost(pid){
+  const p=DB.purchases.find(x=>x.id===pid); if(!p) return;
+  if(p.status!=='Received') return toast('Not received yet','Landed cost can be applied once the purchase is received.','info');
+  const t=purchaseTotals(p);
+  if(!t.add) return toast('No additional costs',`${p.no} has no freight, duties or other costs to allocate, so landed cost equals purchase cost.`,'info');
+  const shown=COST_FIELDS.filter(([k])=>+(p.costs||{})[k]);
+  const ups=landedUpdates(DB,p);
+  showModal({title:`${p.landed?'Recalculate':'Apply'} landed cost · ${esc(p.no)}`,desc:`${esc(supplierOf(p).name)} · ${cur(t.add,p.currency)} additional costs to spread over ${p.lines.length} item${p.lines.length===1?'':'s'}`,wide:true,save:p.landed?'Recalculate Landed Cost':'Apply Landed Cost',saveIcon:'calculator',
+    body:`<div style="display:flex;flex-direction:column;gap:16px">
+      <div class="field"><span class="field-label">Allocate additional costs</span><div class="seg" role="radiogroup">${[['quantity','By Quantity'],['value','By Purchase Value']].map(([k,l])=>`<label class="seg-radio"><input type="radio" name="method" value="${k}" ${(p.landed?p.landed.method:'quantity')===k?'checked':''}><span>${l}</span></label>`).join('')}</div><span class="field-hint">By quantity: each unit carries the same share. By value: dearer lines carry more.</span></div>
+      <div id="lcPreview"></div>
+      <label class="check" style="align-items:flex-start"><input type="checkbox" name="updateCost" checked><span><b>Use the landed unit cost as the inventory cost basis</b><small class="muted" style="display:block;font-weight:500">${ups.filter(x=>x.latest).length} SKU${ups.filter(x=>x.latest).length===1?'':'s'} where this is the latest purchase will be updated. ${ups.some(x=>!x.latest)?`${ups.filter(x=>!x.latest).length} SKU${ups.filter(x=>!x.latest).length===1?' has':'s have'} a later purchase and keep their cost. `:''}This changes inventory value and the cost snapshot of future sales only.</small></span></label>
+      <div class="notice" style="background:var(--info-bg);color:var(--info-fg)">${ic('shield-check','i i-sm')}Completed sales keep the cost stored when they completed, so past gross profit does not change.</div></div>`,
+    onMount:form=>{const draw=()=>{const m=form.querySelector('[name=method]:checked').value, pv=landedPreview(p,m), c=p.currency, a=x=>cur(x,c).replace(c+' ','');
+        $('#lcPreview').innerHTML=`<div class="table-wrap" style="border:1px solid var(--line);border-radius:12px"><table><thead><tr><th>Product</th><th class="num">Qty</th><th class="num">Purchase Cost</th>${shown.map(([k])=>`<th class="num">${LC_SHORT[k]}</th>`).join('')}<th class="num">Landed Cost</th><th class="num">Landed Unit Cost</th></tr></thead><tbody>
+          ${pv.rows.map(r=>{const L=purchaseLineLabel(r.l);return `<tr><td class="nowrap"><span class="strong">${esc(L.name)}</span><span class="cell-sub">${esc(L.variant)} · ${esc(L.sku)}</span></td><td class="num">${n0(r.l.qty)}</td><td class="num">${a(r.cost)}</td>${shown.map(([k])=>`<td class="num">${a(r.alloc[k])}</td>`).join('')}<td class="num strong">${a(r.landed)}</td><td class="num strong">${cur(r.unit,c,4).replace(c+' ','')}${c!==BASE_CURRENCY?`<span class="cell-sub">${sgd(r.unit*pv.fx,2)}</span>`:''}</td></tr>`}).join('')}
+          <tr style="border-top:1.5px solid var(--fg-2)"><td class="strong">Total</td><td class="num strong">${n0(t.units)}</td><td class="num strong">${a(pv.sub)}</td>${shown.map(([k])=>`<td class="num strong">${a(round2(pv.rows.reduce((s,r)=>s+r.alloc[k],0)))}</td>`).join('')}<td class="num strong">${a(pv.landedTotal)}</td><td></td></tr></tbody></table></div>
+          <p class="note" style="margin-top:8px">${ic(round2(pv.allocated)===round2(pv.add)?'circle-check':'circle-alert','i i-sm')}Allocated ${cur(pv.allocated,c)} of ${cur(pv.add,c)} additional costs · landed total ${cur(pv.landedTotal,c)} = purchase total ${cur(pv.total,c)}${c!==BASE_CURRENCY?` · SGD at the stored rate 1 ${esc(c)} = ${pv.fx}`:''}</p>`;refreshIcons()};
+      form.addEventListener('change',draw); draw();},
+    onSave:form=>{const method=form.querySelector('[name=method]:checked').value, updateCost=F(form,'updateCost').checked;
+      let res; try{res=transact(()=>applyLandedCost(DB,p,{method,updateCost}))}catch(e){formAlert(e.message);return false}
+      persist();render();toast(`Landed cost ${p.history.filter(h=>h.kind==='landed').length>1?'recalculated':'applied'}`,`${p.no} · ${method==='value'?'by purchase value':'by quantity'}${res.updated.length?` · cost price updated for ${res.updated.length} SKU${res.updated.length===1?'':'s'}`:''}`);return true}});
+}
+function landedCard(p){
+  const t=purchaseTotals(p);
+  if(p.status!=='Received') return '';
+  if(!p.landed) return `<div class="card"><div class="card-head" style="flex-wrap:wrap"><div><h3>Landed cost</h3><span class="sub">${t.add?`${cur(t.add,p.currency)} of additional costs are not yet spread across the item costs`:'No additional costs, so landed cost equals purchase cost'}</span></div>${t.add?btn('Preview Landed Cost','applyLanded','calculator','',`data-id="${p.id}"`):''}</div></div>`;
+  const c=p.currency, a=x=>cur(x,c).replace(c+' ','');
+  return `<div class="card" style="overflow:hidden"><div class="card-head" style="padding-bottom:16px;flex-wrap:wrap"><div><h3>Landed cost</h3><span class="sub">Applied ${fmtStamp(p.landed.appliedAt)} · ${p.landed.method==='value'?'by purchase value':'by quantity'} · ${p.landed.updateCost?'cost basis updated':'cost basis not changed'}</span></div>${btn('Recalculate','applyLanded','calculator','sm',`data-id="${p.id}"`)}</div>
+    <div class="table-wrap"><table><thead><tr><th>SKU</th><th class="num">Qty</th><th class="num">Purchase Cost</th><th class="num">Additional Costs</th><th class="num">Landed Cost</th><th class="num">Landed Unit Cost${tipI(DEF.landed)}</th><th class="num">Unit in SGD</th></tr></thead><tbody>
+    ${p.landed.lines.map(x=>{const v=variantById(x.variantId);return `<tr ${v?`class="click" data-variant="${v.id}"`:''}><td class="mono">${esc(v?v.sku:'—')}</td><td class="num">${n0(x.qty)}</td><td class="num">${a(x.cost)}</td><td class="num">${a(x.extra)}</td><td class="num strong">${a(x.landed)}</td><td class="num strong">${cur(x.unit,c,4).replace(c+' ','')}</td><td class="num">${sgd(x.unitBase,2)}</td></tr>`}).join('')}</tbody></table></div></div>`;
 }
 
 /* ----- Purchases ----- */
@@ -2148,7 +2605,7 @@ PAGES.purchase = id=>{
   const later=A('Add Note','notePurchase','message-square-plus')+A('Copy as New','copyPurchase','copy');
   const actions={Draft:A('Edit','editPurchase','pencil')+A('Delete','deletePurchase','trash-2','ghost danger-btn')+A('Mark as Ordered','orderPurchase','send')+A('Mark as Received','receivePurchase','package-check','primary'),
     Ordered:A('Edit','editPurchase','pencil')+A('Cancel Purchase','cancelPurchase','circle-x','ghost danger-btn')+A('Mark as Received','receivePurchase','package-check','primary'),
-    Received:A('Reverse Purchase','reversePurchase','undo-2','ghost danger-btn')+A('Return to Supplier','returnToSupplier','package-minus')+later,Cancelled:later,Reversed:later}[p.status];
+    Received:A('Reverse Purchase','reversePurchase','undo-2','ghost danger-btn')+A('Return to Supplier','returnToSupplier','package-minus')+A('Landed Cost','applyLanded','calculator')+later,Cancelled:later,Reversed:later}[p.status];
   const notice={Draft:['info','file-pen-line','Draft. This purchase has not changed stock. Stock is added once, when you mark it as Received.'],
     Ordered:['info','ship',`Ordered${p.expectedDate?`, expected ${fmtDate(p.expectedDate)}`:''}. Stock is added once, when you mark it as Received.`],
     Received:['ok','package-check',`Received ${fmtDate(p.receivedDate)}. ${n0(t.units)} units were added to inventory. Items and quantities are now locked; to undo, use Reverse Purchase.`],
@@ -2167,6 +2624,7 @@ PAGES.purchase = id=>{
       <div class="table-wrap"><table><thead><tr><th>Product</th><th>Variant</th><th>SKU</th><th class="num">Quantity</th><th class="num">Unit Cost</th><th class="num">Line Total</th>${mv.length?'<th>Stock</th>':''}</tr></thead><tbody>
       ${p.lines.map(l=>{const L=purchaseLineLabel(l),ms=mvFor(l);return `<tr ${L.v?`class="click" data-variant="${L.v.id}"`:''}><td class="strong" style="white-space:nowrap">${esc(L.name)}</td><td style="white-space:nowrap">${L.v&&L.v.colour?sw(L.v.colour)+' ':''}${esc(L.variant)}</td><td class="mono">${esc(L.sku)}</td><td class="num strong">${n0(l.qty)}</td><td class="num">${cur(l.unitCost,c)}</td><td class="num strong">${cur(lineTotal(l),c)}</td>${mv.length?`<td style="white-space:nowrap">${ms.map(m=>`<span class="${m.change>0?'chg-in':'chg-out'} strong">${m.change>0?'+':'−'}${n0(Math.abs(m.change))}</span> <span class="muted">${m.prevQty} → ${m.newQty}</span>`).join('<br>')}</td>`:''}</tr>`}).join('')}
       </tbody></table></div></div>
+  ${landedCard(p)}
   ${returnsCard(DB.supplierReturns.filter(r=>r.purchaseId===p.id),'supplier')}
   <div class="grid g-3">
     <div class="card"><div class="card-head"><h3>Details</h3></div><div class="card-body"><dl class="spec" style="grid-template-columns:130px minmax(0,1fr)">
@@ -2178,7 +2636,7 @@ PAGES.purchase = id=>{
       ${COST_FIELDS.map(([k,l])=>`<div><span>${k==='other'&&p.costs.otherDesc?`Other: ${esc(p.costs.otherDesc)}`:l}</span><span class="${+p.costs[k]?'':'muted'}">${cur(p.costs[k]||0,c)}</span></div>`).join('')}
       <div class="total"><span>Total Purchase Cost</span><span>${cur(t.total,c)}</span></div></div>
       <div><div class="field-label" style="margin-bottom:4px">Notes</div><p class="desc">${p.notes?esc(p.notes):'<span class="muted">No notes</span>'}</p></div>
-      <div class="note">${ic('info','i i-sm')}Additional costs are stored with the purchase. Spreading them across item costs (landed cost) comes in a later phase.</div></div></div>
+      <div class="note">${ic('info','i i-sm')}Additional costs belong to this purchase, not to operating expenses. Landed cost spreads them across the items.</div></div></div>
     <div class="card"><div class="card-head"><h3>Activity</h3></div><div class="card-body"><div class="timeline">${p.history.slice().reverse().map(h=>`<div class="tl-item"><span class="tl-dot" style="background:var(--${{received:'ok-fg',reversed:'bad-fg',cancelled:'bad-fg',ordered:'info-fg',note:'warn-fg'}[h.kind]||'fg-3'})"></span><span>${esc(h.text)}</span><span class="muted" style="white-space:nowrap;font-size:12.5px">${fmtStamp(h.at)}</span></div>`).join('')}</div></div></div>
   </div>`;
 };
@@ -2362,8 +2820,10 @@ PAGES.variant = id=>{
         <dt>Colour</dt><dd style="display:flex;gap:8px;align-items:center">${v.colour?sw(v.colour)+esc(v.colour):'—'}</dd><dt>Packaging</dt><dd>${esc(v.packaging)||'—'}</dd>
         <dt>Variant status</dt><dd>${badge(v.status)}</dd></dl></div>
       <div><h3 style="font-size:15px;margin-bottom:12px">Stock and value</h3><dl class="spec">
-        <dt>Current stock</dt><dd>${n0(v.qty)} units</dd><dt>Reorder level</dt><dd>${v.reorder} units</dd><dt>Cost price</dt><dd>${sgd(v.cost,2)}</dd><dt>Selling price</dt><dd>${sgd(v.price,2)}</dd>
-        <dt>Last purchase cost</dt><dd>${v.lastPurchaseCost!=null?`${cur(v.lastPurchaseCost,v.lastPurchaseCurrency)} <span class="muted" style="font-weight:500">on ${fmtDate(v.lastPurchaseDate)}</span>`:'—'}</dd>
+        <dt>Current stock</dt><dd>${n0(v.qty)} units</dd><dt>Reorder level</dt><dd>${v.reorder} units</dd><dt>Inventory cost basis${tipI(DEF.basis)}</dt><dd>${sgd(v.cost,2)}</dd><dt>Selling price</dt><dd>${sgd(v.price,2)}</dd>
+        <dt>Last purchase cost${tipI(DEF.lastp)}</dt><dd>${v.lastPurchaseCost!=null?`${cur(v.lastPurchaseCost,v.lastPurchaseCurrency)} <span class="muted" style="font-weight:500">on ${fmtDate(v.lastPurchaseDate)}</span>`:'—'}</dd>
+        <dt>Landed unit cost${tipI(DEF.landed)}</dt><dd>${v.landedUnitCost!=null?`${sgd(v.landedUnitCost,2)} <span class="muted" style="font-weight:500">· <a href="#purchase-${v.landedCostPurchaseId}">${esc((DB.purchases.find(p=>p.id===v.landedCostPurchaseId)||{}).no||'')}</a></span>`:'<span class="muted">Not applied</span>'}</dd>
+        <dt>Cost at time of sale${tipI(DEF.atsale)}</dt><dd>${(()=>{const s=DB.sales.filter(x=>x.status==='Completed'&&x.lines.some(l=>l.variantId===v.id)).sort((a,b)=>b.completedDate.localeCompare(a.completedDate))[0];const l=s&&s.lines.find(l=>l.variantId===v.id);return l?`${sgd(l.unitCost,2)} <span class="muted" style="font-weight:500">· latest, ${esc(s.no)}</span>`:'—'})()}</dd>
         <dt>Margin</dt><dd>${v.price?Math.round((v.price-v.cost)/v.price*100)+'%':'—'}</dd><dt>Inventory value</dt><dd>${sgd(v.qty*v.cost,2)} <span class="muted" style="font-weight:500">(${n0(v.qty)} × ${sgd(v.cost,2)})</span></dd>
         <dt>Last movement</dt><dd>${mv.length?fmtDate(mv[mv.length-1].date)+' · '+MOVEMENT_TYPES[mv[mv.length-1].type].label:'—'}</dd></dl></div></div>`
     :S.vtab==='Stock Movement'?variantLedger(v)
@@ -2383,20 +2843,22 @@ PAGES.settings = ()=>{
   const f=(label,val,type='text')=>`<label class="field"><span class="field-label">${label}</span><input class="input" type="${type}" value="${esc(val)}"></label>`;
   const sel=(label,opts,v)=>`<label class="field"><span class="field-label">${label}</span><select class="select">${opts.map(o=>`<option ${o===v?'selected':''}>${o}</option>`).join('')}</select></label>`;
   const pref=(t,d,on)=>`<div class="pref"><div><b>${t}</b><small>${d}</small></div><label class="switch"><input type="checkbox" ${on?'checked':''} aria-label="${t}"><span></span></label></div>`;
-  const links=[['categories','Product Categories'],['company','Company Information'],['currency','Currency'],['markets','Countries / Markets'],['inventory','Inventory Preferences'],['notifications','Notifications'],['profile','User Profile'],['data','Data']];
+  const links=[['categories','Product Categories'],['fincats','Expense and Income Categories'],['company','Company Information'],['currency','Currency'],['markets','Countries / Markets'],['inventory','Inventory Preferences'],['notifications','Notifications'],['profile','User Profile'],['data','Data']];
   const cats=DB.categories.map(c=>{const n=DB.products.filter(p=>p.categoryId===c.id).length;return `<div class="cat-row"><div><b style="font-size:14px">${esc(c.name)}</b><div class="muted" style="font-size:12.5px">${n} product${n===1?'':'s'}${c.usesGauge?' · uses gauge':''}</div></div><label class="check" title="Show the gauge field for products in this category"><input type="checkbox" data-catgauge="${c.id}" ${c.usesGauge?'checked':''}>Gauge</label><button class="btn sm" data-action="renameCat" data-id="${c.id}">Rename</button><button class="btn sm ghost danger-btn" data-action="deleteCat" data-id="${c.id}" ${n?'disabled title="Move its products to another category first"':''}>Delete</button></div>`}).join('');
   return head('Settings','Basic setup for the business. Product categories and data are live; the other sections arrive in later phases.')+
   `<div class="split settings">
     <nav class="settings-nav">${links.map(l=>`<a href="#settings" data-scroll="set-${l[0]}">${l[1]}</a>`).join('')}</nav>
     <div style="display:flex;flex-direction:column;gap:18px;min-width:0">
       ${sec('categories','Product Categories','Group products. Turn on Gauge for categories that need it, such as strings.',`<div>${cats}</div><form class="sku-row" id="addCatForm" style="margin-top:16px;max-width:460px"><input class="input" name="name" placeholder="New category, e.g. Bags" aria-label="New category name"><button class="btn" type="submit">${ic('plus','i i-sm')}Add Category</button></form><span class="err" id="catErr"></span>`)}
-      ${sec('company','Company Information','Shown on invoices and purchase orders',`<div class="form-grid">${f('Company name','MSV Southeast Asia Pte. Ltd.')}${f('UEN','202412345K')}${f('Email','orders@msv-sea.com','email')}${f('Phone','+65 6123 4567')}<label class="field span-2"><span class="field-label">Address</span><input class="input" value="21 Kallang Avenue, #04-160, Singapore 339412"></label></div>`)}
+      ${sec('fincats','Expense and Income Categories','Used when recording expenses and other income. You can also add one while recording.',`<div class="field-label" style="margin-bottom:8px">Expense categories</div><div class="variants">${DB.expenseCategories.map(c=>`<span class="chip">${esc(c)}</span>`).join('')}</div><form class="sku-row" id="addExpCatForm" style="margin-top:12px;max-width:460px"><input class="input" name="name" placeholder="New expense category" aria-label="New expense category"><button class="btn" type="submit">${ic('plus','i i-sm')}Add</button></form><span class="err" id="expCatErr"></span>
+        <div class="field-label" style="margin:18px 0 8px">Other income categories</div><div class="variants">${DB.incomeCategories.map(c=>`<span class="chip">${esc(c)}</span>`).join('')}</div><form class="sku-row" id="addIncCatForm" style="margin-top:12px;max-width:460px"><input class="input" name="name" placeholder="New income category" aria-label="New income category"><button class="btn" type="submit">${ic('plus','i i-sm')}Add</button></form><span class="err" id="incCatErr"></span>`)}
+      ${sec('company','Company Information','Shown on invoices and purchase orders',`<div class="form-grid">${f('Company name','Evolve Tennis')}${f('UEN','202412345K')}${f('Email','','email')}${f('Phone','+65 6123 4567')}<label class="field span-2"><span class="field-label">Address</span><input class="input" value="21 Kallang Avenue, #04-160, Singapore 339412"></label></div>`)}
       ${sec('currency','Currency and exchange rates','Stock, profit and reports are in SGD. Sales and purchases can be in any currency below.',`<div class="table-wrap" style="border:1px solid var(--line);border-radius:12px;max-width:520px"><table><thead><tr><th>Currency</th><th>1 unit = SGD</th><th></th></tr></thead><tbody>${DB.currencies.map(c=>{const used=DB.purchases.some(p=>p.currency===c)||DB.sales.some(x=>x.currency===c)||DB.suppliers.some(x=>x.currency===c)||DB.customers.some(x=>x.currency===c);return `<tr><td class="strong">${esc(c)}${c===BASE_CURRENCY?' <span class="muted" style="font-weight:500">· base</span>':''}</td><td>${c===BASE_CURRENCY?'1':`<input class="input" type="number" step="any" min="0" data-fx="${esc(c)}" value="${DB.fxRates[c]||''}" placeholder="Not set" style="max-width:160px;height:36px" aria-label="SGD per 1 ${esc(c)}">`}</td><td class="num">${c!==BASE_CURRENCY&&!used?`<button class="link-btn" data-action="removeCurrency" data-code="${esc(c)}" style="font-size:12.5px">Remove</button>`:''}</td></tr>`}).join('')}</tbody></table></div><form class="sku-row" id="addCurForm" style="margin-top:14px;max-width:360px"><input class="input" name="code" maxlength="3" placeholder="Add a code, e.g. AUD" aria-label="Currency code"><button class="btn" type="submit">${ic('plus','i i-sm')}Add Currency</button></form><span class="err" id="curErr"></span><div class="note" style="margin-top:10px">${ic('info','i i-sm')}Rates are entered by you, not live. New sales start from these rates; each completed sale and received purchase keeps the rate it had at the time, so past reports don't change.</div>`)}
       ${sec('markets','Countries / Markets','Where you sell',`<div class="variants">${['Singapore','Malaysia','Thailand','Indonesia','Vietnam','Philippines'].map(c=>`<span class="chip" style="height:32px">${ic('check','i i-sm')}${c}</span>`).join('')}<button class="btn sm ghost">${ic('plus','i i-sm')}Add market</button></div>`)}
-      ${sec('inventory','Inventory Preferences','How stock is tracked',`${pref('Allow negative stock','Off: stock can never go below zero',false)}${pref('Include landed costs in cost price','Arrives with Purchases',false)}`)}
+      ${sec('inventory','Inventory Preferences','How stock is tracked',`${pref('Allow negative stock','Off: stock can never go below zero',false)}<div class="note" style="margin-top:12px">${ic('info','i i-sm')}Landed cost is applied per purchase from Financials or the purchase page.</div>`)}
       ${sec('notifications','Notifications','What you get alerted about',`${pref('Low stock alerts','When a variant reaches its reorder level',true)}${pref('Overdue invoices','When a customer passes their payment terms',true)}${pref('Weekly summary email','Every Monday at 8:00',false)}`)}
       ${sec('profile','User Profile','Your account',`<div style="display:flex;gap:16px;align-items:center;margin-bottom:18px"><span class="avatar" style="width:52px;height:52px;font-size:17px">JK</span><div><b>Jasmine Koh</b><div class="muted" style="font-size:13px">Owner · jasmine@msv-sea.com</div></div></div><div class="form-grid">${f('Full name','Jasmine Koh')}${f('Email','jasmine@msv-sea.com','email')}</div>`)}
-      ${sec('data','Data','Products, stock history, suppliers, purchases, customers, sales and returns are saved in this browser only',`<div class="pref"><div><b>Restore sample data</b><small>Replace everything with the MSV sample catalogue, suppliers, purchases, customers and sales</small></div><button class="btn sm" data-action="restoreSample">Restore</button></div><div class="pref"><div><b>Start with an empty catalogue</b><small>Remove all products, suppliers, purchases, customers, sales and stock history. Categories and currencies are kept.</small></div><button class="btn sm danger-btn" data-action="clearData">Clear data</button></div>`)}
+      ${sec('data','Data','Products, stock history, suppliers, purchases, customers, sales, returns, expenses and other income are saved in this browser only',`<div class="pref"><div><b>Restore sample data</b><small>Replace everything with the MSV sample catalogue, suppliers, purchases, customers and sales</small></div><button class="btn sm" data-action="restoreSample">Restore</button></div><div class="pref"><div><b>Start with an empty catalogue</b><small>Remove all products, suppliers, purchases, customers, sales and stock history. Categories and currencies are kept.</small></div><button class="btn sm danger-btn" data-action="clearData">Clear data</button></div>`)}
     </div>
   </div>`;
 };
@@ -3342,9 +3804,9 @@ function toast(title,msg,tone){
 }
 
 /* ---------- Router & render ---------- */
-const NAV=[['dashboard','Dashboard','layout-dashboard'],['inventory','Inventory','boxes'],['movements','Stock Movements','history'],['products','Products','package'],['purchases','Purchases','truck'],['suppliers','Suppliers','factory'],['sales','Sales','receipt'],['customers','Customers','users'],['returns','Returns','undo-2'],['reports','Reports','chart-column'],['audit','Audit Trail','scroll-text'],['settings','Settings','settings']];
-const PARENT={product:'products',variant:'products',customer:'customers',purchase:'purchases',supplier:'suppliers',sale:'sales',movement:'movements',stockcount:'movements',return:'returns',sreturn:'returns'};
-function route(){ const h=location.hash.slice(1); const m=h.match(/^(product|variant|purchase|supplier|sale|customer|movement|return|sreturn)-(.+)$/); if(m) return [m[1],m[2]]; return [PAGES[h]?h:'dashboard',null]; }
+const NAV=[['dashboard','Dashboard','layout-dashboard'],['inventory','Inventory','boxes'],['movements','Stock Movements','history'],['products','Products','package'],['purchases','Purchases','truck'],['suppliers','Suppliers','factory'],['sales','Sales','receipt'],['customers','Customers','users'],['returns','Returns','undo-2'],['reports','Reports','chart-column'],['financials','Financials','landmark'],['audit','Audit Trail','scroll-text'],['settings','Settings','settings']];
+const PARENT={product:'products',variant:'products',customer:'customers',purchase:'purchases',supplier:'suppliers',sale:'sales',movement:'movements',stockcount:'movements',return:'returns',sreturn:'returns',expense:'financials',income:'financials'};
+function route(){ const h=location.hash.slice(1); const m=h.match(/^(product|variant|purchase|supplier|sale|customer|movement|return|sreturn|expense|income)-(.+)$/); if(m) return [m[1],m[2]]; return [PAGES[h]?h:'dashboard',null]; }
 function render(){
   clearMemo();
   const [r,id]=route(), active=PARENT[r]||r, att=attention().length, ledgerIssues=ledgerCheck().length;
@@ -3355,12 +3817,13 @@ function render(){
   if(r==='sales') renderSalTable();
   if(r==='movements') renderMovTable();
   renderNotifications();
+  document.title=`${(NAV.find(n=>n[0]===active)||[0,''])[1]||'Dashboard'} · Evolve Tennis System`;
   refreshIcons(); $('#shell').classList.remove('open');
 }
 function refreshIcons(){ if(window.lucide) lucide.createIcons({attrs:{'stroke-width':1.75}}); }
 function go(h){ if(location.hash==='#'+h) render(); else location.hash=h; window.scrollTo(0,0); }
 let lastRoute='';
-window.addEventListener('hashchange',()=>{const [r,id]=route();if(r==='variant'&&lastRoute!=='variant')S.vtab='Overview';if(r==='variant'&&id!==S.vmovFor){S.vmov=blankVmovFilters();S.vmovFor=id}lastRoute=r;render();window.scrollTo(0,0)});
+window.addEventListener('hashchange',()=>{if(modal)closeModal();const [r,id]=route();if(r==='variant'&&lastRoute!=='variant')S.vtab='Overview';if(r==='variant'&&id!==S.vmovFor){S.vmov=blankVmovFilters();S.vmovFor=id}lastRoute=r;render();window.scrollTo(0,0)});
 
 /* ---------- Events ---------- */
 const ACTIONS={
@@ -3436,6 +3899,19 @@ const ACTIONS={
   restoreSample:()=>confirmDialog({title:'Restore sample data?',body:'This replaces all products, suppliers, purchases, customers, sales and stock movements in this browser with the MSV sample data.',confirm:'Restore Sample Data',onConfirm:()=>{DB=seedDb();persist();render();toast('Sample data restored','')}}),
   clearData:()=>confirmDialog({title:'Clear all data?',body:'This removes every product, supplier, purchase, customer, sale and stock movement saved in this browser. Categories and currencies are kept. This can\'t be undone.',confirm:'Clear Data',onConfirm:()=>{DB=emptyDb();persist();go('products');toast('Data cleared','Add your first product to get started.')}}),
   exportReport:d=>exportReport(d.set||undefined),
+  recordExpense:()=>openFinForm('expense'),
+  recordIncome:()=>openFinForm('income'),
+  editExpense:d=>openFinForm('expense',d.id),
+  editIncome:d=>openFinForm('income',d.id),
+  dupExpense:d=>{const r=DB.expenses.find(x=>x.id===d.id);openFinForm('expense',null,{copyFrom:{...r,status:'Paid'}})},
+  dupIncome:d=>{const r=DB.incomes.find(x=>x.id===d.id);openFinForm('income',null,{copyFrom:{...r,status:'Received'}})},
+  cancelExpense:d=>openCancelFin('expense',d.id),
+  cancelIncome:d=>openCancelFin('income',d.id),
+  payExpense:d=>markFin('expense',d.id),
+  receiveIncome:d=>markFin('income',d.id),
+  applyLanded:d=>openLandedCost(d.id),
+  resetExpF:()=>{S.fin.exp=blankFin().exp;render()},
+  resetIncF:()=>{S.fin.inc=blankFin().inc;render()},
   moreRep:d=>{S.rep.limit[d.set]=(S.rep.limit[d.set]||50)+50;render()},
   resetRepMv:()=>{S.rep.mv=blankRep().mv;render()},
   repToLedger:()=>{const {from,to}=periodRange(),f=S.rep.mv,v=f.variant&&variantById(f.variant);S.mov={...blankMovFilters(),from,to,product:f.product,type:f.type,supplier:f.supplier,customer:f.customer,q:v?v.sku:''};S.movLimit=150;go('movements')},
@@ -3443,7 +3919,7 @@ const ACTIONS={
 };
 document.addEventListener('click',e=>{
   if(e.target.closest('a[href^="#"]:not([data-action])')&&!e.target.closest('#mForm')) return;
-  const el=e.target.closest('[data-action],[data-go],[data-variant],[data-product],[data-vtab],[data-rtab],[data-range],[data-sort],[data-scroll],[data-pstatus],[data-setstatus],[data-psort],[data-sstatus],[data-ssort],[data-drange],[data-dtop],[data-ctype],[data-cstatus],[data-rtabgo],[data-rettab],[data-retstatus],[data-tmetric],[data-best],[data-pall],[data-rinv],[data-slow],[data-crank],[data-mmetric],[data-country],[data-pmetric],[data-srank],[data-rret],[data-rsort]');
+  const el=e.target.closest('[data-action],[data-go],[data-variant],[data-product],[data-vtab],[data-rtab],[data-range],[data-sort],[data-scroll],[data-pstatus],[data-setstatus],[data-psort],[data-sstatus],[data-ssort],[data-drange],[data-dtop],[data-ctype],[data-cstatus],[data-rtabgo],[data-rettab],[data-retstatus],[data-tmetric],[data-best],[data-pall],[data-rinv],[data-slow],[data-crank],[data-mmetric],[data-country],[data-pmetric],[data-srank],[data-rret],[data-rsort],[data-ftab],[data-fexp],[data-fprof],[data-flc],[data-rfin],[data-expcat],[data-inccat],[data-ftabgo]');
   if(!el) return;
   const d=el.dataset;
   if(d.action){ if(['suggestSku','addVariantCard','removeVariantCard','addPLine','removePLine','newSupplierInline','addSLine','removeSLine','newCustomerInline'].includes(d.action)) return; const fn=ACTIONS[d.action]; if(fn){ if(el.tagName==='A'&&d.action==='close'){closeModal();return} e.preventDefault(); fn(d,el);} return; }
@@ -3453,6 +3929,14 @@ document.addEventListener('click',e=>{
   if(d.vtab){S.vtab=d.vtab;return render();}
   if(d.rtab){S.rtab=RTAB_ALIAS[d.rtab]||d.rtab;if(d.rsub)S.rep.inv=d.rsub;return render();}
   if(d.tmetric){S.rep.metric=d.tmetric;return render();}
+  if(d.ftab){S.fin.tab=d.ftab;return render();}
+  if(d.fexp){S.fin.expView=d.fexp;return render();}
+  if(d.fprof){S.fin.prof=d.fprof;return render();}
+  if(d.flc){S.fin.lc=d.flc;return render();}
+  if(d.rfin){S.rep.fin=d.rfin;return render();}
+  if(d.expcat!==undefined){Object.assign(S.fin,{tab:'Expenses',expView:'All Expenses'});Object.assign(S.fin.exp,{cat:d.expcat,type:'Operating Expense'});if(location.hash==='#reports')S.rep.fin='Operating Expenses';return render();}
+  if(d.inccat!==undefined){S.fin.tab='Other Income';S.fin.inc.cat=d.inccat;return render();}
+  if(d.ftabgo){S.fin.tab=d.ftabgo;if(d.fexpgo)S.fin.expView=d.fexpgo;return go('financials');}
   if(d.best){S.rep.best=d.best;return render();}
   if(d.pall){S.rep.prodAll=d.pall==='All SKUs';return render();}
   if(d.rinv){S.rep.inv=d.rinv;return render();}
@@ -3492,6 +3976,8 @@ document.addEventListener('change',e=>{
   if(t.id==='pFrom'||t.id==='pTo'){if(!t.value)return;S.period[t.id==='pFrom'?'from':'to']=t.value;savePeriod();render();return}
   if(t.id==='slowDays'||t.id==='staleDays'){DB.reportSettings={...slowCfg(),[t.id]:+t.value};persist();render();return}
   if(t.id==='prodRank'){S.rep.sort.products={k:PROD_RANK[t.value],dir:-1};if(t.value==='Current Stock')S.rep.prodAll=true;render();return}
+  if(t.dataset.ef){S.fin.exp[t.dataset.ef]=t.value;S.rep.limit.expenses=50;render();return}
+  if(t.dataset.if){S.fin.inc[t.dataset.if]=t.value;S.rep.limit.incomes=50;render();return}
   if(t.dataset.mvf){S.rep.mv[t.dataset.mvf]=t.value;if(t.dataset.mvf==='product')S.rep.mv.variant='';render();return}
   if(t.dataset.fx){const r=parseFloat(t.value);if(r>0){DB.fxRates[t.dataset.fx]=r;persist();toast('Exchange rate updated',`1 ${t.dataset.fx} = ${r} SGD. Completed sales keep their own rate.`)}else toast('Rate not saved','Enter a number greater than 0.','error');return}
   if(t.dataset.pfilter){S.pur[t.dataset.pfilter]=t.value;rerenderKeepFocus('purQ');return}
@@ -3507,6 +3993,8 @@ document.addEventListener('input',e=>{
   if(t.id==='cntQ'){S.cnt.q=t.value;rerenderKeepFocus('cntQ');return}
   if(t.id==='retQ'){S.ret.q=t.value;rerenderKeepFocus('retQ');return}
   if(t.id==='audQ'){S.aud.q=t.value;S.audLimit=200;rerenderKeepFocus('audQ');return}
+  if(t.id==='expQ'){S.fin.exp.q=t.value;S.rep.limit.expenses=50;rerenderKeepFocus('expQ');return}
+  if(t.id==='incQ'){S.fin.inc.q=t.value;S.rep.limit.incomes=50;rerenderKeepFocus('incQ');return}
   if(t.dataset.count){const id=t.dataset.count,v=variantById(id);S.cnt.counts[id]=t.value.trim();const cell=document.querySelector(`[data-var="${id}"]`);if(cell)cell.innerHTML=varianceHtml(v,S.cnt.counts[id]);const one=document.querySelector(`[data-action=applyOneCount][data-id="${id}"]`);if(one)one.disabled=S.cnt.counts[id]==='';
     const n=Object.keys(S.cnt.counts).filter(k=>S.cnt.counts[k]!=='').length,ab=document.querySelector('[data-action=applyCounts]');if(ab){ab.disabled=!n;ab.lastChild.textContent=`Review and Apply${n?` (${n})`:''}`}const cb=document.querySelector('[data-action=clearCounts]');if(cb)cb.disabled=!n;return}
   if(t.id==='salQ'){S.sal.q=t.value;renderSalTable();const rb=document.querySelector('[data-action=resetSal]');if(rb)rb.disabled=!salFiltersActive();return}
@@ -3521,6 +4009,10 @@ document.addEventListener('submit',e=>{
     if(!/^[A-Z]{3}$/.test(c)){err.textContent='Use a 3-letter code, e.g. AUD.';return}
     if(DB.currencies.includes(c)){err.textContent='That currency is already on the list.';return}
     DB.currencies.push(c);persist();render();toast('Currency added',c);return}
+  if(e.target.id==='addExpCatForm'||e.target.id==='addIncCatForm'){e.preventDefault();const isE=e.target.id==='addExpCatForm',list=isE?DB.expenseCategories:DB.incomeCategories,n=e.target.querySelector('[name=name]').value.trim(),err=$(isE?'#expCatErr':'#incCatErr');
+    if(!n){err.textContent='Enter a category name.';return}
+    if(list.some(c=>c.toLowerCase()===n.toLowerCase())){err.textContent='That category already exists.';return}
+    list.push(n);persist();render();toast('Category added',n);return}
   if(e.target.id==='addCatForm'){e.preventDefault();const n=e.target.querySelector('[name=name]').value.trim(),err=$('#catErr');
     if(!n){err.textContent='Enter a category name.';return}
     if(DB.categories.some(c=>c.name.toLowerCase()===n.toLowerCase())){err.textContent='That category already exists.';return}

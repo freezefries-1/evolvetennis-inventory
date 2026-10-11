@@ -217,10 +217,12 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
     near(s.lines.reduce((a, l) => a + l.grossProfit, 0), 234, 'line snapshots'); near(s.lines.reduce((a, l) => a + l.cogs, 0), 566);
   });
   await check('historical profit does not change when the cost price changes', async () => {
+    const gpSale = await page.evaluate(i => saleTotals(DB.sales.find(s => s.id === i)).gpSale, saleId);
     await page.evaluate(() => { DB.variants.find(v => v.sku === 'MSV-FH-123-BLK-R').cost = 95; persist(); });
     near((await totalsOf(saleId)).gp, 234);
+    near(await page.evaluate(i => saleTotals(DB.sales.find(s => s.id === i)).gpSale, saleId), gpSale, 'sale gross profit incl. charges');
     await page.goto(FILE + '#sale-' + saleId);
-    ok((await page.textContent('.stat-strip')).includes('SGD 234.00'));
+    ok((await page.textContent('.stat-strip')).includes('SGD ' + gpSale.toLocaleString('en-SG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })));
     await page.evaluate(() => { DB.variants.find(v => v.sku === 'MSV-FH-123-BLK-R').cost = 82; persist(); });
   });
   await check('a foreign-currency sale converts revenue to SGD at its own rate', async () => {
