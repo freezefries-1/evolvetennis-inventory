@@ -3,6 +3,7 @@
 // Usage: node tests/phase6.spec.js   (needs the `playwright` package and Chromium)
 const path = require('path');
 const { chromium } = require('playwright');
+const { signIn, closeM } = require('./auth');
 
 const FILE = 'file://' + path.resolve(__dirname, '..', 'index.html');
 let passed = 0;
@@ -45,6 +46,7 @@ const RAW = `(from,to)=>{
   await page.goto(FILE);
   await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
   await page.goto(FILE + '#dashboard');
+  await signIn(page);
   await page.waitForSelector('.kpi');
 
   const raw = (from, to) => page.evaluate(([f, a, b]) => eval(f)(a, b), [RAW, from, to]);
@@ -121,7 +123,7 @@ const RAW = `(from,to)=>{
   await check('chart metric switches between revenue, units and gross profit', async () => {
     await page.goto(FILE + '#dashboard'); await setPeriod('This Month'); const x = await raw((await range()).from, today);
     await page.click('[data-tmetric="Units Sold"]'); ok((await page.textContent('#app')).includes(`${(x.units - x.ru).toLocaleString('en-SG')} units in this period`));
-    await page.click('[data-tmetric="Gross Profit"]'); ok((await page.textContent('#app')).includes(`SGD ${Math.round(x.gp).toLocaleString('en-SG')} in this period`));
+    await page.click('[data-tmetric="Gross Profit"]'); ok((await page.textContent('#app')).includes(`SGD ${Math.round(x.gp).toLocaleString('en-SG', { minimumFractionDigits: 2 })} in this period`));
     await page.click('[data-tmetric="Revenue"]');
   });
   await check('alerts open the matching report', async () => {

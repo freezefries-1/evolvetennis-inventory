@@ -2,6 +2,7 @@
 // Usage: node tests/phase4.spec.js   (needs the `playwright` package and Chromium)
 const path = require('path');
 const { chromium } = require('playwright');
+const { signIn, closeM, saveM, confirmM, ADMIN } = require('./auth');
 
 const FILE = 'file://' + path.resolve(__dirname, '..', 'index.html');
 let passed = 0;
@@ -22,14 +23,15 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
   await page.goto(FILE);
   await page.evaluate(() => localStorage.clear());
   await page.goto(FILE + '#customers');
+  await signIn(page);
   await page.waitForSelector('#app table');
 
   const db = () => page.evaluate(() => JSON.parse(JSON.stringify(DB)));
   const toastText = () => page.textContent('#toastRoot');
   const qty = sku => page.evaluate(s => DB.variants.find(v => v.sku === s).qty, sku);
   const vid = sku => page.evaluate(s => DB.variants.find(v => v.sku === s).id, sku);
-  const save = () => page.click('.modal-foot [data-action=save]');
-  const closeModal = () => page.click('.modal-foot [data-action=close]');
+  const save = () => saveM(page);
+  const closeModal = () => closeM(page);
   const formText = () => page.textContent('#mForm');
   const openSale = async () => { await page.goto(FILE + '#sales'); await page.click('.page-head [data-action=sale]'); };
   async function item(n, query, sku) {
@@ -80,7 +82,7 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
   });
   await check('deactivated customers are not offered on new sales', async () => {
     await page.goto(FILE + '#customer-c-stan');
-    await page.click('[data-action=toggleCustomer][data-id="c-stan"]');
+    await page.click('[data-action=toggleCustomer][data-id="c-stan"]'); await confirmM(page);
     ok((await toastText()).includes('Customer deactivated'));
     await openSale();
     ok(!(await page.$$eval('#mForm [name=customerId] option', o => o.map(x => x.value))).includes('c-stan'));
@@ -300,7 +302,7 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
     for (const r of ['Last 30 Days', 'Last 3 Months', 'Last 6 Months', 'This Year']) {
       await page.selectOption('#period', r);
       const exp = await page.evaluate(() => { const p = periodRange(); return Math.round(salesStats(completedBetween(p.from, p.to), returnsBetween(p.from, p.to)).total); });
-      ok((await page.textContent('#app')).includes('SGD ' + exp.toLocaleString('en-SG') + ' in this period'), r);
+      ok((await page.textContent('#app')).includes('SGD ' + exp.toLocaleString('en-SG', { minimumFractionDigits: 2 }) + ' in this period'), r);
     }
   });
   await check('top products can rank by units', async () => {

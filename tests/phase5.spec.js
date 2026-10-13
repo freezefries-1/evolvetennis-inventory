@@ -2,6 +2,7 @@
 // Usage: node tests/phase5.spec.js   (needs the `playwright` package and Chromium)
 const path = require('path');
 const { chromium } = require('playwright');
+const { signIn, closeM, saveM, confirmM, ADMIN } = require('./auth');
 
 const FILE = 'file://' + path.resolve(__dirname, '..', 'index.html');
 let passed = 0;
@@ -22,14 +23,15 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
   await page.goto(FILE);
   await page.evaluate(() => localStorage.clear());
   await page.goto(FILE + '#movements');
+  await signIn(page);
   await page.waitForSelector('#movTable table');
 
   const db = () => page.evaluate(() => JSON.parse(JSON.stringify(DB)));
   const toastText = () => page.textContent('#toastRoot');
   const qty = sku => page.evaluate(s => DB.variants.find(v => v.sku === s).qty, sku);
   const vid = sku => page.evaluate(s => DB.variants.find(v => v.sku === s).id, sku);
-  const save = () => page.click('.modal-foot [data-action=save]');
-  const closeModal = () => page.click('.modal-foot [data-action=close]');
+  const save = () => saveM(page);
+  const closeModal = () => closeM(page);
   const formText = () => page.textContent('#mForm');
   const issues = () => page.evaluate(() => ledgerCheck().length);
   const lastMove = sku => page.evaluate(s => { const v = DB.variants.find(x => x.sku === s); return JSON.parse(JSON.stringify(DB.movements.filter(m => m.variantId === v.id).sort((a, b) => a.seq - b.seq).pop())); }, sku);
@@ -69,7 +71,7 @@ const near = (a, b, msg) => { if (Math.abs(a - b) > 0.005) throw new Error(`${ms
     await page.goto(FILE + '#movements');
     await page.fill('#movQ', saleNo);
     const cells = await page.$$eval('#movTable tbody tr:first-child td', t => t.map(x => x.innerText.trim()));
-    ok(/^MOV-/.test(cells[1]) && cells[2] === 'Sale' && cells[4] === '−10' && cells[7] === saleNo && cells[8] === 'Kallang Tennis Hub' && cells[10] === 'Jasmine Koh', cells.join(' | '));
+    ok(/^MOV-/.test(cells[1]) && cells[2] === 'Sale' && cells[4] === '−10' && cells[7] === saleNo && cells[8] === 'Kallang Tennis Hub' && cells[10] === ADMIN.name, cells.join(' | '));
     await page.fill('#movQ', '');
   });
 

@@ -2,6 +2,7 @@
 // Usage: node tests/phase3.spec.js   (needs the `playwright` package and Chromium)
 const path = require('path');
 const { chromium } = require('playwright');
+const { signIn, closeM, saveM, confirmM, ADMIN } = require('./auth');
 
 const FILE = 'file://' + path.resolve(__dirname, '..', 'index.html');
 let passed = 0;
@@ -21,13 +22,14 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
   await page.goto(FILE);
   await page.evaluate(() => localStorage.clear());
   await page.goto(FILE + '#suppliers');
+  await signIn(page);
   await page.waitForSelector('#app table');
 
   const db = () => page.evaluate(() => JSON.parse(JSON.stringify(DB)));
   const toastText = () => page.textContent('#toastRoot');
   const qty = sku => page.evaluate(s => DB.variants.find(v => v.sku === s).qty, sku);
-  const save = () => page.click('.modal-foot [data-action=save]');
-  const closeModal = () => page.click('.modal-foot [data-action=close]');
+  const save = () => saveM(page);
+  const closeModal = () => closeM(page);
   const formText = () => page.textContent('#mForm');
   async function pickItem(n, query, sku) {
     const row = `#pLines [data-pline]:nth-child(${n}) `;
@@ -81,7 +83,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
   await check('deactivates a supplier and hides it from new purchases', async () => {
     const s = (await db()).suppliers.find(x => x.name === 'Osaka String Trading');
     await page.goto(FILE + '#supplier-' + s.id);
-    await page.click(`[data-action=toggleSupplier][data-id="${s.id}"]`);
+    await page.click(`[data-action=toggleSupplier][data-id="${s.id}"]`); await confirmM(page);
     ok((await toastText()).includes('Supplier deactivated'));
     await page.goto(FILE + '#purchases');
     await page.click('.page-head [data-action=purchase]');

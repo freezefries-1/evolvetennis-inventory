@@ -2,6 +2,7 @@
 // Usage: node tests/phase2.spec.js   (needs the `playwright` package and Chromium)
 const path = require('path');
 const { chromium } = require('playwright');
+const { signIn, closeM, saveM, confirmM, ADMIN } = require('./auth');
 
 const FILE = 'file://' + path.resolve(__dirname, '..', 'index.html');
 let passed = 0;
@@ -22,12 +23,13 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
   await page.goto(FILE);
   await page.evaluate(() => localStorage.clear());
   await page.goto(FILE + '#products');
+  await signIn(page);
   await page.waitForSelector('.p-card');
 
   const db = () => page.evaluate(() => JSON.parse(JSON.stringify(DB)));
   const toastText = () => page.textContent('#toastRoot');
   const variantBySku = async sku => (await db()).variants.find(v => v.sku === sku);
-  const save = () => page.click('.modal-foot [data-action=save]');
+  const save = () => saveM(page);
 
   console.log('Products');
   await check('creates a product with two variants, each with its own suggested SKU', async () => {
@@ -76,7 +78,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     await save();
     ok((await page.textContent('#mForm')).includes('already used by MSV Focus Hex'), 'duplicate warning shown');
     ok(await page.$('#mForm [name=sku].invalid'), 'field marked invalid');
-    await page.click('.modal-foot [data-action=close]');
+    await closeM(page);
   });
 
   await check('rejects duplicate SKUs within the same form', async () => {
@@ -89,7 +91,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     await page.fill('#vList [data-vbox]:nth-child(2) [name=sku]', 'DUP-1');
     await save();
     ok((await page.textContent('#mForm')).includes('Another variant in this form uses the same SKU'));
-    await page.click('.modal-foot [data-action=close]');
+    await closeM(page);
     ok(!(await db()).products.some(p => p.name === 'MSV Dupe Test'), 'nothing saved');
   });
 
@@ -102,7 +104,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     const t = await page.textContent('#mForm');
     for (const msg of ['Product name cannot be blank', 'Cost price cannot be negative', 'Selling price cannot be negative', 'Opening stock cannot be negative', 'Reorder level cannot be negative'])
       ok(t.includes(msg), 'missing: ' + msg);
-    await page.click('.modal-foot [data-action=close]');
+    await closeM(page);
   });
 
   await check('edits product information', async () => {
@@ -153,7 +155,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     await page.fill('#mForm [name=qty]', '1');
     await save();
     ok((await page.textContent('#mForm')).includes('Choose a reason'));
-    await page.click('.modal-foot [data-action=close]');
+    await closeM(page);
     eq((await variantBySku('MSV-TS-123-BLK-R')).qty, 18);
   });
 
@@ -165,7 +167,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     await page.fill('#mForm [name=notes]', 'Missing after move');
     await save();
     ok((await page.textContent('#mForm')).includes('Only 18 in stock'));
-    await page.click('.modal-foot [data-action=close]');
+    await closeM(page);
     eq((await variantBySku('MSV-TS-123-BLK-R')).qty, 18);
   });
 
@@ -240,7 +242,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     const v = await variantBySku('MSV-FH-123-BLK-R');
     await page.fill('#invQ', 'MSV-FH-123-BLK-R');
     const cells = await page.$$eval('#invTable tbody tr:first-child td', tds => tds.map(t => t.innerText.trim()));
-    eq(cells[5], String(v.qty)); eq(cells[8], 'SGD ' + (v.qty * v.cost).toLocaleString('en-SG'));
+    eq(cells[5], String(v.qty)); eq(cells[8], 'SGD ' + (v.qty * v.cost).toLocaleString('en-SG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
     await page.fill('#invQ', '');
   });
 
@@ -249,7 +251,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
     const p = (await db()).products.find(x => x.name === 'MSV Test Spin');
     await page.goto(FILE + '#product-' + p.id);
     ok(!(await page.$('[data-action=deleteProduct]')), 'no Delete when there is history');
-    await page.click(`[data-action=toggleProduct][data-id="${p.id}"]`);
+    await page.click(`[data-action=toggleProduct][data-id="${p.id}"]`); await confirmM(page);
     ok((await toastText()).includes('Product deactivated'));
     await page.goto(FILE + '#inventory');
     await page.fill('#invQ', 'MSV-TS');
@@ -263,7 +265,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
   await check('deactivates a single variant', async () => {
     const v = await variantBySku('MSV-FH-118-RED-S');
     await page.goto(FILE + '#variant-' + v.id);
-    await page.click(`[data-action=toggleVariant][data-id="${v.id}"]`);
+    await page.click(`[data-action=toggleVariant][data-id="${v.id}"]`); await confirmM(page);
     eq((await variantBySku('MSV-FH-118-RED-S')).status, 'Inactive');
     ok((await toastText()).includes('Variant deactivated'));
   });
@@ -285,7 +287,7 @@ function ok(v, msg) { if (!v) throw new Error(msg || 'assertion failed'); }
   });
 
   await check('categories can be added', async () => {
-    await page.goto(FILE + '#settings');
+    await page.goto(FILE + '#settings'); await page.click('.tabs [data-settab=inventory]');
     await page.fill('#addCatForm [name=name]', 'Bags');
     await page.click('#addCatForm button[type=submit]');
     ok((await db()).categories.some(c => c.name === 'Bags'));
