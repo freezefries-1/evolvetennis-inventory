@@ -3,6 +3,11 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B3227">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Evolve Tennis">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <title>Evolve Tennis System</title>
 <meta name="description" content="Evolve Tennis System: stock, purchasing, sales, reporting and financials for Evolve Tennis.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -514,6 +519,59 @@ div.field{display:flex;flex-direction:column;gap:7px;min-width:0}
   .field-search{max-width:none}
   .spec{grid-template-columns:120px minmax(0,1fr)}
   .chart{height:210px}
+}
+/* Phone layout: tables become labelled cards, forms open as full-height sheets with the
+   save bar always in reach, long filter lists fold away, and a tab bar sits at the bottom. */
+.mnav,.filter-toggle{display:none}
+@media (max-width:640px){
+  .input,.select,textarea.input,.search input,.toolbar .select{font-size:16px}
+  .input,.select,.btn{height:44px}.toolbar .select{height:42px}.btn.sm{height:36px}
+  .content{padding-bottom:calc(96px + env(safe-area-inset-bottom,0px))}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .kpi{padding:14px 14px 15px;gap:4px}.kpi-icon{width:28px;height:28px;border-radius:8px}.kpi-label{font-size:12.5px}
+  .kpi-value{font-size:22px}.kpi-value small{font-size:12.5px}.kpi-note{font-size:11.5px;gap:4px}
+  .stat-strip div{padding:13px 14px}.stat-strip b{font-size:17px}
+  table.cards,table.cards tbody,table.cards tfoot{display:block}
+  table.cards thead{display:none}
+  table.cards tr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 14px;padding:14px 16px;border-bottom:1px solid var(--line-soft)}
+  table.cards tbody tr:last-child{border-bottom:none}table.cards tfoot tr{background:var(--surface-2);border-top:1px solid var(--line)}
+  table.cards td{display:block;padding:0;border:0;text-align:left;white-space:normal;overflow-wrap:anywhere;min-width:0;font-size:14px}
+  table.cards td::before{content:attr(data-label);display:block;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3);margin-bottom:3px}
+  table.cards td[data-label=""]::before{display:none}
+  table.cards td:first-child,table.cards td.wide{grid-column:1/-1}
+  table.cards td:first-child::before{display:none}
+  table.cards td:first-child{font-weight:600;font-size:15px}
+  table.cards td:empty{display:none}
+  table.cards td .input,table.cards td .select{width:100%}
+  table.cards tr.click:active{background:var(--surface-2)}
+  .table-wrap.scroll-y{max-height:none}
+  .toolbar{padding:14px 16px}
+  .toolbar.fold:not(.open)>*:not(.field-search):not(.seg):not(.filter-toggle){display:none}
+  .toolbar.fold .filter-toggle{display:inline-flex}
+  .toolbar.fold .field-search{flex:1 1 160px}
+  .filter-toggle b{display:inline-grid;place-items:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:var(--brand);color:#fff;font-size:11.5px}
+  .scrim{padding:24px 0 0;flex-direction:column;align-items:stretch;justify-content:flex-start}
+  .modal,.modal.narrow{max-width:none;max-height:none;margin-top:auto;border-radius:16px 16px 0 0;border-left:0;border-right:0;border-bottom:0}
+  .modal-head{padding:18px 16px 0}.modal-head h2{font-size:18px}
+  .modal-body{padding:18px 16px;gap:18px}
+  .modal-foot{position:sticky;bottom:0;z-index:2;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-radius:0}
+  .modal-foot .btn{flex:1 1 auto}
+  .s-line[data-sline],.p-line[data-pline]{border:1px solid var(--line);border-radius:10px;padding:12px;background:var(--surface)}
+  .s-line[data-sline]>:not(:first-child)::before,.p-line[data-pline]>:not(:first-child)::before{display:block;font-size:10.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--fg-3);margin-bottom:3px}
+  .s-line[data-sline] .line-total,.p-line[data-pline] .line-total{padding-top:0}
+  .s-line[data-sline]>.icon-btn,.p-line[data-pline]>.icon-btn{grid-column:1/-1;justify-self:end;margin:-6px -6px -6px 0}
+  .s-line[data-sline]>.icon-btn::before,.p-line[data-pline]>.icon-btn::before{display:none!important}
+  .s-line[data-sline]>:nth-child(2)::before{content:'Quantity'}
+  .s-line[data-sline]>:nth-child(3)::before{content:'Selling Price'}
+  .s-line[data-sline]>:nth-child(4)::before{content:'Discount'}
+  .s-line[data-sline]>:nth-child(5)::before{content:'Line Total'}
+  .p-line[data-pline]>:nth-child(2)::before{content:'Quantity'}
+  .p-line[data-pline]>:nth-child(3)::before{content:'Unit Cost'}
+  .p-line[data-pline]>:nth-child(4)::before{content:'Line Total'}
+  .mnav{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));position:fixed;left:0;right:0;bottom:0;z-index:22;background:var(--surface);border-top:1px solid var(--line);padding:6px 4px calc(6px + env(safe-area-inset-bottom,0px));box-shadow:0 -4px 16px rgba(11,50,39,.06)}
+  .mnav a,.mnav button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border:0;background:none;font:inherit;font-size:11px;font-weight:600;color:var(--fg-3);text-decoration:none;border-radius:10px;cursor:pointer;min-height:48px;justify-content:center}
+  .mnav [aria-current="page"]{color:var(--brand-ink,var(--brand))}
+  .mnav [aria-current="page"] .i{color:var(--brand)}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -4946,6 +5004,49 @@ function salesBridge(st,extra=''){return `<div class="summary"><div><span>Gross 
 const rangeWarn = ()=>`<div class="notice" role="alert" style="margin:16px 22px">${ic('triangle-alert','i i-sm')}The From date is after the To date, so nothing can match. Swap the dates to see results.</div>`;
 
 applyFormatSettings(DB);
+/* Phone layout helpers. Tables get a label per cell so they can show as cards; long filter
+   lists fold behind a Filters button (kept open across re-renders); a bottom tab bar
+   covers the main sections and opens the full menu. */
+const PHONE=window.matchMedia('(max-width:640px)');
+const openFilters=new Set();
+function cardTables(root){
+  root.querySelectorAll('table:not(.perm-table)').forEach(t=>{
+    const hr=t.tHead&&t.tHead.rows[t.tHead.rows.length-1]; if(!hr) return;
+    let heads=null; const H=()=>heads||(heads=[...hr.cells].flatMap(c=>Array(c.colSpan||1).fill(c.textContent.trim())));
+    [...t.tBodies,...(t.tFoot?[t.tFoot]:[])].forEach(b=>[...b.rows].forEach(r=>{if(r.dataset.lb)return;r.dataset.lb='1';let i=0;[...r.cells].forEach(c=>{const span=c.colSpan||1;c.dataset.label=span>1?'':(H()[i]||'');if(span>1)c.classList.add('wide');i+=span})}));
+    t.classList.add('cards');
+  });
+}
+function filterCount(tb){return [...tb.querySelectorAll('select')].filter(x=>x.selectedIndex>0).length+[...tb.querySelectorAll('input[type=date]')].filter(x=>x.value).length+[...tb.querySelectorAll('input[type=checkbox]')].filter(x=>x.checked).length}
+function foldToolbars(root){
+  root.querySelectorAll('.toolbar').forEach((tb,i)=>{
+    if(tb.dataset.fold) return; tb.dataset.fold='1';
+    const n=tb.querySelectorAll('select,input[type=date]').length; if(n<2) return;
+    const key=route()[0]+'|'+i; tb.classList.add('fold'); tb.dataset.foldkey=key;
+    const b=document.createElement('button'); b.type='button'; b.className='btn filter-toggle'; b.setAttribute('aria-expanded','false');
+    const fs=tb.querySelector('.field-search'); fs?fs.after(b):tb.prepend(b);
+    if(openFilters.has(key)) tb.classList.add('open');
+    paintToggle(tb);
+  });
+}
+function paintToggle(tb){const b=tb.querySelector('.filter-toggle');if(!b)return;const n=filterCount(tb),open=tb.classList.contains('open');b.setAttribute('aria-expanded',String(open));b.innerHTML=`${ic('sliders-horizontal','i i-sm')}${open?'Hide Filters':'Filters'}${n?`<b>${n}</b>`:''}`;refreshIcons()}
+document.addEventListener('click',e=>{const b=e.target.closest('.filter-toggle');if(!b)return;const tb=b.closest('.toolbar');tb.classList.toggle('open');const k=tb.dataset.foldkey;tb.classList.contains('open')?openFilters.add(k):openFilters.delete(k);paintToggle(tb)});
+document.addEventListener('change',e=>{const tb=e.target.closest&&e.target.closest('.toolbar.fold');if(tb)paintToggle(tb)});
+const MNAV=[['dashboard','Home','layout-dashboard'],['inventory','Stock','boxes'],['sales','Sales','receipt'],['purchases','Purchases','truck']];
+const MNAV_OF={variant:'inventory',movements:'inventory',movement:'inventory',product:'inventory',products:'inventory',sale:'sales',customers:'sales',customer:'sales',returns:'sales',return:'sales',purchase:'purchases',suppliers:'purchases',supplier:'purchases',sreturn:'purchases'};
+function paintMnav(){
+  let bar=$('#mnav'); if(!bar){bar=document.createElement('nav');bar.id='mnav';bar.className='mnav';bar.setAttribute('aria-label','Main sections');$('#shell').appendChild(bar)}
+  const r=route()[0], cur=MNAV_OF[r]||r, items=MNAV.filter(([k])=>canRoute(k));
+  const sig=JSON.stringify([cur,items.map(x=>x[0])]); if(bar.dataset.sig===sig) return; bar.dataset.sig=sig;
+  bar.style.gridTemplateColumns=`repeat(${items.length+1},minmax(0,1fr))`;
+  bar.innerHTML=items.map(([k,l,i])=>`<a href="#${k}"${cur===k?' aria-current="page"':''}>${ic(i)}${l}</a>`).join('')+`<button type="button" id="mnavMore" aria-label="Open menu">${ic('menu')}Menu</button>`;
+  refreshIcons();
+}
+document.addEventListener('click',e=>{if(e.target.closest('#mnavMore'))$('#shell').classList.add('open')});
+let phoneQueued=false;
+function phonePass(){phoneQueued=false;const app=$('#app');if(app){cardTables(app);foldToolbars(app)}const m=$('.modal');if(m)cardTables(m);if(typeof ME!=='undefined'&&ME)paintMnav();const gs=$('#globalSearchInput');if(gs){if(!gs.dataset.ph)gs.dataset.ph=gs.placeholder;gs.placeholder=PHONE.matches?'Search':gs.dataset.ph}}
+new MutationObserver(()=>{if(!phoneQueued){phoneQueued=true;requestAnimationFrame(phonePass)}}).observe(document.body,{childList:true,subtree:true});
+PHONE.addEventListener('change',phonePass);
 if(!BOOT_RAW||BOOT_VER!==DB.version) persist();
 lastRoute=route()[0];
 render();

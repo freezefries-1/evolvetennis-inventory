@@ -9,6 +9,8 @@ src=design/msv-inventory.html
 split=$(grep -n '</style>' "$src" | head -1 | cut -d: -f1)
 {
   printf '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n'
+  # Phone: green browser bar, and a proper name and icon when added to the home screen.
+  printf '<meta name="theme-color" content="#0B3227">\n<meta name="mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-title" content="Evolve Tennis">\n<link rel="apple-touch-icon" href="apple-touch-icon.png">\n'
   head -n "$split" "$src"
   printf '</head>\n<body>\n'
   tail -n +"$((split + 1))" "$src"
