@@ -3,6 +3,7 @@
 // Usage: node tests/phase7.spec.js   (needs the `playwright` package and Chromium)
 const path = require('path');
 const { chromium } = require('playwright');
+const { signIn, closeM, saveM, confirmM, ADMIN } = require('./auth');
 
 const FILE = 'file://' + path.resolve(__dirname, '..', 'index.html');
 let passed = 0;
@@ -41,12 +42,13 @@ const RAW = `(from,to)=>{
   await page.goto(FILE);
   await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); });
   await page.goto(FILE + '#dashboard');
+  await signIn(page);
   await page.waitForSelector('.kpi');
 
   const raw = (from, to) => page.evaluate(([f, a, b]) => eval(f)(a, b), [RAW, from, to]);
   const range = () => page.evaluate(() => periodRange());
   const db = () => page.evaluate(() => JSON.parse(JSON.stringify(DB)));
-  const save = () => page.click('.modal-foot [data-action=save]');
+  const save = () => saveM(page);
   const toastText = () => page.textContent('#toastRoot');
   const kpis = () => page.$$eval('.kpi .kpi-value', e => e.map(x => num(x.innerText)));
   const strip = () => page.$$eval('.stat-strip > div b', e => e.map(x => num(x.innerText)));
@@ -316,7 +318,7 @@ const RAW = `(from,to)=>{
   await check('existing data upgrades to the financial version without losing records', async () => {
     const counts = await page.evaluate(() => { const d = JSON.parse(JSON.stringify(DB)); d.version = 6; delete d.expenses; delete d.incomes; delete d.expenseCategories; delete d.incomeCategories; localStorage.setItem('msv-inventory-v2', JSON.stringify(d)); return { s: d.sales.length, m: d.movements.length }; });
     await page.goto(FILE + '#dashboard'); await page.reload(); await page.waitForSelector('.kpi');
-    const d = await db(); eq(d.version, 7); eq(d.expenses.length, 0); eq(d.sales.length, counts.s); eq(d.movements.length, counts.m); ok(d.expenseCategories.includes('Marketplace Fees'));
+    const d = await db(); eq(d.version, 8); eq(d.expenses.length, 0); eq(d.sales.length, counts.s); eq(d.movements.length, counts.m); ok(d.expenseCategories.includes('Marketplace Fees'));
   });
   await check('no script errors', async () => eq(errors.length, 0, errors.join(' | ')));
 
